@@ -1,4 +1,5 @@
 import hashlib
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import text
@@ -17,6 +18,7 @@ from app.schemas.auth import (
     LoginRequest,
     SessionResponse,
     SetupAccountRequest,
+    SignupRequest,
     UpdateHouseholdNameRequest,
 )
 from app.security import (
@@ -135,6 +137,55 @@ def setup_account(
     token, expires_at = create_session_token(str(row["household_id"]), payload.username)
     set_session_cookie(response, token)
     return _to_session_response(str(row["household_id"]), row["household_name"], payload.username, expires_at)
+
+
+@router.post("/signup", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
+def signup(
+    payload: SignupRequest,
+    request: Request,
+    response: Response,
+    conn: Connection = Depends(get_owner_db),
+) -> SessionResponse:
+    key = f"signup:{request.client.host if request.client else 'unknown'}"
+    if is_rate_limited(key):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=RATE_LIMIT_ERROR)
+
+    if payload.password != payload.confirm_password:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Passwords do not match.")
+
+    existing = conn.execute(
+        text("select 1 from users where username = :username"), {"username": payload.username}
+    ).first()
+    if existing:
+        register_failed_attempt(key)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="That username is already taken.")
+
+    household_id = uuid.uuid4()
+    conn.execute(
+        text(
+            """
+            insert into users
+                (household_id, household_name, username, password_hash,
+                 security_question, security_answer_hash, status)
+            values
+                (:household_id, :household_name, :username, :password_hash,
+                 :security_question, :security_answer_hash, 'active')
+            """
+        ),
+        {
+            "household_id": household_id,
+            "household_name": payload.household_name,
+            "username": payload.username,
+            "password_hash": hash_secret(payload.password),
+            "security_question": payload.security_question,
+            "security_answer_hash": hash_secret(payload.security_answer.strip().lower()),
+        },
+    )
+
+    clear_attempts(key)
+    token, expires_at = create_session_token(str(household_id), payload.username)
+    set_session_cookie(response, token)
+    return _to_session_response(str(household_id), payload.household_name, payload.username, expires_at)
 
 
 @router.post("/forgot-password/question", response_model=ForgotPasswordQuestionResponse)

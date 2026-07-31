@@ -36,3 +36,22 @@ class NetWorthPoint(BaseModel):
     assets: Decimal
     liabilities: Decimal
     net_worth: Decimal
+
+
+class BalanceImportRowError(BaseModel):
+    row_number: int
+    raw: dict[str, str]
+    reason: str
+
+
+class BalanceImportResult(BaseModel):
+    inserted_count: int
+    errors: list[BalanceImportRowError]
+
+
+class BulkBalanceImportResult(BaseModel):
+    needs_mapping: bool
+    distinct_accounts: list[str] | None = None
+    inserted_count: int | None = None
+    skipped_count: int | None = None
+    errors: list[BalanceImportRowError] = []

@@ -41,17 +41,21 @@ def main() -> None:
     print("Connecting to Supabase and applying schema.sql ...")
     with psycopg.connect(database_url, autocommit=True) as conn:
         with conn.cursor() as cur:
+            cur.execute("select 1 from pg_catalog.pg_roles where rolname = 'app_user'")
+            role_existed_already = cur.fetchone() is not None
             cur.execute(schema_sql)
     print("Schema applied successfully.")
 
-    if generated:
+    if generated and not role_existed_already:
         print("\nGenerated app_user password (save this for TENANT_DATABASE_URL):")
         print(f"  {app_user_password}")
-    print(
-        "\nBuild TENANT_DATABASE_URL by taking your DATABASE_URL and swapping the "
-        "username to app_user and the password to the one above, e.g.:\n"
-        "  postgresql://app_user:<password>@<host>:<port>/postgres"
-    )
+        print(
+            "\nBuild TENANT_DATABASE_URL by taking your DATABASE_URL and swapping the "
+            "username to app_user and the password to the one above, e.g.:\n"
+            "  postgresql://app_user:<password>@<host>:<port>/postgres"
+        )
+    elif role_existed_already:
+        print("\napp_user already existed — its password is unchanged; TENANT_DATABASE_URL in .env is still valid.")
 
 
 if __name__ == "__main__":

@@ -35,7 +35,7 @@ export function CompoundGrowthCalculator() {
       <div className="w-full md:w-56 flex-none flex flex-col gap-3">
         <NumField label="Starting principal" value={inputs.principal} onChange={(v) => setInputs((i) => ({ ...i, principal: v }))} />
         <NumField label="Monthly contribution" value={inputs.monthly_contribution} onChange={(v) => setInputs((i) => ({ ...i, monthly_contribution: v }))} />
-        <NumField label="Annual return rate" value={inputs.annual_rate} step="0.001" onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
+        <NumField label="Annual return rate" value={inputs.annual_rate} percent onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
         <NumField label="Years" value={inputs.years} onChange={(v) => setInputs((i) => ({ ...i, years: v }))} />
       </div>
       <div className="flex-1 flex flex-col gap-3 min-w-0">

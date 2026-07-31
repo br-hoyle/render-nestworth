@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
-import type { Account, HouseholdSettings, IncomeRecord, Scenario, TransactionRecord } from "@/lib/types";
+import type { Account, HouseholdSettings, IncomeRecord, TransactionListResponse } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
@@ -112,13 +112,13 @@ export default function SettingsPage() {
   async function exportData() {
     setExporting(true);
     try {
-      const [accounts, income, transactions, scenarios] = await Promise.all([
+      const [accounts, income, transactionPage] = await Promise.all([
         api.get<Account[]>("/accounts?filter=all"),
         api.get<IncomeRecord[]>("/income"),
-        api.get<TransactionRecord[]>("/transactions?limit=1000"),
-        api.get<Scenario[]>("/scenarios"),
+        api.get<TransactionListResponse>("/transactions?limit=1000"),
       ]);
-      const blob = new Blob([JSON.stringify({ accounts, income, transactions, scenarios }, null, 2)], {
+      const transactions = transactionPage.items;
+      const blob = new Blob([JSON.stringify({ accounts, income, transactions }, null, 2)], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);

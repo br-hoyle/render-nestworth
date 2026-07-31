@@ -24,7 +24,7 @@ function downloadErrorsCsv(preview: ImportPreviewResponse) {
   URL.revokeObjectURL(url);
 }
 
-export default function ImportPage() {
+export function ImportWizard({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
   const [step, setStep] = useState<Step>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [mapping, setMapping] = useState<Record<string, string>>({});
@@ -91,6 +91,7 @@ export default function ImportPage() {
     try {
       await api.delete(`/transactions/import/${encodeURIComponent(committed.sourceFile)}`);
       reset();
+      onDone();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not undo.");
     } finally {
@@ -119,16 +120,17 @@ export default function ImportPage() {
     tab === "new" ? visibleRows.filter((r) => r.status === "new") : tab === "dupes" ? visibleRows.filter((r) => r.status === "dupe") : visibleRows;
 
   return (
-    <div className="p-4 md:p-6 max-w-3xl flex flex-col gap-4">
+    <div className="rounded-lg border border-nw-border bg-nw-rail p-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-medium">Import transactions</h1>
+        <h2 className="text-sm font-medium">Import transactions</h2>
         <div className="flex items-center gap-2 text-xs text-nw-muted">
-          <StepDot n={1} active={step === "upload" || step === "mapping"} done={step === "preview" || step === "done"} />
+          <StepDot active={step === "upload" || step === "mapping"} done={step === "preview" || step === "done"} />
           Upload
-          <StepDot n={2} active={step === "preview"} done={step === "done"} />
+          <StepDot active={step === "preview"} done={step === "done"} />
           Preview
-          <StepDot n={3} active={step === "done"} done={false} />
+          <StepDot active={step === "done"} done={false} />
           Confirm
+          <button onClick={onCancel} className="ml-2 text-nw-muted">✕</button>
         </div>
       </div>
 
@@ -271,8 +273,13 @@ export default function ImportPage() {
             <Button onClick={handleUndo} disabled={busy}>
               Undo this import
             </Button>
-            <Button variant="primary" onClick={reset}>
-              Import another file
+            <Button
+              variant="primary"
+              onClick={() => {
+                onDone();
+              }}
+            >
+              Done
             </Button>
           </div>
         </div>
@@ -281,7 +288,7 @@ export default function ImportPage() {
   );
 }
 
-function StepDot({ active, done }: { n: number; active: boolean; done: boolean }) {
+function StepDot({ active, done }: { active: boolean; done: boolean }) {
   return (
     <span
       className={

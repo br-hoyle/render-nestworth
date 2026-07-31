@@ -6,9 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 const MANAGE_LINKS = [
   { href: "/accounts", label: "Accounts" },
   { href: "/income", label: "Income" },
-  { href: "/balances", label: "Balances history" },
   { href: "/transactions", label: "Transactions" },
-  { href: "/import", label: "Import CSV" },
 ];
 
 export default function MorePage() {

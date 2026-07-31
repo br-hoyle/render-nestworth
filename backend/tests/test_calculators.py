@@ -3,12 +3,22 @@ from decimal import Decimal
 
 from app.services.calculators import (
     compound_growth,
+    debt_acceleration,
+    debt_consolidation,
     debt_payoff,
     emergency_fund,
+    financial_independence,
     house_affordability,
+    interest_rate_solver,
+    loan,
     mortgage,
     rebalancing,
+    refinance,
     retirement,
+    roth_ira,
+    simple_interest,
+    target_emergency_fund,
+    traditional_ira,
 )
 
 
@@ -107,3 +117,131 @@ def test_rebalancing_trades_move_toward_target():
     )
     assert trades["trades"]["stocks"] < 0  # sell stocks
     assert trades["trades"]["bonds"] > 0  # buy bonds
+
+
+# --- Backlog pass 2 additions ---
+
+
+def test_loan_matches_mortgage_payment_formula():
+    # Same $200k/6%/30yr reference point as the mortgage test above.
+    result = loan.compute(Decimal("200000"), Decimal("0.06"), 30)
+    assert abs(result["monthly_payment"] - Decimal("1199.10")) < Decimal("0.05")
+    assert result["total_paid"] > Decimal("200000")
+    assert result["yearly_schedule"][-1]["balance"] == Decimal("0.00")
+
+
+def test_refinance_lower_rate_saves_money():
+    result = refinance.compute(
+        current_balance=Decimal("300000"),
+        current_rate=Decimal("0.07"),
+        current_remaining_years=25,
+        new_rate=Decimal("0.05"),
+        new_term_years=25,
+        closing_costs=Decimal("5000"),
+    )
+    assert result["monthly_savings"] > 0
+    assert result["breakeven_months"] is not None and result["breakeven_months"] > 0
+    assert result["lifetime_interest_saved"] > 0
+
+
+def test_interest_rate_solver_recovers_known_rate():
+    # Build a payment at a known 6% rate, then confirm the solver recovers ~6%.
+    known_payment = mortgage.monthly_payment(Decimal("200000"), Decimal("0.06"), 30)
+    result = interest_rate_solver.compute(Decimal("200000"), known_payment, 30)
+    assert abs(result["annual_rate_pct"] - 6.0) < 0.05
+
+
+def test_interest_rate_solver_payment_too_low_returns_error():
+    result = interest_rate_solver.compute(Decimal("200000"), Decimal("100"), 30)
+    assert result["error"] is not None
+    assert result["annual_rate_pct"] is None
+
+
+def test_roth_ira_caps_contribution_at_annual_limit():
+    result = roth_ira.compute(Decimal("0"), Decimal("50000"), 1, Decimal("0.07"))
+    assert result["contribution_capped"] is True
+    assert result["total_contributions"] == roth_ira.ANNUAL_LIMIT
+
+
+def test_traditional_ira_growth_matches_roth_math():
+    result = traditional_ira.compute(Decimal("10000"), Decimal("7000"), 10, Decimal("0.07"))
+    assert result["final_balance"] > result["total_contributions"] + Decimal("10000")
+
+
+def test_simple_interest_no_compounding():
+    result = simple_interest.compute(Decimal("1000"), Decimal("0.05"), Decimal("2"))
+    assert result["interest"] == Decimal("100.00")
+    assert result["total"] == Decimal("1100.00")
+
+
+def test_debt_consolidation_blended_rate():
+    result = debt_consolidation.compute(
+        debts=[
+            {"balance": "10000", "annual_rate": "0.20", "monthly_payment": "300"},
+            {"balance": "10000", "annual_rate": "0.10", "monthly_payment": "250"},
+        ],
+        new_rate=Decimal("0.12"),
+        new_term_years=5,
+    )
+    assert result["total_balance"] == Decimal("20000.00")
+    assert abs(result["blended_current_rate_pct"] - 15.0) < 0.01
+    assert result["current_total_monthly_payment"] == Decimal("550.00")
+
+
+def test_financial_independence_already_fi():
+    result = financial_independence.compute(
+        current_net_worth=Decimal("2000000"),
+        annual_savings=Decimal("0"),
+        annual_expenses=Decimal("40000"),
+        withdrawal_rate=Decimal("0.04"),
+    )
+    assert result["already_fi"] is True
+    assert result["years_to_fi"] == 0
+
+
+def test_financial_independence_projects_forward():
+    result = financial_independence.compute(
+        current_net_worth=Decimal("100000"),
+        annual_savings=Decimal("50000"),
+        annual_expenses=Decimal("40000"),
+        expected_return=Decimal("0.05"),
+        withdrawal_rate=Decimal("0.04"),
+    )
+    assert result["already_fi"] is False
+    assert result["years_to_fi"] is not None
+    assert result["years_to_fi"] > 0
+
+
+def test_debt_acceleration_avalanche_beats_baseline():
+    debts = [
+        {"balance": "5000", "annual_rate": "0.22", "minimum_payment": "100"},
+        {"balance": "8000", "annual_rate": "0.06", "minimum_payment": "150"},
+    ]
+    result = debt_acceleration.compute(debts, extra_payment=Decimal("200"))
+    assert result["months_saved_avalanche"] > 0
+    assert result["months_saved_snowball"] > 0
+    # Avalanche (highest rate first) should never accrue more interest than snowball here,
+    # since the high-rate debt is also the smaller balance in this example.
+    assert result["avalanche_total_interest"] <= result["snowball_total_interest"]
+
+
+def test_target_emergency_fund_already_met():
+    result = target_emergency_fund.compute(
+        current_liquid_balance=Decimal("30000"),
+        monthly_expense=Decimal("4000"),
+        target_months=Decimal("6"),
+        months_to_reach_goal=12,
+    )
+    assert result["already_met"] is True
+    assert result["required_monthly_contribution"] == Decimal(0)
+
+
+def test_target_emergency_fund_required_contribution():
+    result = target_emergency_fund.compute(
+        current_liquid_balance=Decimal("0"),
+        monthly_expense=Decimal("2000"),
+        target_months=Decimal("6"),
+        months_to_reach_goal=12,
+    )
+    assert result["target_amount"] == Decimal("12000.00")
+    assert result["required_monthly_contribution"] == Decimal("1000.00")

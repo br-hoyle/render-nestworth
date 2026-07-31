@@ -56,7 +56,7 @@ export function MortgageCalculator() {
     <div className="flex flex-col md:flex-row gap-4">
       <div className="w-full md:w-56 flex-none flex flex-col gap-3">
         <NumField label="Principal" value={inputs.principal} onChange={(v) => setInputs((i) => ({ ...i, principal: v }))} />
-        <NumField label="Rate" value={inputs.annual_rate} step="0.001" onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
+        <NumField label="Rate" value={inputs.annual_rate} percent onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
         <NumField label="Term (years)" value={inputs.term_years} onChange={(v) => setInputs((i) => ({ ...i, term_years: v }))} />
         <TextField
           label="Start date"

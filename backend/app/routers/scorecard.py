@@ -19,12 +19,20 @@ METRICS = [
     ("liquidity_ratio", "Liquidity ratio", "Safety", "ratio", kpi_service.liquidity_ratio),
     ("housing_cost_ratio", "Housing cost ratio", "Safety", "percent", kpi_service.housing_cost_ratio),
     ("savings_rate", "Savings rate", "Growth", "percent", kpi_service.savings_rate),
-    ("retirement_contribution_rate", "Retirement contribution rate", "Growth", "percent", kpi_service.retirement_contribution_rate),
     ("net_worth_growth_yoy", "Net worth growth (YoY)", "Growth", "percent", kpi_service.net_worth_growth_yoy),
     ("fi_progress", "FI progress", "Growth", "percent", kpi_service.fi_progress),
     ("debt_to_income", "Debt-to-income", "Debt & mix", "percent", kpi_service.debt_to_income),
     ("debt_payoff_runway", "Debt payoff runway", "Debt & mix", "months", kpi_service.debt_payoff_runway_months),
     ("net_worth", "Net worth", "Debt & mix", "dollars", kpi_service.net_worth_value),
+    # Backlog pass 2 additions:
+    ("debt_to_assets_ratio", "Debt-to-assets", "Efficiency", "percent", kpi_service.debt_to_assets_ratio),
+    ("capital_deployment_rate", "Capital deployment rate", "Efficiency", "percent", kpi_service.capital_deployment_rate),
+    ("liquid_runway", "Liquid runway", "Efficiency", "months", kpi_service.liquid_runway_months),
+    ("savings_efficiency", "Savings efficiency", "Efficiency", "percent", kpi_service.savings_efficiency),
+    ("net_worth_velocity", "Net worth velocity", "Efficiency", "percent", kpi_service.net_worth_velocity),
+    ("needs_ratio", "Needs", "Budget rule", "percent", kpi_service.needs_ratio),
+    ("wants_ratio", "Wants", "Budget rule", "percent", kpi_service.wants_ratio),
+    ("savings_ratio", "Savings", "Budget rule", "percent", kpi_service.savings_ratio),
 ]
 
 
@@ -80,9 +88,7 @@ def transaction_sums(conn: Connection, household_id: str, start: date, end: date
             select
                 coalesce(sum(amount) filter (where type = 'income'), 0) as income,
                 coalesce(sum(-amount) filter (where type = 'expense'), 0) as expense,
-                coalesce(sum(-amount) filter (where type = 'expense' and ("group" ilike '%housing%' or item ilike '%mortgage%')), 0) as housing,
-                coalesce(sum(-amount) filter (where type = 'expense' and "group" ilike '%retirement%'), 0) as retirement,
-                count(*) filter (where type = 'expense' and "group" ilike '%retirement%') as retirement_count
+                coalesce(sum(-amount) filter (where type = 'expense' and ("group" ilike '%housing%' or item ilike '%mortgage%')), 0) as housing
             from transactions
             where household_id = :household_id and date >= :start and date <= :end
             """
@@ -92,8 +98,45 @@ def transaction_sums(conn: Connection, household_id: str, start: date, end: date
     return row
 
 
+def classified_expense_sums(conn: Connection, household_id: str, start: date, end: date) -> dict:
+    """Sums expense transactions by flow_type (needs/wants/savings), joining
+    transaction_categories on an exact group+item rule first, falling back to a
+    group-level rule (item = ''). Returns has_classified=False when the household hasn't
+    classified anything yet, so KPIs can fall back gracefully rather than showing all-zero."""
+    row = conn.execute(
+        text(
+            """
+            with joined as (
+                select t.amount,
+                    coalesce(tc_item.flow_type, tc_group.flow_type) as flow_type
+                from transactions t
+                left join transaction_categories tc_item
+                    on tc_item.household_id = t.household_id
+                    and tc_item."group" = coalesce(t."group", '')
+                    and tc_item.item = coalesce(t.item, '')
+                left join transaction_categories tc_group
+                    on tc_group.household_id = t.household_id
+                    and tc_group."group" = coalesce(t."group", '')
+                    and tc_group.item = ''
+                where t.household_id = :household_id
+                    and t.type = 'expense'
+                    and t.date >= :start and t.date <= :end
+            )
+            select
+                coalesce(sum(-amount) filter (where flow_type = 'needs'), 0) as needs,
+                coalesce(sum(-amount) filter (where flow_type = 'wants'), 0) as wants,
+                coalesce(sum(-amount) filter (where flow_type = 'savings'), 0) as savings,
+                count(*) filter (where flow_type is not null) as classified_count
+            from joined
+            """
+        ),
+        {"household_id": household_id, "start": start, "end": end},
+    ).mappings().first()
+    return row
+
+
 def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings: dict) -> KpiInputs:
-    total_assets, total_liabilities, assets_by_category, balance_by_type = balances_totals_at(conn, household_id, as_of)
+    total_assets, total_liabilities, _, balance_by_type = balances_totals_at(conn, household_id, as_of)
 
     liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
     cash_types = {t.lower() for t in settings.get("cash_account_types", [])}
@@ -123,7 +166,17 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
     else:
         trailing_expense = txn["expense"]
 
-    retirement_trailing = txn["retirement"] if txn["retirement_count"] > 0 else None
+    classified = classified_expense_sums(conn, household_id, window_start, as_of)
+    has_classified = classified["classified_count"] > 0
+    needs_trailing = classified["needs"] if has_classified else None
+    wants_trailing = classified["wants"] if has_classified else None
+    savings_trailing = classified["savings"] if has_classified else None
+
+    # Fixed 12-month window for Savings Efficiency / Net Worth Velocity, independent of the
+    # expense_basis-driven trailing window above (matches net_worth_growth_yoy's 1yr compare).
+    txn_12mo = transaction_sums(conn, household_id, one_year_ago, as_of)
+    gross_income_12mo = txn_12mo["income"]
+    net_income_12mo = txn_12mo["income"] - txn_12mo["expense"]
 
     return KpiInputs(
         net_worth=net_worth,
@@ -132,15 +185,18 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
         total_liabilities=total_liabilities,
         liquid_balance=liquid_balance,
         cash_balance=cash_balance,
-        assets_by_category=assets_by_category,
         gross_annual_income=gross_annual_income,
         trailing_income=trailing_income,
         trailing_expense=trailing_expense,
         trailing_months=window_months,
         housing_expense_trailing=txn["housing"],
-        retirement_contribution_trailing=retirement_trailing,
         liability_reduction_trailing_6mo=liability_reduction_6mo,
         settings=settings,
+        needs_expense_trailing=needs_trailing,
+        wants_expense_trailing=wants_trailing,
+        savings_flow_trailing=savings_trailing,
+        gross_income_trailing_12mo=gross_income_12mo,
+        net_income_trailing_12mo=net_income_12mo,
     )
 
 
@@ -166,11 +222,6 @@ def get_scorecard(
     for slug, label, group, unit, fn in METRICS:
         value, color = fn(inputs)
         metrics.append(KpiMetric(slug=slug, label=label, group=group, value=value, unit=unit, color=color))
-
-    mix = kpi_service.allocation_mix(inputs)
-    metrics.append(
-        KpiMetric(slug="allocation_mix", label="Allocation mix", group="Debt & mix", value=None, unit="mix", color="green", mix=mix)
-    )
 
     return ScorecardResponse(as_of=today.isoformat(), metrics=metrics)
 

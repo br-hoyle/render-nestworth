@@ -45,3 +45,13 @@ class StaleAccountInfo(BaseModel):
     last_real_date: date | None
     days_stale: int | None
     is_stale: bool
+
+
+class SparklinePoint(BaseModel):
+    full_date: date
+    balance: Decimal
+
+
+class AccountSparkline(BaseModel):
+    account_id: uuid.UUID
+    points: list[SparklinePoint]

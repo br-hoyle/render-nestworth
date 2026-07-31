@@ -195,14 +195,12 @@ export default function UpdatePage() {
         <Button variant="primary" disabled={!balance || submitting} onClick={handleSaveAndNext}>
           {submitting ? "Saving…" : "Save & next"}
         </Button>
-        <div className="flex gap-2">
-          <Button className="flex-1" onClick={advance}>
-            Skip
-          </Button>
-          <Button className="flex-1" onClick={handleClosed}>
-            Closed
-          </Button>
-        </div>
+        <Button className="w-full" onClick={handleClosed}>
+          Account closed
+        </Button>
+        <p className="text-xs text-nw-muted text-center">
+          Every active account needs a balance before you can finish — there's no skipping.
+        </p>
       </div>
     </div>
   );

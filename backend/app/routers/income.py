@@ -52,9 +52,9 @@ def create_income(
     rows = conn.execute(
         text(
             "select income_id, effective_start_date, effective_end_date from income "
-            "where household_id = :household_id and individual = :individual"
+            "where household_id = :household_id and individual = :individual and company = :company"
         ),
-        {"household_id": session.household_id, "individual": payload.individual},
+        {"household_id": session.household_id, "individual": payload.individual, "company": payload.company},
     ).mappings().all()
     existing = [DateRange(r["effective_start_date"], r["effective_end_date"]) for r in rows]
     new_range = DateRange(payload.effective_start_date, payload.effective_end_date)

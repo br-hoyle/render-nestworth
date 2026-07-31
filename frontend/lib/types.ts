@@ -28,6 +28,24 @@ export interface StaleAccountInfo {
   is_stale: boolean;
 }
 
+export interface AccountSparkline {
+  account_id: string;
+  points: { full_date: string; balance: string }[];
+}
+
+export interface BalanceImportResult {
+  inserted_count: number;
+  errors: { row_number: number; raw: Record<string, string>; reason: string }[];
+}
+
+export interface BulkBalanceImportResult {
+  needs_mapping: boolean;
+  distinct_accounts: string[] | null;
+  inserted_count: number | null;
+  skipped_count: number | null;
+  errors: { row_number: number; raw: Record<string, string>; reason: string }[];
+}
+
 export interface IncomeRecord {
   income_id: string;
   individual: string;
@@ -133,6 +151,32 @@ export interface TransactionRecord {
   source_file: string | null;
 }
 
+export interface TransactionListResponse {
+  items: TransactionRecord[];
+  total: number;
+}
+
+export interface UnclassifiedGroup {
+  group: string;
+  item: string;
+  count: number;
+  total_amount: string;
+}
+
+export interface CategorySummaryRow {
+  group: string;
+  item: string;
+  count: number;
+  total_amount: string;
+  flow_type: "needs" | "wants" | "savings" | "transfer" | "other" | null;
+}
+
+export interface TransactionCategoryRule {
+  group: string;
+  item: string;
+  flow_type: "needs" | "wants" | "savings" | "transfer" | "other";
+}
+
 export type KpiColor = "green" | "yellow" | "red" | "coral";
 
 export interface KpiMetric {
@@ -140,9 +184,8 @@ export interface KpiMetric {
   label: string;
   group: string;
   value: number | null;
-  unit: "months" | "percent" | "ratio" | "dollars" | "mix";
+  unit: "months" | "percent" | "ratio" | "dollars";
   color: KpiColor;
-  mix: Record<string, number> | null;
 }
 
 export interface ScorecardResponse {
@@ -158,22 +201,4 @@ export interface KpiHistoryPoint {
 export interface KpiHistoryResponse {
   slug: string;
   points: KpiHistoryPoint[];
-}
-
-export type ScenarioType = "retirement" | "house";
-
-export interface Scenario {
-  scenario_id: string;
-  scenario_type: ScenarioType;
-  scenario_name: string;
-  assumptions: Record<string, unknown>;
-  created_date: string;
-  updated_date: string;
-}
-
-export interface ScenarioComparison {
-  scenario_id: string;
-  scenario_name: string;
-  assumptions: Record<string, unknown>;
-  result: Record<string, unknown>;
 }

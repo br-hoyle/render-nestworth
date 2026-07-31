@@ -8,8 +8,20 @@ DEFAULT_KPI_THRESHOLDS = {
     "liquidity_ratio": {"red_below": 0.5, "green_at_or_above": 1.0},
     "housing_cost_ratio": {"green_below": 28, "red_at_or_above": 36},
     "savings_rate": {"red_below": 5, "green_at_or_above": 15},
-    "retirement_contribution_rate": {"red_below": 5, "green_at_or_above": 15},
     "debt_to_income": {"green_below": 36, "red_at_or_above": 43},
+    # Retrofitted from previously-hardcoded bands, for consistency (backlog pass 2):
+    "fi_progress": {"red_below": 50, "green_at_or_above": 100},
+    "debt_payoff_runway": {"green_below": 36, "red_at_or_above": 84},
+    # New in backlog pass 2:
+    "debt_to_assets_ratio": {"green_below": 30, "red_at_or_above": 50},
+    "capital_deployment_rate": {"red_below": 10, "green_at_or_above": 20},
+    "liquid_runway": {"red_below": 3, "green_at_or_above": 6},
+    "savings_efficiency": {"red_below": 0, "green_at_or_above": 20},
+    "net_worth_velocity": {"red_below": 0, "green_at_or_above": 100},
+    # 50/30/20 rule — banded around a target rather than a simple higher/lower-is-better cut.
+    "needs_ratio": {"target": 50, "green_tolerance": 5, "yellow_tolerance": 15},
+    "wants_ratio": {"target": 30, "green_tolerance": 5, "yellow_tolerance": 15},
+    "savings_ratio": {"target": 20, "green_tolerance": 5, "yellow_tolerance": 15},
 }
 
 DEFAULT_SETTINGS = {
@@ -21,7 +33,6 @@ DEFAULT_SETTINGS = {
     "manual_monthly_expense": None,
     "fi_withdrawal_rate": 0.04,
     "fi_number_override": None,
-    "retirement_contribution_rate_override": None,
     "kpi_thresholds": DEFAULT_KPI_THRESHOLDS,
 }
 
@@ -41,7 +52,6 @@ class HouseholdSettings(BaseModel):
     manual_monthly_expense: float | None = None
     fi_withdrawal_rate: float = 0.04
     fi_number_override: float | None = None
-    retirement_contribution_rate_override: float | None = None
     kpi_thresholds: dict = DEFAULT_KPI_THRESHOLDS
 
 

@@ -6,9 +6,9 @@ import clsx from "clsx";
 
 const TABS = [
   { href: "/overview", label: "Overview" },
-  { href: "/trends/net-worth", label: "Trends", match: "/trends" },
+  { href: "/trends/cash-flow", label: "Trends", match: "/trends" },
   { href: "/update", label: "Update", isFab: true },
-  { href: "/plan/scenarios", label: "Plan", match: "/plan" },
+  { href: "/plan/calculators", label: "Plan", match: "/plan" },
   { href: "/more", label: "More" },
 ];
 

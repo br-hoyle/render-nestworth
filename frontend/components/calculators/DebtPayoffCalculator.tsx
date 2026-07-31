@@ -44,7 +44,7 @@ export function DebtPayoffCalculator() {
     <div className="flex flex-col md:flex-row gap-4">
       <div className="w-full md:w-56 flex-none flex flex-col gap-3">
         <NumField label="Current balance" value={inputs.balance} onChange={(v) => setInputs((i) => ({ ...i, balance: v }))} />
-        <NumField label="APR" value={inputs.annual_rate} step="0.001" onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
+        <NumField label="APR" value={inputs.annual_rate} percent onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
         <NumField label="Monthly payment" value={inputs.monthly_payment} onChange={(v) => setInputs((i) => ({ ...i, monthly_payment: v }))} />
         <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>

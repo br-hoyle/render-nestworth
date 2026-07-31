@@ -13,6 +13,8 @@ from app.schemas.accounts import (
     AccountCreate,
     AccountRead,
     AccountRevise,
+    AccountSparkline,
+    SparklinePoint,
     StaleAccountInfo,
 )
 from app.services.effective_dates import (
@@ -121,6 +123,39 @@ def stale_accounts(
             )
         )
     return result
+
+
+@router.get("/sparklines", response_model=list[AccountSparkline])
+def account_sparklines(
+    limit: int = 12,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> list[AccountSparkline]:
+    """Last N real snapshots per active account, in one batch query (avoids N+1 round
+    trips) — feeds the small inline sparkline next to each account's balance."""
+    rows = conn.execute(
+        text(
+            """
+            select account_id, full_date, balance from (
+                select b.account_id, b.full_date, b.balance,
+                       row_number() over (partition by b.account_id order by b.full_date desc) as rn
+                from balances b
+                join accounts a on a.account_id = b.account_id
+                where a.household_id = :household_id and a.effective_end_date = '9999-12-31'
+            ) ranked
+            where rn <= :limit
+            order by account_id, full_date
+            """
+        ),
+        {"household_id": session.household_id, "limit": limit},
+    ).mappings().all()
+
+    by_account: dict[uuid.UUID, list[SparklinePoint]] = {}
+    for row in rows:
+        by_account.setdefault(row["account_id"], []).append(
+            SparklinePoint(full_date=row["full_date"], balance=row["balance"])
+        )
+    return [AccountSparkline(account_id=account_id, points=points) for account_id, points in by_account.items()]
 
 
 @router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)

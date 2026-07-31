@@ -33,9 +33,6 @@ const DEFAULT_INPUTS: HouseInputs = {
 export function HouseAffordabilityCalculator() {
   const [inputs, setInputs] = useState<HouseInputs>(DEFAULT_INPUTS);
   const [result, setResult] = useState<Result | null>(null);
-  const [scenarioName, setScenarioName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<HouseInputs>>("/calculators/house-affordability/defaults");
@@ -62,25 +59,13 @@ export function HouseAffordabilityCalculator() {
     return () => clearTimeout(id);
   }, [inputs]);
 
-  async function saveScenario() {
-    if (!scenarioName) return;
-    setSaving(true);
-    try {
-      await api.post("/scenarios", { scenario_type: "house", scenario_name: scenarioName, assumptions: inputs });
-      setSaved(true);
-      setScenarioName("");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <div className="flex flex-col md:flex-row gap-4">
       <div className="w-full md:w-56 flex-none flex flex-col gap-3">
         <NumField label="Gross monthly income" value={inputs.gross_monthly_income} onChange={(v) => setInputs((i) => ({ ...i, gross_monthly_income: v }))} />
         <NumField label="Other monthly debts" value={inputs.monthly_debts} onChange={(v) => setInputs((i) => ({ ...i, monthly_debts: v }))} />
-        <NumField label="Down payment %" value={inputs.down_payment_pct} step="0.01" onChange={(v) => setInputs((i) => ({ ...i, down_payment_pct: v }))} />
-        <NumField label="Rate" value={inputs.annual_rate} step="0.001" onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
+        <NumField label="Down payment" value={inputs.down_payment_pct} percent onChange={(v) => setInputs((i) => ({ ...i, down_payment_pct: v }))} />
+        <NumField label="Rate" value={inputs.annual_rate} percent onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
         <NumField label="Term (years)" value={inputs.term_years} onChange={(v) => setInputs((i) => ({ ...i, term_years: v }))} />
         <NumField label="Tax/ins/HOA per month" value={inputs.tax_ins_hoa_monthly} onChange={(v) => setInputs((i) => ({ ...i, tax_ins_hoa_monthly: v }))} />
         <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
@@ -91,22 +76,6 @@ export function HouseAffordabilityCalculator() {
           <ResultTile label="Monthly PITI" value={fmtMoney(result?.monthly_piti)} />
           <ResultTile label="Front-end DTI" value={result?.front_end_dti ? `${result.front_end_dti}%` : "—"} />
           <ResultTile label="Back-end DTI" value={result?.back_end_dti ? `${result.back_end_dti}%` : "—"} />
-        </div>
-
-        <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex gap-2 items-end flex-wrap">
-          <div className="flex-1 min-w-[160px]">
-            <label className="text-[11px] uppercase tracking-wide text-nw-muted">Scenario name</label>
-            <input
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
-              placeholder="Move in 2027"
-              className="w-full mt-1 rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
-            />
-          </div>
-          <Button variant="primary" onClick={saveScenario} disabled={saving || !scenarioName}>
-            {saving ? "Saving…" : "Save as scenario"}
-          </Button>
-          {saved && <span className="text-xs text-nw-green">Saved.</span>}
         </div>
       </div>
     </div>

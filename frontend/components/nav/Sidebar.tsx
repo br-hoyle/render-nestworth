@@ -11,7 +11,6 @@ const NAV_GROUPS: { heading: string; items: { href: string; label: string }[] }[
     heading: "Track",
     items: [
       { href: "/overview", label: "Overview" },
-      { href: "/trends/net-worth", label: "Net worth" },
       { href: "/trends/cash-flow", label: "Cash flow" },
       { href: "/trends/scorecard", label: "Scorecard" },
     ],
@@ -21,17 +20,12 @@ const NAV_GROUPS: { heading: string; items: { href: string; label: string }[] }[
     items: [
       { href: "/accounts", label: "Accounts" },
       { href: "/income", label: "Income" },
-      { href: "/balances", label: "Balances" },
       { href: "/transactions", label: "Transactions" },
-      { href: "/import", label: "Import CSV" },
     ],
   },
   {
     heading: "Plan",
-    items: [
-      { href: "/plan/calculators", label: "Calculators" },
-      { href: "/plan/scenarios", label: "Scenarios" },
-    ],
+    items: [{ href: "/plan/calculators", label: "Calculators" }],
   },
 ];
 

@@ -6,9 +6,8 @@ class KpiMetric(BaseModel):
     label: str
     group: str
     value: float | None
-    unit: str  # "months" | "percent" | "ratio" | "dollars" | "mix"
+    unit: str  # "months" | "percent" | "ratio" | "dollars"
     color: str  # "green" | "yellow" | "red" | "coral"
-    mix: dict[str, float] | None = None
 
 
 class ScorecardResponse(BaseModel):

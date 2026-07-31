@@ -3,16 +3,22 @@ from decimal import Decimal
 from app.schemas.settings import DEFAULT_SETTINGS
 from app.services.kpi import (
     KpiInputs,
-    allocation_mix,
+    capital_deployment_rate,
     debt_payoff_runway_months,
+    debt_to_assets_ratio,
     debt_to_income,
     emergency_fund_months,
     fi_progress,
     housing_cost_ratio,
+    liquid_runway_months,
     liquidity_ratio,
+    needs_ratio,
     net_worth_growth_yoy,
-    retirement_contribution_rate,
+    net_worth_velocity,
+    savings_efficiency,
     savings_rate,
+    savings_ratio,
+    wants_ratio,
 )
 
 
@@ -24,13 +30,11 @@ def make_inputs(**overrides) -> KpiInputs:
         total_liabilities=Decimal("50000"),
         liquid_balance=Decimal("18000"),
         cash_balance=Decimal("12000"),
-        assets_by_category={"Banking": Decimal("20000"), "Investments": Decimal("80000"), "Retirement": Decimal("50000")},
         gross_annual_income=Decimal("120000"),
         trailing_income=Decimal("30000"),
         trailing_expense=Decimal("24000"),
         trailing_months=3,
         housing_expense_trailing=Decimal("7200"),
-        retirement_contribution_trailing=Decimal("3000"),
         liability_reduction_trailing_6mo=Decimal("6000"),
         settings=DEFAULT_SETTINGS,
     )
@@ -82,20 +86,6 @@ def test_savings_rate_no_income_returns_none():
     assert color == "red"
 
 
-def test_retirement_contribution_rate_from_transactions():
-    # 3000 trailing over 3 months -> annualized 12000 / 120000 income = 10% -> yellow
-    value, color = retirement_contribution_rate(make_inputs())
-    assert value == 10.0
-    assert color == "yellow"
-
-
-def test_retirement_contribution_rate_manual_override():
-    settings = {**DEFAULT_SETTINGS, "retirement_contribution_rate_override": 20}
-    value, color = retirement_contribution_rate(make_inputs(settings=settings))
-    assert value == 20.0
-    assert color == "green"
-
-
 def test_net_worth_growth_yoy():
     value, color = net_worth_growth_yoy(make_inputs())
     assert value == 25.0
@@ -136,7 +126,86 @@ def test_debt_payoff_runway_no_progress_returns_none():
     assert color == "red"
 
 
-def test_allocation_mix_percentages_sum_to_100():
-    mix = allocation_mix(make_inputs())
-    assert round(sum(mix.values()), 4) == 100.0
-    assert mix["Investments"] > mix["Banking"]
+# --- Backlog pass 2 additions ---
+
+
+def test_debt_to_assets_ratio():
+    # 50000 liabilities / 150000 assets = 33.33% -> yellow (between 30 and 50)
+    value, color = debt_to_assets_ratio(make_inputs())
+    assert round(value, 2) == 33.33
+    assert color == "yellow"
+
+
+def test_debt_to_assets_ratio_no_assets_no_debt():
+    value, color = debt_to_assets_ratio(make_inputs(total_assets=Decimal("0"), total_liabilities=Decimal("0")))
+    assert value == 0.0
+    assert color == "green"
+
+
+def test_capital_deployment_rate():
+    # net income = 30000-24000=6000; savings flow 1200 -> 20% -> green
+    value, color = capital_deployment_rate(make_inputs(savings_flow_trailing=Decimal("1200")))
+    assert value == 20.0
+    assert color == "green"
+
+
+def test_capital_deployment_rate_unclassified_returns_none():
+    value, color = capital_deployment_rate(make_inputs(savings_flow_trailing=None))
+    assert value is None
+    assert color == "yellow"
+
+
+def test_liquid_runway_months_uses_needs_when_classified():
+    # needs 12000 trailing / 3mo = 4000/mo; liquid 18000 / 4000 = 4.5mo -> yellow
+    value, color = liquid_runway_months(make_inputs(needs_expense_trailing=Decimal("12000")))
+    assert value == 4.5
+    assert color == "yellow"
+
+
+def test_liquid_runway_months_falls_back_to_overall_expense():
+    # unclassified -> falls back to trailing_expense (24000/3=8000/mo); 18000/8000=2.25 -> red
+    value, color = liquid_runway_months(make_inputs(needs_expense_trailing=None))
+    assert round(value, 2) == 2.25
+    assert color == "red"
+
+
+def test_savings_efficiency():
+    # delta net worth = 100000-80000=20000; gross income 12mo = 40000 -> 50% -> green
+    value, color = savings_efficiency(make_inputs(gross_income_trailing_12mo=Decimal("40000")))
+    assert value == 50.0
+    assert color == "green"
+
+
+def test_savings_efficiency_no_prior_year_returns_none():
+    value, color = savings_efficiency(make_inputs(net_worth_one_year_ago=None, gross_income_trailing_12mo=Decimal("40000")))
+    assert value is None
+    assert color == "yellow"
+
+
+def test_net_worth_velocity_above_one():
+    # delta 20000 / net income 12mo 10000 = 200% -> green (ratio > 1.0)
+    value, color = net_worth_velocity(make_inputs(net_income_trailing_12mo=Decimal("10000")))
+    assert value == 200.0
+    assert color == "green"
+
+
+def test_needs_wants_savings_ratios_on_target():
+    inputs = make_inputs(
+        trailing_income=Decimal("10000"),
+        needs_expense_trailing=Decimal("5000"),
+        wants_expense_trailing=Decimal("3000"),
+        savings_flow_trailing=Decimal("2000"),
+    )
+    needs_val, needs_color = needs_ratio(inputs)
+    wants_val, wants_color = wants_ratio(inputs)
+    savings_val, savings_color = savings_ratio(inputs)
+    assert needs_val == 50.0 and needs_color == "green"
+    assert wants_val == 30.0 and wants_color == "green"
+    assert savings_val == 20.0 and savings_color == "green"
+
+
+def test_needs_ratio_far_off_target_is_red():
+    inputs = make_inputs(trailing_income=Decimal("10000"), needs_expense_trailing=Decimal("8500"))
+    value, color = needs_ratio(inputs)
+    assert value == 85.0
+    assert color == "red"

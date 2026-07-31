@@ -39,7 +39,7 @@ export default function LoginPage() {
           alt="NestWorth"
           width={220}
           height={45}
-          className="self-start mb-2"
+          className="self-center mb-2"
         />
         <p className="text-sm text-nw-muted">Sign in to your household.</p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -73,7 +73,10 @@ export default function LoginPage() {
           Forgot password?
         </Link>
         <p className="text-xs text-nw-muted mt-4">
-          No sign-up link. Accounts exist only by invite.
+          New here?{" "}
+          <Link href="/signup" className="text-nw-mint">
+            Create an account
+          </Link>
         </p>
       </div>
     </div>

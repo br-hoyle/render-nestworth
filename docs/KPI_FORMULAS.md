@@ -1,6 +1,7 @@
 # KPI formulas
 
-All 11 metrics are implemented as pure functions in
+All 19 metrics (the original 11 plus 8 added in the backlog-pass-2 batch) are implemented
+as pure functions in
 [`backend/app/services/kpi.py`](../backend/app/services/kpi.py), unit-tested in
 [`backend/tests/test_kpi.py`](../backend/tests/test_kpi.py). The data-fetching that builds
 their inputs lives in [`backend/app/routers/scorecard.py`](../backend/app/routers/scorecard.py)
@@ -43,13 +44,6 @@ front-end ratio. Thresholds: green `< 28%`, red `≥ 36%`.
 **Savings rate** (`percent`) — `(income − expense) ÷ income × 100` over the expense-basis
 window, from transactions. Thresholds: red `< 5%`, green `≥ 15%`.
 
-**Retirement contribution rate** (`percent`) — annualized retirement-tagged expense
-transactions (`Group` ILIKE `%retirement%`) ÷ gross annual income. **Documented
-simplification**: the schema has no dedicated "this is a retirement contribution" flag, so
-this is a heuristic based on how transactions happen to be categorized in the imported CSV.
-A household can override it directly with `retirement_contribution_rate_override` in
-Settings if they don't tag contributions that way. Thresholds: red `< 5%`, green `≥ 15%`.
-
 **Net worth growth (YoY)** (`percent`) — `(net worth now − net worth 1 year ago) ÷
 |net worth 1 year ago| × 100`. Green if non-negative, coral (a warning color, not a strict
 "red" threshold) if negative — trend direction matters more than a fixed band here.
@@ -75,12 +69,54 @@ Thresholds: green `≤ 36` months, yellow `≤ 84` months, red beyond that.
 **Net worth** (`dollars`) — total assets minus total liabilities, as of today. Green if
 non-negative, coral if negative.
 
-**Allocation mix** (`mix`, not a single value) — each asset category's share of total
-assets, e.g. `{"Banking": 21, "Investments": 54, "Retirement": 25}`. Feeds the allocation
-donut on Overview and the Scorecard.
+Asset allocation by category/type is shown directly on Overview (a sunburst chart built
+from live account balances) rather than as a scored KPI.
+
+## Efficiency (added in backlog pass 2)
+
+**Debt-to-assets** (`percent`) — `total liabilities ÷ total assets × 100`. Lower is better;
+green `< 30%`, red `≥ 50%`. Unlike debt-to-income, this is a pure balance-sheet ratio (no
+income dependency), so it stays meaningful even for a household with irregular income.
+
+**Capital deployment rate** (`percent`) — `(needs/wants/savings-classified "savings" flow
+transactions) ÷ (trailing income − trailing expense) × 100`. Requires the household to have
+classified at least one transaction via `transaction_categories`; returns "not classified
+yet" (gray/`None`) otherwise rather than a misleading zero. Green `≥ 20%`, red `< 10%`.
+
+**Liquid runway** (`months`) — `liquid balance ÷ average monthly "needs" expense`. Falls back
+to overall trailing expense (same basis as Emergency fund) if the household hasn't
+classified transactions yet — documented fallback, not silently wrong. Green `≥ 6` months,
+red `< 3`.
+
+**Savings efficiency** (Wealth Retention Rate, `percent`) — `(net worth now − net worth 1
+year ago) ÷ gross income over the same trailing 12 months × 100`. Answers "how much of every
+earned dollar actually stayed on the balance sheet." Green `≥ 20%`, red `< 0%`.
+
+**Net worth velocity** (`percent`) — `(net worth now − net worth 1 year ago) ÷ net income
+(income − expense) over the same trailing 12 months × 100`. A value above 100% means net
+worth grew by more than take-home cash flow alone would explain (investment growth is
+pulling its weight); green `≥ 100%`, red `< 0%`.
+
+## Budget rule — 50/30/20 (added in backlog pass 2)
+
+**Needs / Wants / Savings ratios** (`percent` each) — trailing `needs`/`wants`/`savings`
+flow-type transaction sums (from `transaction_categories`) ÷ trailing income × 100. These
+are *banded around a target* rather than monotonically better/worse: `needs_ratio` targets
+50%, `wants_ratio` targets 30%, `savings_ratio` targets 20%, each green within a few points of
+target, red the further off in *either* direction (see `color_for_target` in `kpi.py`) — a
+15%-needs household isn't "great", it likely means the classification is incomplete. Shown
+together with dashed target lines on the Scorecard's dedicated `BudgetRuleChart`.
+
+## Transaction classification (`transaction_categories`)
+
+The five metrics above all depend on the household mapping transaction `group`/`item` pairs
+to a `needs` / `wants` / `savings` / `transfer` / `other` flow type (Transactions page →
+unclassified banner → Classify screen). A group-level rule (`item = ''`) applies to every
+item under that group unless a more specific group+item rule exists. Until classified, the
+affected metrics return `null` rather than a misleading zero.
 
 ## History
 
-Each metric (except Allocation mix) supports `GET /scorecard/{slug}/history?months=N` —
-the same formula recomputed at each of the last N month-end dates, so the detail panel can
-show a real trend line with threshold bands, not just the current value.
+Every registered metric supports `GET /scorecard/{slug}/history?months=N` — the same formula
+recomputed at each of the last N month-end dates, so the detail panel can show a real trend
+line with threshold bands, not just the current value.

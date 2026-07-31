@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import type { KpiMetric } from "@/lib/types";
-import { formatMetricValue, KPI_COLOR_HEX } from "@/lib/format";
+import { formatMetricValue, KPI_COLOR_HEX, titleCase } from "@/lib/format";
 
 // Rough progress-bar fill so a yellow tile visibly reads as "how far off", not just "not
 // green" — approximate positioning, not a precise scale, since thresholds vary per metric.
@@ -18,10 +18,10 @@ export function KpiTile({ metric, onClick }: { metric: KpiMetric; onClick?: () =
   return (
     <button
       onClick={onClick}
-      className="text-left rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-1.5 hover:border-nw-line-hi"
+      className="w-full text-left rounded-lg border border-nw-border bg-nw-surface p-2.5 flex flex-col gap-1 hover:border-nw-line-hi overflow-hidden"
     >
-      <div className="text-[10px] uppercase tracking-wide text-nw-muted">{metric.label}</div>
-      <div className="flex items-center gap-2">
+      <div className="text-[10px] uppercase tracking-wide text-nw-muted truncate">{titleCase(metric.label)}</div>
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-base font-medium">{formatMetricValue(metric.value, metric.unit)}</span>
         <span
           className="w-1.5 h-1.5 rounded-full flex-none"

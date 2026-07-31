@@ -8,9 +8,9 @@ from app.routers import (
     auth,
     balances,
     calculators,
+    cashflow,
     health,
     income,
-    scenarios,
     scorecard,
     settings as settings_router,
     transactions,
@@ -37,4 +37,4 @@ app.include_router(settings_router.router)
 app.include_router(transactions.router)
 app.include_router(scorecard.router)
 app.include_router(calculators.router)
-app.include_router(scenarios.router)
+app.include_router(cashflow.router)

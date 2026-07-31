@@ -1,58 +1,81 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
 import { fmtMoney } from "./shared";
 
-const CATEGORIES = ["Banking", "Investments", "Retirement", "Property"];
+interface Row {
+  id: number;
+  name: string;
+  current: number;
+  targetPct: number;
+}
 
 interface Result {
   total: string;
   trades: Record<string, string>;
 }
 
+let nextId = 1;
+
+function defaultRows(): Row[] {
+  return [
+    { id: nextId++, name: "", current: 0, targetPct: 0 },
+    { id: nextId++, name: "", current: 0, targetPct: 0 },
+  ];
+}
+
 export function RebalancingCalculator() {
-  const [current, setCurrent] = useState<Record<string, number>>({ Banking: 0, Investments: 0, Retirement: 0, Property: 0 });
-  const [target, setTarget] = useState<Record<string, number>>({ Banking: 10, Investments: 50, Retirement: 30, Property: 10 });
+  const [rows, setRows] = useState<Row[]>(defaultRows);
   const [result, setResult] = useState<Result | null>(null);
 
-  const targetTotal = Object.values(target).reduce((a, b) => a + b, 0);
+  const targetTotal = rows.reduce((sum, r) => sum + r.targetPct, 0);
+
+  function updateRow(id: number, patch: Partial<Row>) {
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function addRow() {
+    setRows((rs) => [...rs, { id: nextId++, name: "", current: 0, targetPct: 0 }]);
+  }
+
+  function removeRow(id: number) {
+    setRows((rs) => rs.filter((r) => r.id !== id));
+  }
 
   useEffect(() => {
+    const named = rows.filter((r) => r.name.trim());
+    if (named.length === 0) {
+      setResult(null);
+      return;
+    }
     const id = setTimeout(() => {
+      const current_allocation = Object.fromEntries(named.map((r) => [r.name.trim(), r.current]));
+      const target_allocation_pct = Object.fromEntries(named.map((r) => [r.name.trim(), r.targetPct]));
       api
-        .post<Result>("/calculators/rebalancing", { current_allocation: current, target_allocation_pct: target })
+        .post<Result>("/calculators/rebalancing", { current_allocation, target_allocation_pct })
         .then(setResult)
         .catch(() => setResult(null));
     }, 300);
     return () => clearTimeout(id);
-  }, [current, target]);
+  }, [rows]);
 
   return (
     <div className="flex flex-col gap-4 max-w-xl">
-      <p className="text-xs text-nw-muted">Optional tool — suggests trades to hit a target allocation.</p>
-      <div className="grid grid-cols-[1fr_100px_100px] gap-2 items-center text-xs">
+      <p className="text-xs text-nw-muted">Optional tool — suggests trades to hit a target allocation. Add any categories you like.</p>
+      <div className="grid grid-cols-[1fr_100px_100px_28px] gap-2 items-center text-xs">
         <div />
         <div className="text-nw-muted uppercase">Current $</div>
         <div className="text-nw-muted uppercase">Target %</div>
-        {CATEGORIES.map((cat) => (
-          <Fragment key={cat}>
-            <div>{cat}</div>
-            <input
-              type="number"
-              value={current[cat]}
-              onChange={(e) => setCurrent((c) => ({ ...c, [cat]: Number(e.target.value) }))}
-              className="rounded-md border border-nw-border bg-nw-rail px-2 py-1"
-            />
-            <input
-              type="number"
-              value={target[cat]}
-              onChange={(e) => setTarget((t) => ({ ...t, [cat]: Number(e.target.value) }))}
-              className="rounded-md border border-nw-border bg-nw-rail px-2 py-1"
-            />
-          </Fragment>
+        <div />
+        {rows.map((row) => (
+          <FragmentRow key={row.id} row={row} onChange={(patch) => updateRow(row.id, patch)} onRemove={() => removeRow(row.id)} />
         ))}
       </div>
+      <Button onClick={addRow} className="self-start">
+        + Add category
+      </Button>
       {targetTotal !== 100 && <p className="text-xs text-nw-amber">Target percentages sum to {targetTotal}%, not 100%.</p>}
 
       {result && (
@@ -70,5 +93,43 @@ export function RebalancingCalculator() {
         </div>
       )}
     </div>
+  );
+}
+
+function FragmentRow({
+  row,
+  onChange,
+  onRemove,
+}: {
+  row: Row;
+  onChange: (patch: Partial<Row>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <>
+      <input
+        placeholder="Category name"
+        value={row.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+        className="rounded-md border border-nw-border bg-nw-rail px-2 py-1"
+      />
+      <input
+        type="number"
+        step="1"
+        value={row.current}
+        onChange={(e) => onChange({ current: Math.round(Number(e.target.value)) })}
+        className="rounded-md border border-nw-border bg-nw-rail px-2 py-1"
+      />
+      <input
+        type="number"
+        step="1"
+        value={row.targetPct}
+        onChange={(e) => onChange({ targetPct: Number(e.target.value) })}
+        className="rounded-md border border-nw-border bg-nw-rail px-2 py-1"
+      />
+      <button onClick={onRemove} className="text-nw-coral text-xs" title="Remove category">
+        ✕
+      </button>
+    </>
   );
 }

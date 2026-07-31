@@ -38,9 +38,6 @@ const DEFAULT_INPUTS: RetirementInputs = {
 export function RetirementCalculator() {
   const [inputs, setInputs] = useState<RetirementInputs>(DEFAULT_INPUTS);
   const [result, setResult] = useState<Result | null>(null);
-  const [scenarioName, setScenarioName] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<RetirementInputs>>("/calculators/retirement/defaults");
@@ -59,18 +56,6 @@ export function RetirementCalculator() {
     return () => clearTimeout(id);
   }, [inputs]);
 
-  async function saveScenario() {
-    if (!scenarioName) return;
-    setSaving(true);
-    try {
-      await api.post("/scenarios", { scenario_type: "retirement", scenario_name: scenarioName, assumptions: inputs });
-      setSaved(true);
-      setScenarioName("");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
     <div className="flex flex-col md:flex-row gap-4">
       <div className="w-full md:w-56 flex-none flex flex-col gap-3">
@@ -79,8 +64,8 @@ export function RetirementCalculator() {
         <NumField label="Life expectancy" value={inputs.life_expectancy} onChange={(v) => setInputs((i) => ({ ...i, life_expectancy: v }))} />
         <NumField label="Current balance" value={inputs.current_balance} onChange={(v) => setInputs((i) => ({ ...i, current_balance: v }))} />
         <NumField label="Monthly contribution" value={inputs.monthly_contribution} onChange={(v) => setInputs((i) => ({ ...i, monthly_contribution: v }))} />
-        <NumField label="Real return rate" value={inputs.real_return_rate} step="0.001" onChange={(v) => setInputs((i) => ({ ...i, real_return_rate: v }))} />
-        <NumField label="Withdrawal rate" value={inputs.withdrawal_rate} step="0.001" onChange={(v) => setInputs((i) => ({ ...i, withdrawal_rate: v }))} />
+        <NumField label="Real return rate" value={inputs.real_return_rate} percent onChange={(v) => setInputs((i) => ({ ...i, real_return_rate: v }))} />
+        <NumField label="Withdrawal rate" value={inputs.withdrawal_rate} percent onChange={(v) => setInputs((i) => ({ ...i, withdrawal_rate: v }))} />
         <NumField label="Social Security ($/mo)" value={inputs.social_security_monthly} onChange={(v) => setInputs((i) => ({ ...i, social_security_monthly: v }))} />
         <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
@@ -105,22 +90,6 @@ export function RetirementCalculator() {
             </ResponsiveContainer>
           </div>
         )}
-
-        <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex gap-2 items-end flex-wrap">
-          <div className="flex-1 min-w-[160px]">
-            <label className="text-[11px] uppercase tracking-wide text-nw-muted">Scenario name</label>
-            <input
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
-              placeholder="Retire at 65"
-              className="w-full mt-1 rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
-            />
-          </div>
-          <Button variant="primary" onClick={saveScenario} disabled={saving || !scenarioName}>
-            {saving ? "Saving…" : "Save as scenario"}
-          </Button>
-          {saved && <span className="text-xs text-nw-green">Saved.</span>}
-        </div>
       </div>
     </div>
   );

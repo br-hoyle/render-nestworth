@@ -129,6 +129,21 @@ create table if not exists household_settings (
     updated_date timestamptz not null default now()
 );
 
+-- ----------------------------------------------------------------------------
+-- 8. transaction_categories — ADDITION (backlog pass 2).
+-- Maps a household's transaction `group`/`item` text values to a 50/30/20-style flow_type.
+-- item = '' means "applies to the whole group" (no NULL-in-primary-key ambiguity).
+-- Powers: the fixed/variable (needs/wants) split, the 50/30/20 rule tracking, Capital
+-- Deployment Rate's "savings" bucket, and Liquid Runway's essential-expense basis.
+-- ----------------------------------------------------------------------------
+create table if not exists transaction_categories (
+    household_id uuid not null references users(household_id),
+    "group" text not null,
+    item text not null default '',
+    flow_type text not null check (flow_type in ('needs', 'wants', 'savings', 'transfer', 'other')),
+    primary key (household_id, "group", item)
+);
+
 -- ============================================================================
 -- Row Level Security
 -- ============================================================================
@@ -140,6 +155,7 @@ alter table balances enable row level security;
 alter table transactions enable row level security;
 alter table scenarios enable row level security;
 alter table household_settings enable row level security;
+alter table transaction_categories enable row level security;
 
 alter table accounts force row level security;
 alter table income force row level security;
@@ -147,6 +163,7 @@ alter table balances force row level security;
 alter table transactions force row level security;
 alter table scenarios force row level security;
 alter table household_settings force row level security;
+alter table transaction_categories force row level security;
 
 -- users: permissive by design (see note at top of file) — the trusted backend role needs
 -- unrestricted username lookups pre-session. This is the app's own service connection, not
@@ -184,6 +201,11 @@ create policy household_settings_tenant_isolation on household_settings for all
     using (household_id = current_setting('app.current_household_id', true)::uuid)
     with check (household_id = current_setting('app.current_household_id', true)::uuid);
 
+drop policy if exists transaction_categories_tenant_isolation on transaction_categories;
+create policy transaction_categories_tenant_isolation on transaction_categories for all
+    using (household_id = current_setting('app.current_household_id', true)::uuid)
+    with check (household_id = current_setting('app.current_household_id', true)::uuid);
+
 -- ============================================================================
 -- app_user role — the restricted role the backend uses for all household-scoped requests.
 -- Replace the password below before running, then use it to build TENANT_DATABASE_URL.
@@ -198,5 +220,6 @@ $$;
 
 grant usage on schema public to app_user;
 grant select, insert, update, delete on
-    users, accounts, income, balances, transactions, scenarios, household_settings
+    users, accounts, income, balances, transactions, scenarios, household_settings,
+    transaction_categories
     to app_user;
