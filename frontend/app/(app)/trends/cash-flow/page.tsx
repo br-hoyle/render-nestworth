@@ -33,6 +33,8 @@ export default function CashFlowPage() {
   const [wantsHistory, setWantsHistory] = useState<KpiHistoryResponse | null>(null);
   const [spendView, setSpendView] = useState<"group" | "item">("group");
   const [spendGroupFilter, setSpendGroupFilter] = useState("");
+  const [spendItemFilter, setSpendItemFilter] = useState("");
+  const [spendMerchantFilter, setSpendMerchantFilter] = useState("");
 
   useEffect(() => {
     api
@@ -72,18 +74,28 @@ export default function CashFlowPage() {
     () => [...new Set((transactions ?? []).map((t) => t.group).filter(Boolean))] as string[],
     [transactions]
   );
+  const spendItems = useMemo(
+    () => [...new Set((transactions ?? []).map((t) => t.item).filter(Boolean))] as string[],
+    [transactions]
+  );
+  const spendMerchants = useMemo(
+    () => [...new Set((transactions ?? []).map((t) => t.merchant).filter(Boolean))] as string[],
+    [transactions]
+  );
 
   const spendRows = useMemo(() => {
     if (!transactions) return [];
     const map = new Map<string, number>();
     for (const t of transactions) {
       if (t.type !== "expense") continue;
-      if (spendView === "item" && spendGroupFilter && t.group !== spendGroupFilter) continue;
+      if (spendGroupFilter && t.group !== spendGroupFilter) continue;
+      if (spendItemFilter && t.item !== spendItemFilter) continue;
+      if (spendMerchantFilter && t.merchant !== spendMerchantFilter) continue;
       const key = spendView === "group" ? t.group || "Other" : t.item || "Other";
       map.set(key, (map.get(key) ?? 0) + Math.abs(Number(t.amount)));
     }
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
-  }, [transactions, spendView, spendGroupFilter]);
+  }, [transactions, spendView, spendGroupFilter, spendItemFilter, spendMerchantFilter]);
 
   const maxSpendRow = spendRows[0]?.[1] ?? 1;
 
@@ -185,6 +197,13 @@ export default function CashFlowPage() {
         <p className="text-[10px] text-nw-muted">Amber = needs, mint = wants. Targets: 50% / 30% (see Scorecard).</p>
       </div>
 
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Spending Habits</div>
+        <Link href="/transactions" className="text-xs text-nw-mint">
+          Transactions →
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
           <div className="flex justify-between items-center gap-2 flex-wrap">
@@ -204,24 +223,58 @@ export default function CashFlowPage() {
               </button>
             </div>
           </div>
-          {spendView === "item" && (
-            <select
-              value={spendGroupFilter}
-              onChange={(e) => setSpendGroupFilter(e.target.value)}
-              className="self-start rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs"
-            >
-              <option value="">All groups</option>
-              {spendGroups.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
-          )}
+          <div className="grid grid-cols-3 gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-nw-muted">Group</span>
+              <select
+                value={spendGroupFilter}
+                onChange={(e) => setSpendGroupFilter(e.target.value)}
+                className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs"
+              >
+                <option value="">All</option>
+                {spendGroups.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-nw-muted">Item</span>
+              <select
+                value={spendItemFilter}
+                onChange={(e) => setSpendItemFilter(e.target.value)}
+                className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs"
+              >
+                <option value="">All</option>
+                {spendItems.map((i) => (
+                  <option key={i} value={i}>
+                    {i}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-nw-muted">Merchant</span>
+              <select
+                value={spendMerchantFilter}
+                onChange={(e) => setSpendMerchantFilter(e.target.value)}
+                className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs"
+              >
+                <option value="">All</option>
+                {spendMerchants.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto">
             {spendRows.length === 0 && <p className="text-xs text-nw-muted">No expense data yet.</p>}
-            {spendRows.map(([label, amount]) => (
+            {spendRows.map(([label, amount], i) => (
               <div key={label} className="flex items-center gap-2 text-sm">
+                <span className="w-5 h-5 rounded-full bg-nw-track text-[10px] flex items-center justify-center text-nw-muted flex-none">{i + 1}</span>
                 <span className="flex-1 truncate">{label}</span>
                 <div className="w-16 h-1.5 rounded-full bg-nw-track overflow-hidden flex-none">
                   <div className="h-full bg-nw-green-line" style={{ width: `${(amount / maxSpendRow) * 100}%` }} />
@@ -230,19 +283,14 @@ export default function CashFlowPage() {
               </div>
             ))}
           </div>
-          <Link href="/transactions" className="text-xs text-nw-mint self-end">
-            All Transactions →
-          </Link>
         </div>
 
         <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-          <div className="text-sm font-medium">Merchant Spending</div>
-          {transactions && <MerchantLeaderboard transactions={transactions} />}
+          {transactions && <MerchantLeaderboard transactions={transactions} title="Merchant Spending" />}
         </div>
 
         <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-          <div className="text-sm font-medium">Average Spend</div>
-          {transactions && <SpendPatterns transactions={transactions} />}
+          {transactions && <SpendPatterns transactions={transactions} title="Average Spend" />}
         </div>
       </div>
 

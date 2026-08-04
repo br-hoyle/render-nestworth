@@ -7,7 +7,7 @@ import { money } from "@/lib/format";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function SpendPatterns({ transactions }: { transactions: TransactionRecord[] }) {
+export function SpendPatterns({ transactions, title }: { transactions: TransactionRecord[]; title?: string }) {
   const [view, setView] = useState<"weekday" | "month">("weekday");
   const [groupFilter, setGroupFilter] = useState("");
   const [itemFilter, setItemFilter] = useState("");
@@ -51,19 +51,22 @@ export function SpendPatterns({ transactions }: { transactions: TransactionRecor
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex border border-nw-border rounded-md overflow-hidden text-xs self-start">
-        <button onClick={() => setView("weekday")} className={"px-2.5 py-1 " + (view === "weekday" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}>
-          By Day of Week
-        </button>
-        <button onClick={() => setView("month")} className={"px-2.5 py-1 " + (view === "month" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}>
-          By Month of Year
-        </button>
+      <div className="flex justify-between items-center gap-2 flex-wrap">
+        {title && <span className="text-sm font-medium">{title}</span>}
+        <div className="flex border border-nw-border rounded-md overflow-hidden text-xs flex-none">
+          <button onClick={() => setView("weekday")} className={"px-2 py-1 whitespace-nowrap " + (view === "weekday" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}>
+            Weekday
+          </button>
+          <button onClick={() => setView("month")} className={"px-2 py-1 whitespace-nowrap " + (view === "month" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}>
+            Month
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-2">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-nw-muted">Group</span>
           <select value={groupFilter} onChange={(e) => setGroupFilter(e.target.value)} className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs">
-            <option value="">All groups</option>
+            <option value="">All</option>
             {groups.map((g) => (
               <option key={g} value={g}>{g}</option>
             ))}
@@ -72,7 +75,7 @@ export function SpendPatterns({ transactions }: { transactions: TransactionRecor
         <label className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-nw-muted">Item</span>
           <select value={itemFilter} onChange={(e) => setItemFilter(e.target.value)} className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs">
-            <option value="">All items</option>
+            <option value="">All</option>
             {items.map((i) => (
               <option key={i} value={i}>{i}</option>
             ))}
@@ -81,7 +84,7 @@ export function SpendPatterns({ transactions }: { transactions: TransactionRecor
         <label className="flex flex-col gap-1">
           <span className="text-[10px] uppercase tracking-wide text-nw-muted">Merchant</span>
           <select value={merchantFilter} onChange={(e) => setMerchantFilter(e.target.value)} className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs">
-            <option value="">All merchants</option>
+            <option value="">All</option>
             {merchants.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
