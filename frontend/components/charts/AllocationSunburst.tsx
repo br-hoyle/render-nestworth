@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { Account } from "@/lib/types";
+import { money } from "@/lib/format";
 
 const CATEGORY_COLORS = ["var(--nw-mint)", "var(--nw-green)", "var(--nw-green-deep)", "var(--nw-green-line)", "var(--nw-amber)", "var(--nw-muted)"];
 
@@ -25,6 +26,7 @@ export function AllocationSunburst({ accounts, height = 200 }: { accounts: Accou
             outerRadius={height / 3}
             startAngle={90}
             endAngle={-270}
+            isAnimationActive={false}
           >
             {inner.map((d, i) => (
               <Cell key={d.name} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
@@ -38,6 +40,7 @@ export function AllocationSunburst({ accounts, height = 200 }: { accounts: Accou
             outerRadius={height / 2 - 4}
             startAngle={90}
             endAngle={-270}
+            isAnimationActive={false}
           >
             {outer.map((d, i) => (
               <Cell
@@ -51,7 +54,11 @@ export function AllocationSunburst({ accounts, height = 200 }: { accounts: Accou
             contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
             itemStyle={{ color: "var(--nw-text)" }}
             labelStyle={{ color: "var(--nw-text)" }}
-            formatter={(value) => `${Number(value).toFixed(1)}%`}
+            formatter={(value, name, item) => {
+              const dollar = item?.payload?.dollar;
+              const pct = `${Number(value).toFixed(1)}%`;
+              return dollar !== undefined ? `${pct} (${money(dollar)})` : pct;
+            }}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -64,6 +71,7 @@ export function AllocationSunburst({ accounts, height = 200 }: { accounts: Accou
             <span className="w-2 h-2 rounded-full flex-none" style={{ background: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
             <span>{d.name}</span>
             <span className="text-nw-muted">{d.value.toFixed(0)}%</span>
+            <span className="text-nw-muted">· {money(d.dollar)}</span>
           </div>
         ))}
       </div>
@@ -88,9 +96,9 @@ function buildRings(accounts: Account[]) {
   if (grandTotal <= 0) return { inner: [], outer: [] };
 
   const categories = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]);
-  const inner = categories.map(([name, value]) => ({ name, value: (value / grandTotal) * 100 }));
+  const inner = categories.map(([name, value]) => ({ name, value: (value / grandTotal) * 100, dollar: value }));
 
-  const outer: { category: string; type: string; label: string; value: number; categoryIndex: number; opacity: number }[] = [];
+  const outer: { category: string; type: string; label: string; value: number; dollar: number; categoryIndex: number; opacity: number }[] = [];
   categories.forEach(([category], categoryIndex) => {
     const types = [...(typeTotals.get(category)?.entries() ?? [])].sort((a, b) => b[1] - a[1]);
     types.forEach(([type, value], i) => {
@@ -99,6 +107,7 @@ function buildRings(accounts: Account[]) {
         type,
         label: `${category} · ${type}`,
         value: (value / grandTotal) * 100,
+        dollar: value,
         categoryIndex,
         opacity: Math.max(0.45, 1 - i * 0.2),
       });

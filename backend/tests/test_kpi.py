@@ -3,7 +3,6 @@ from decimal import Decimal
 from app.schemas.settings import DEFAULT_SETTINGS
 from app.services.kpi import (
     KpiInputs,
-    capital_deployment_rate,
     debt_payoff_runway_months,
     debt_to_assets_ratio,
     debt_to_income,
@@ -18,6 +17,7 @@ from app.services.kpi import (
     savings_efficiency,
     savings_rate,
     savings_ratio,
+    target_net_worth,
     wants_ratio,
 )
 
@@ -99,10 +99,11 @@ def test_net_worth_growth_yoy_negative():
 
 
 def test_fi_progress():
-    # annual expense = 24000/3*12 = 96000; fi number = 96000/0.04 = 2,400,000
+    # annual expense = 24000/3*12 = 96000; fi number (target) = 96000/0.04 = 2,400,000
     # progress = 100000/2400000 = 4.1666% -> red
-    value, color = fi_progress(make_inputs())
-    assert round(value, 2) == 4.17
+    value, color, progress_pct = fi_progress(make_inputs())
+    assert value == 2_400_000.0
+    assert round(progress_pct, 2) == 4.17
     assert color == "red"
 
 
@@ -142,16 +143,22 @@ def test_debt_to_assets_ratio_no_assets_no_debt():
     assert color == "green"
 
 
-def test_capital_deployment_rate():
-    # net income = 30000-24000=6000; savings flow 1200 -> 20% -> green
-    value, color = capital_deployment_rate(make_inputs(savings_flow_trailing=Decimal("1200")))
-    assert value == 20.0
-    assert color == "green"
+def test_target_net_worth():
+    # income 120000, savings_rate 0.15, roi 0.07, age 40 -> target ~= 781,389.99
+    inputs = make_inputs(
+        settings={**DEFAULT_SETTINGS, "household_age": 40, "target_net_worth_savings_rate": 0.15, "target_net_worth_roi": 0.07}
+    )
+    value, color, progress_pct = target_net_worth(inputs)
+    assert round(value, 2) == 781389.99
+    # progress = 100000/781389.99 = 12.8% -> red (<50)
+    assert round(progress_pct, 2) == 12.80
+    assert color == "red"
 
 
-def test_capital_deployment_rate_unclassified_returns_none():
-    value, color = capital_deployment_rate(make_inputs(savings_flow_trailing=None))
+def test_target_net_worth_no_age_returns_none():
+    value, color, progress_pct = target_net_worth(make_inputs())
     assert value is None
+    assert progress_pct is None
     assert color == "yellow"
 
 

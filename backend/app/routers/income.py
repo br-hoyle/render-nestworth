@@ -2,16 +2,20 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
+from app.routers.scorecard import gross_annual_income_at
 from app.schemas.income import (
     IncomeConflict,
     IncomeCreate,
     IncomeEndRequest,
     IncomeRead,
+    IncomeSeriesPoint,
+    IncomeSeriesResponse,
     IncomeSummary,
 )
 from app.services.effective_dates import (
@@ -162,3 +166,55 @@ def income_summary(
         total_annual_income=sum(by_individual.values(), Decimal(0)),
         by_individual=by_individual,
     )
+
+
+@router.get("/series", response_model=IncomeSeriesResponse)
+def income_series(
+    months: int = 24,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> IncomeSeriesResponse:
+    """Gross (from the effective-dated income table, per CLAUDE.md's "household income at
+    any point in time" definition — reuses gross_annual_income_at, the same function the
+    scorecard KPIs use) vs. Net (actual income-type transactions, month by month) — lets a
+    household see how what they actually banked compares to their on-paper income."""
+    today = date.today()
+    start = today - relativedelta(months=months)
+
+    net_rows = conn.execute(
+        text(
+            """
+            select to_char(date_trunc('month', date), 'YYYY-MM') as month,
+                   sum(amount) as net
+            from transactions
+            where household_id = :household_id and type = 'income' and date >= :start
+            group by date_trunc('month', date)
+            """
+        ),
+        {"household_id": session.household_id, "start": start},
+    ).mappings().all()
+    net_by_month = {r["month"]: r["net"] for r in net_rows}
+
+    points = []
+    for i in range(months, -1, -1):
+        cutoff = today - relativedelta(months=i)
+        gross_monthly = gross_annual_income_at(conn, session.household_id, cutoff) / 12
+        net_monthly = net_by_month.get(cutoff.strftime("%Y-%m"))
+
+        diff_dollar = (gross_monthly - net_monthly) if net_monthly is not None else None
+        diff_pct = (
+            float((gross_monthly - net_monthly) / gross_monthly * 100)
+            if net_monthly is not None and gross_monthly > 0
+            else None
+        )
+        points.append(
+            IncomeSeriesPoint(
+                date=cutoff,
+                gross_monthly=gross_monthly,
+                net_monthly=net_monthly,
+                diff_dollar=diff_dollar,
+                diff_pct=diff_pct,
+            )
+        )
+
+    return IncomeSeriesResponse(points=points)

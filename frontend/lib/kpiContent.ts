@@ -37,10 +37,10 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     howToInterpret: "Positive is growth; the color here tracks direction, not a fixed target.",
   },
   fi_progress: {
-    description: "How far you are toward having enough invested to stop working.",
-    formula: "Net worth ÷ FI number × 100, where FI number = annual expenses ÷ withdrawal rate",
-    whyItMatters: "Turns \"financial independence\" from a vague goal into a trackable percentage.",
-    howToInterpret: "100% means your assets could theoretically sustain your spending indefinitely at your chosen withdrawal rate.",
+    description: "The net worth you'd need to cover your spending indefinitely (25× annual expenses, or your chosen withdrawal rate), and how close you are.",
+    formula: "Target = annual expenses ÷ withdrawal rate; progress = net worth ÷ target × 100",
+    whyItMatters: "Turns your expenses into a concrete net-worth number to aim for, not just a vague savings goal.",
+    howToInterpret: "100% progress means your assets could theoretically sustain your spending indefinitely at your chosen withdrawal rate.",
   },
   debt_to_income: {
     description: "Total debt measured against how much you earn in a year.",
@@ -66,11 +66,11 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     whyItMatters: "A pure balance-sheet leverage ratio — meaningful even with irregular income.",
     howToInterpret: "Under 30% is conservative leverage, 50%+ means half your assets are debt-financed.",
   },
-  capital_deployment_rate: {
-    description: "The share of your monthly cash surplus actually put to work building wealth.",
-    formula: "Investment contributions + extra debt principal payments ÷ net income (income − expense) × 100",
-    whyItMatters: "Savings rate shows what's left over; this shows where it actually went — idle cash doesn't compound.",
-    howToInterpret: "Requires classifying transactions as \"savings\" first. 20%+ means most of your surplus is being deployed, not sitting idle.",
+  target_net_worth: {
+    description: "The net worth you'd have today if you'd saved a fixed share of income every month since age 20, growing at an expected rate of return.",
+    formula: "Future value of a monthly savings annuity: (income ÷ 12 × savings rate), compounded monthly from age 20 to today",
+    whyItMatters: "A benchmark grounded in your own income and age, rather than a generic rule of thumb — shows whether you're ahead of or behind a steady savings pace.",
+    howToInterpret: "Requires setting your current age in this tile's assumptions. 100%+ means you're at or ahead of the pace this savings rate and return would imply.",
   },
   liquid_runway: {
     description: "How many months your liquid assets could sustain essential spending with zero income.",

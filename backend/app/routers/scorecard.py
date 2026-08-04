@@ -20,13 +20,18 @@ METRICS = [
     ("housing_cost_ratio", "Housing cost ratio", "Safety", "percent", kpi_service.housing_cost_ratio),
     ("savings_rate", "Savings rate", "Growth", "percent", kpi_service.savings_rate),
     ("net_worth_growth_yoy", "Net worth growth (YoY)", "Growth", "percent", kpi_service.net_worth_growth_yoy),
-    ("fi_progress", "FI progress", "Growth", "percent", kpi_service.fi_progress),
+    # Labels are intentionally swapped relative to slug/function names: the household wants
+    # the expense-based number (fi_progress fn) displayed as "Target net worth" and the
+    # age-based savings-annuity number (target_net_worth fn) displayed as "Financial
+    # Independence" — slugs stay put so thresholds/assumptions/content keyed by slug
+    # elsewhere don't need to move.
+    ("fi_progress", "Target net worth", "Growth", "dollars", kpi_service.fi_progress),
+    ("target_net_worth", "Financial Independence", "Growth", "dollars", kpi_service.target_net_worth),
     ("debt_to_income", "Debt-to-income", "Debt & mix", "percent", kpi_service.debt_to_income),
     ("debt_payoff_runway", "Debt payoff runway", "Debt & mix", "months", kpi_service.debt_payoff_runway_months),
     ("net_worth", "Net worth", "Debt & mix", "dollars", kpi_service.net_worth_value),
     # Backlog pass 2 additions:
     ("debt_to_assets_ratio", "Debt-to-assets", "Efficiency", "percent", kpi_service.debt_to_assets_ratio),
-    ("capital_deployment_rate", "Capital deployment rate", "Efficiency", "percent", kpi_service.capital_deployment_rate),
     ("liquid_runway", "Liquid runway", "Efficiency", "months", kpi_service.liquid_runway_months),
     ("savings_efficiency", "Savings efficiency", "Efficiency", "percent", kpi_service.savings_efficiency),
     ("net_worth_velocity", "Net worth velocity", "Efficiency", "percent", kpi_service.net_worth_velocity),
@@ -220,8 +225,11 @@ def get_scorecard(
 
     metrics = []
     for slug, label, group, unit, fn in METRICS:
-        value, color = fn(inputs)
-        metrics.append(KpiMetric(slug=slug, label=label, group=group, value=value, unit=unit, color=color))
+        result = fn(inputs)
+        value, color, progress_pct = result if len(result) == 3 else (*result, None)
+        metrics.append(
+            KpiMetric(slug=slug, label=label, group=group, value=value, unit=unit, color=color, progress_pct=progress_pct)
+        )
 
     return ScorecardResponse(as_of=today.isoformat(), metrics=metrics)
 
@@ -247,7 +255,10 @@ def get_metric_history(
     for i in range(months, -1, -1):
         cutoff = today - relativedelta(months=i)
         inputs = build_kpi_inputs(conn, session.household_id, cutoff, settings)
-        value, _ = fn(inputs)
+        result = fn(inputs)
+        # For dollar-target metrics, chart progress-to-target over time (the meaningful
+        # trend) rather than the target itself, which barely moves month to month.
+        value = result[2] if len(result) == 3 else result[0]
         points.append(KpiHistoryPoint(date=cutoff.isoformat(), value=value))
 
     return KpiHistoryResponse(slug=slug, points=points)

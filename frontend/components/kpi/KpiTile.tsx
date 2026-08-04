@@ -7,6 +7,9 @@ import { formatMetricValue, KPI_COLOR_HEX, titleCase } from "@/lib/format";
 // Rough progress-bar fill so a yellow tile visibly reads as "how far off", not just "not
 // green" — approximate positioning, not a precise scale, since thresholds vary per metric.
 function trackWidth(metric: KpiMetric): number {
+  if (metric.progress_pct !== null && metric.progress_pct !== undefined) {
+    return Math.max(4, Math.min(100, metric.progress_pct));
+  }
   if (metric.value === null) return 0;
   if (metric.unit === "percent") return Math.max(4, Math.min(100, metric.value));
   if (metric.unit === "months") return Math.max(4, Math.min(100, (metric.value / 12) * 100));

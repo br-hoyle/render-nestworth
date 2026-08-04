@@ -14,8 +14,9 @@ DEFAULT_KPI_THRESHOLDS = {
     "debt_payoff_runway": {"green_below": 36, "red_at_or_above": 84},
     # New in backlog pass 2:
     "debt_to_assets_ratio": {"green_below": 30, "red_at_or_above": 50},
-    "capital_deployment_rate": {"red_below": 10, "green_at_or_above": 20},
     "liquid_runway": {"red_below": 3, "green_at_or_above": 6},
+    # Percent-of-target thresholds, same banding convention as fi_progress.
+    "target_net_worth": {"red_below": 50, "green_at_or_above": 100},
     "savings_efficiency": {"red_below": 0, "green_at_or_above": 20},
     "net_worth_velocity": {"red_below": 0, "green_at_or_above": 100},
     # 50/30/20 rule — banded around a target rather than a simple higher/lower-is-better cut.
@@ -33,6 +34,10 @@ DEFAULT_SETTINGS = {
     "manual_monthly_expense": None,
     "fi_withdrawal_rate": 0.04,
     "fi_number_override": None,
+    # Assumptions for the Target Net Worth projection (age-based savings-annuity model).
+    "target_net_worth_savings_rate": 0.15,
+    "target_net_worth_roi": 0.07,
+    "household_age": None,
     "kpi_thresholds": DEFAULT_KPI_THRESHOLDS,
 }
 
@@ -52,6 +57,9 @@ class HouseholdSettings(BaseModel):
     manual_monthly_expense: float | None = None
     fi_withdrawal_rate: float = 0.04
     fi_number_override: float | None = None
+    target_net_worth_savings_rate: float = 0.15
+    target_net_worth_roi: float = 0.07
+    household_age: int | None = None
     kpi_thresholds: dict = DEFAULT_KPI_THRESHOLDS
 
 

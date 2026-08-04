@@ -112,7 +112,7 @@ export default function TransactionsPage() {
             {`group/item pair${unclassified.length === 1 ? "" : "s"} aren't classified as needs/wants/savings yet.`}
           </span>
           <button onClick={() => setShowClassify(true)} className="whitespace-nowrap">
-            Classify now →
+            Classify Now →
           </button>
         </div>
       )}

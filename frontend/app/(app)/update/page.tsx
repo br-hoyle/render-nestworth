@@ -12,9 +12,11 @@ function money(v: string | number) {
 }
 
 interface ChangeEntry {
+  account_id: string;
   account_name: string;
   before: number | null;
   after: number;
+  full_date: string;
 }
 
 export default function UpdatePage() {
@@ -58,14 +60,22 @@ export default function UpdatePage() {
         full_date: asOfDate,
         balance: Number(balance),
       });
-      setChanges((c) => [
-        ...c,
-        {
+      setChanges((c) => {
+        const entry: ChangeEntry = {
+          account_id: current.account_id,
           account_name: current.account_name,
           before: current.latest_balance ? Number(current.latest_balance) : null,
           after: Number(balance),
-        },
-      ]);
+          full_date: asOfDate,
+        };
+        const existingIdx = c.findIndex((e) => e.account_id === current.account_id);
+        if (existingIdx >= 0) {
+          const copy = [...c];
+          copy[existingIdx] = entry;
+          return copy;
+        }
+        return [...c, entry];
+      });
       advance();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
@@ -78,6 +88,17 @@ export default function UpdatePage() {
     setBalance("");
     setAsOfDate(new Date().toISOString().slice(0, 10));
     setIndex((i) => i + 1);
+  }
+
+  function handleBack() {
+    if (!queue || index === 0) return;
+    setError(null);
+    const prevIndex = index - 1;
+    const prevAccount = queue[prevIndex];
+    const existing = changes.find((c) => c.account_id === prevAccount.account_id);
+    setBalance(existing ? String(existing.after) : "");
+    setAsOfDate(existing ? existing.full_date : new Date().toISOString().slice(0, 10));
+    setIndex(prevIndex);
   }
 
   async function handleClosed() {
@@ -132,6 +153,9 @@ export default function UpdatePage() {
           })}
           {changes.length === 0 && <p className="text-xs text-nw-muted">Nothing updated this round.</p>}
         </div>
+        <button onClick={handleBack} className="text-xs text-nw-mint text-center">
+          ← Back to fix the last entry
+        </button>
         <Link href="/overview">
           <Button variant="primary" className="w-full">
             Back to overview
@@ -151,6 +175,12 @@ export default function UpdatePage() {
           {index + 1} / {queue.length}
         </span>
       </div>
+
+      {index > 0 && (
+        <button onClick={handleBack} className="text-xs text-nw-mint self-start -mt-2">
+          ← Back
+        </button>
+      )}
 
       <div className="flex gap-1">
         {queue.map((_, i) => (

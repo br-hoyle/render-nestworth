@@ -16,6 +16,17 @@ const BAND_AROUND_TARGET = {
   labels: ["Target %", "Green within ±", "Yellow within ±"],
 };
 
+// Top-level settings fields (not kpi_thresholds) that back a metric's own formula — edited
+// alongside thresholds since both live in the same household_settings PATCH.
+const ASSUMPTION_FIELDS: Record<string, { key: string; label: string; step?: string }[]> = {
+  fi_progress: [{ key: "fi_withdrawal_rate", label: "Withdrawal rate", step: "0.01" }],
+  target_net_worth: [
+    { key: "household_age", label: "Current age", step: "1" },
+    { key: "target_net_worth_savings_rate", label: "Savings rate", step: "0.01" },
+    { key: "target_net_worth_roi", label: "Expected return", step: "0.01" },
+  ],
+};
+
 const THRESHOLD_KEYS: Record<string, { keys: string[]; labels: string[] }> = {
   emergency_fund: HIGHER_IS_BETTER,
   liquidity_ratio: HIGHER_IS_BETTER,
@@ -23,9 +34,9 @@ const THRESHOLD_KEYS: Record<string, { keys: string[]; labels: string[] }> = {
   savings_rate: HIGHER_IS_BETTER,
   debt_to_income: LOWER_IS_BETTER,
   fi_progress: HIGHER_IS_BETTER,
+  target_net_worth: HIGHER_IS_BETTER,
   debt_payoff_runway: LOWER_IS_BETTER,
   debt_to_assets_ratio: LOWER_IS_BETTER,
-  capital_deployment_rate: HIGHER_IS_BETTER,
   liquid_runway: HIGHER_IS_BETTER,
   savings_efficiency: HIGHER_IS_BETTER,
   net_worth_velocity: HIGHER_IS_BETTER,
@@ -46,13 +57,18 @@ export function KpiDetailPanel({
   const [history, setHistory] = useState<KpiHistoryResponse | null>(null);
   const [settings, setSettings] = useState<HouseholdSettings | null>(null);
   const [thresholds, setThresholds] = useState<Record<string, number>>({});
+  const [assumptions, setAssumptions] = useState<Record<string, number | null>>({});
   const [saving, setSaving] = useState(false);
+
+  const assumptionConfig = ASSUMPTION_FIELDS[metric.slug];
 
   useEffect(() => {
     api.get<KpiHistoryResponse>(`/scorecard/${metric.slug}/history?months=24`).then(setHistory);
     api.get<HouseholdSettings>("/settings").then((s) => {
       setSettings(s);
       setThresholds((s.kpi_thresholds as Record<string, Record<string, number>>)?.[metric.slug] ?? {});
+      const fields = ASSUMPTION_FIELDS[metric.slug] ?? [];
+      setAssumptions(Object.fromEntries(fields.map((f) => [f.key, (s[f.key] as number | null) ?? null])));
     });
   }, [metric.slug]);
 
@@ -63,7 +79,7 @@ export function KpiDetailPanel({
     setSaving(true);
     try {
       const kpi_thresholds = { ...(settings.kpi_thresholds as object), [metric.slug]: thresholds };
-      await api.patch("/settings", { kpi_thresholds });
+      await api.patch("/settings", { kpi_thresholds, ...assumptions });
       onSettingsSaved();
     } finally {
       setSaving(false);
@@ -86,6 +102,11 @@ export function KpiDetailPanel({
         <span className="text-2xl font-medium">{formatMetricValue(metric.value, metric.unit)}</span>
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: KPI_COLOR_HEX[metric.color] }} />
       </div>
+      {metric.progress_pct !== null && (
+        <p className="text-xs text-nw-muted -mt-2">
+          Progress to target: <span className="font-medium text-nw-text">{metric.progress_pct.toFixed(1)}%</span>
+        </p>
+      )}
 
       {content && (
         <div className="flex flex-col gap-2 text-xs">
@@ -129,6 +150,22 @@ export function KpiDetailPanel({
         <p className="text-xs text-nw-muted">Not enough history yet to chart this metric.</p>
       )}
 
+      {assumptionConfig && (
+        <div className="flex flex-col gap-2">
+          <div className="text-[10px] uppercase tracking-wide text-nw-muted">Assumptions</div>
+          {assumptionConfig.map((field) => (
+            <TextField
+              key={field.key}
+              label={field.label}
+              type="number"
+              step={field.step}
+              value={assumptions[field.key] ?? ""}
+              onChange={(e) => setAssumptions((a) => ({ ...a, [field.key]: e.target.value === "" ? null : Number(e.target.value) }))}
+            />
+          ))}
+        </div>
+      )}
+
       {thresholdConfig && (
         <div className="flex flex-col gap-2">
           <div className="text-[10px] uppercase tracking-wide text-nw-muted">Thresholds</div>
@@ -141,10 +178,13 @@ export function KpiDetailPanel({
               onChange={(e) => setThresholds((t) => ({ ...t, [key]: Number(e.target.value) }))}
             />
           ))}
-          <Button variant="primary" onClick={save} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
-          </Button>
         </div>
+      )}
+
+      {(thresholdConfig || assumptionConfig) && (
+        <Button variant="primary" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
       )}
     </div>
   );

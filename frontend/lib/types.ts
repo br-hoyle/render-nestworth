@@ -33,6 +33,27 @@ export interface AccountSparkline {
   points: { full_date: string; balance: string }[];
 }
 
+export interface BalanceGridRow {
+  account_id: string;
+  account_name: string;
+  institution_name: string;
+  account_type: string;
+  balance_type: BalanceType;
+  values: (string | null)[];
+}
+
+export interface BalanceGridCategory {
+  category: string;
+  rows: BalanceGridRow[];
+  totals: string[];
+}
+
+export interface BalanceGridResponse {
+  dates: string[];
+  categories: BalanceGridCategory[];
+  grand_totals: string[];
+}
+
 export interface BalanceImportResult {
   inserted_count: number;
   errors: { row_number: number; raw: Record<string, string>; reason: string }[];
@@ -71,6 +92,18 @@ export interface IncomeSummary {
   by_individual: Record<string, string>;
 }
 
+export interface IncomeSeriesPoint {
+  date: string;
+  gross_monthly: string;
+  net_monthly: string | null;
+  diff_dollar: string | null;
+  diff_pct: number | null;
+}
+
+export interface IncomeSeriesResponse {
+  points: IncomeSeriesPoint[];
+}
+
 export interface Balance {
   balance_id: string;
   account_id: string;
@@ -107,6 +140,10 @@ export interface HouseholdSettings {
   stale_threshold_days: number;
   default_range_months: number;
   liquid_account_types: string[];
+  fi_withdrawal_rate: number;
+  target_net_worth_savings_rate: number;
+  target_net_worth_roi: number;
+  household_age: number | null;
   [key: string]: unknown;
 }
 
@@ -186,6 +223,7 @@ export interface KpiMetric {
   value: number | null;
   unit: "months" | "percent" | "ratio" | "dollars";
   color: KpiColor;
+  progress_pct: number | null;
 }
 
 export interface ScorecardResponse {

@@ -40,3 +40,15 @@ class IncomeSummary(BaseModel):
     as_of: date
     total_annual_income: Decimal
     by_individual: dict[str, Decimal]
+
+
+class IncomeSeriesPoint(BaseModel):
+    date: date
+    gross_monthly: Decimal
+    net_monthly: Decimal | None
+    diff_dollar: Decimal | None
+    diff_pct: float | None
+
+
+class IncomeSeriesResponse(BaseModel):
+    points: list[IncomeSeriesPoint]

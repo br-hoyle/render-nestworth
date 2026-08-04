@@ -11,7 +11,7 @@ const NAV_GROUPS: { heading: string; items: { href: string; label: string }[] }[
     heading: "Track",
     items: [
       { href: "/overview", label: "Overview" },
-      { href: "/trends/cash-flow", label: "Cash flow" },
+      { href: "/trends/cash-flow", label: "Cash Flow" },
       { href: "/trends/scorecard", label: "Scorecard" },
     ],
   },

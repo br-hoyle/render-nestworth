@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useEffect, useState } from "react";
+import { ComposedChart, Bar, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api, ApiError } from "@/lib/api";
-import type { IncomeConflict, IncomeRecord, IncomeSummary, TransactionListResponse } from "@/lib/types";
+import type { IncomeConflict, IncomeRecord, IncomeSeriesResponse, IncomeSummary } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
@@ -13,18 +13,12 @@ function money(v: string | number) {
   return Number(v).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-function monthsAgo(n: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - n);
-  return d.toISOString().slice(0, 10);
-}
-
 export default function IncomePage() {
   const [records, setRecords] = useState<IncomeRecord[] | null>(null);
   const [summary, setSummary] = useState<IncomeSummary | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState<"active" | "all">("active");
-  const [incomeByMonth, setIncomeByMonth] = useState<{ month: string; amount: number }[]>([]);
+  const [series, setSeries] = useState<IncomeSeriesResponse | null>(null);
 
   async function load() {
     const [r, s] = await Promise.all([
@@ -37,16 +31,16 @@ export default function IncomePage() {
 
   useEffect(() => {
     load();
-    api.get<TransactionListResponse>(`/transactions?start=${monthsAgo(24)}&limit=1000`).then((res) => {
-      const map = new Map<string, number>();
-      for (const t of res.items) {
-        if (t.type !== "income") continue;
-        const month = t.date.slice(0, 7);
-        map.set(month, (map.get(month) ?? 0) + Number(t.amount));
-      }
-      setIncomeByMonth([...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, amount]) => ({ month, amount })));
-    });
+    api.get<IncomeSeriesResponse>("/income/series?months=24").then(setSeries);
   }, []);
+
+  const seriesData = (series?.points ?? []).map((p) => ({
+    month: p.date.slice(0, 7),
+    gross: Number(p.gross_monthly),
+    net: p.net_monthly !== null ? Number(p.net_monthly) : null,
+    diff_pct: p.diff_pct,
+  }));
+  const latestPoint = series?.points[series.points.length - 1];
 
   const visibleRecords = (records ?? []).filter((r) => filter === "all" || r.is_open);
   const byIndividual = visibleRecords.reduce<Record<string, IncomeRecord[]>>((acc, r) => {
@@ -71,19 +65,77 @@ export default function IncomePage() {
         </div>
       </div>
 
-      {incomeByMonth.length > 1 && (
+      {seriesData.length > 1 && (
         <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-          <div className="text-sm font-medium">Total Income Over Time</div>
-          <p className="text-[10px] text-nw-muted -mt-1">From imported transactions, not the effective-dated records below.</p>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={incomeByMonth}>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <div className="text-sm font-medium">Gross vs. Net Income</div>
+              <p className="text-[10px] text-nw-muted">
+                Gross = effective-dated income records below. Net = actual income-type transactions.
+              </p>
+            </div>
+            {latestPoint && (
+              <div className="flex gap-3 text-right">
+                <div>
+                  <div className="text-[10px] uppercase text-nw-muted">Gross</div>
+                  <div className="text-sm">{money(latestPoint.gross_monthly)}/mo</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-nw-muted">Net</div>
+                  <div className="text-sm">{latestPoint.net_monthly !== null ? `${money(latestPoint.net_monthly)}/mo` : "—"}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase text-nw-muted">Diff</div>
+                  <div className={"text-sm " + (latestPoint.diff_pct !== null && latestPoint.diff_pct <= 0 ? "text-nw-green" : "text-nw-coral")}>
+                    {latestPoint.diff_dollar !== null ? money(latestPoint.diff_dollar) : "—"}
+                    {latestPoint.diff_pct !== null && ` (${latestPoint.diff_pct >= 0 ? "+" : ""}${latestPoint.diff_pct.toFixed(0)}%)`}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <ComposedChart data={seriesData}>
               <CartesianGrid stroke="var(--nw-border)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={60} tickFormatter={(v) => money(v)} />
-              <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
-              <Bar dataKey="amount" fill="var(--nw-green)" radius={[2, 2, 0, 0]} />
-            </BarChart>
+              <YAxis
+                yAxisId="left"
+                tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+                tickFormatter={(v) => money(v)}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+                tickLine={false}
+                axisLine={false}
+                width={40}
+                tickFormatter={(v) => `${v}%`}
+              />
+              <Tooltip
+                contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
+                itemStyle={{ color: "var(--nw-text)" }}
+                labelStyle={{ color: "var(--nw-text)" }}
+                formatter={(value, name) => (name === "Diff %" ? [`${Number(value).toFixed(0)}%`, name] : [money(Number(value)), name])}
+              />
+              <Bar yAxisId="left" dataKey="gross" name="Gross" fill="var(--nw-green-line)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              <Bar yAxisId="left" dataKey="net" name="Net" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="diff_pct"
+                name="Diff %"
+                stroke="var(--nw-amber)"
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+              />
+            </ComposedChart>
           </ResponsiveContainer>
+          <p className="text-[10px] text-nw-muted">Amber line = Diff % (Gross − Net, right axis). Net shows "—" for months with no imported transactions.</p>
         </div>
       )}
 

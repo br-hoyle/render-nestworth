@@ -152,8 +152,8 @@ export default function CashFlowPage() {
               labelStyle={{ color: "var(--nw-text)" }}
               formatter={(value, name) => (name === "Savings Rate" ? [`${Number(value).toFixed(0)}%`, name] : [money(Number(value)), name])}
             />
-            <Bar yAxisId="left" dataKey="income" name="Income" fill="var(--nw-green)" radius={[2, 2, 0, 0]} />
-            <Bar yAxisId="left" dataKey="expense" name="Expense" fill="var(--nw-muted)" radius={[2, 2, 0, 0]} />
+            <Bar yAxisId="left" dataKey="income" name="Income" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+            <Bar yAxisId="left" dataKey="expense" name="Expense" fill="var(--nw-muted)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
             <Line yAxisId="right" type="monotone" dataKey="savingsRate" name="Savings Rate" stroke="var(--nw-mint)" strokeWidth={2} dot={false} connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
@@ -231,7 +231,7 @@ export default function CashFlowPage() {
             ))}
           </div>
           <Link href="/transactions" className="text-xs text-nw-mint self-end">
-            All transactions →
+            All Transactions →
           </Link>
         </div>
 

@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, timedelta
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,6 +15,9 @@ from app.schemas.accounts import (
     AccountRead,
     AccountRevise,
     AccountSparkline,
+    BalanceGridCategory,
+    BalanceGridResponse,
+    BalanceGridRow,
     SparklinePoint,
     StaleAccountInfo,
 )
@@ -22,7 +26,7 @@ from app.services.effective_dates import (
     OverlapError,
     validate_no_overlap,
 )
-from app.services.forward_fill import is_stale, staleness_days
+from app.services.forward_fill import Snapshot, forward_fill_series, is_stale, staleness_days
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -156,6 +160,95 @@ def account_sparklines(
             SparklinePoint(full_date=row["full_date"], balance=row["balance"])
         )
     return [AccountSparkline(account_id=account_id, points=points) for account_id, points in by_account.items()]
+
+
+@router.get("/balance-grid", response_model=BalanceGridResponse)
+def account_balance_grid(
+    limit: int = 8,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> BalanceGridResponse:
+    """Unlike /sparklines (last N snapshots per account, independently dated), this puts
+    every open account on the SAME shared axis — the household's last N distinct snapshot
+    dates — so institutions can sit side by side in one table and categories can be totaled
+    per date. Category totals net asset and liability accounts together (e.g. a mortgage
+    offsets the home it's secured by), matching Overview's Balances-by-Category behavior."""
+    date_rows = conn.execute(
+        text(
+            """
+            select distinct b.full_date
+            from balances b
+            join accounts a on a.account_id = b.account_id
+            where a.household_id = :household_id and a.effective_end_date = '9999-12-31'
+            order by b.full_date desc
+            limit :limit
+            """
+        ),
+        {"household_id": session.household_id, "limit": limit},
+    ).all()
+    dates = sorted(r.full_date for r in date_rows)
+    if not dates:
+        return BalanceGridResponse(dates=[], categories=[], grand_totals=[])
+
+    accounts = conn.execute(
+        text(
+            """
+            select account_id, account_name, institution_name, category, account_type, balance_type
+            from accounts
+            where household_id = :household_id and effective_end_date = '9999-12-31'
+            order by category, institution_name, account_name
+            """
+        ),
+        {"household_id": session.household_id},
+    ).mappings().all()
+
+    category_order: list[str] = []
+    rows_by_category: dict[str, list[BalanceGridRow]] = {}
+    totals_by_category: dict[str, list[Decimal]] = {}
+    grand_totals = [Decimal(0) for _ in dates]
+
+    for acct in accounts:
+        snapshot_rows = conn.execute(
+            text(
+                "select full_date, balance from balances "
+                "where account_id = :account_id and full_date <= :end order by full_date"
+            ),
+            {"account_id": acct["account_id"], "end": dates[-1]},
+        ).all()
+        snapshots = [Snapshot(r.full_date, r.balance) for r in snapshot_rows]
+        points = forward_fill_series(snapshots, dates)
+        by_date = {p.full_date: p.balance for p in points}
+        values = [by_date.get(d) for d in dates]
+
+        category = acct["category"]
+        if category not in rows_by_category:
+            category_order.append(category)
+            rows_by_category[category] = []
+            totals_by_category[category] = [Decimal(0) for _ in dates]
+
+        rows_by_category[category].append(
+            BalanceGridRow(
+                account_id=acct["account_id"],
+                account_name=acct["account_name"],
+                institution_name=acct["institution_name"],
+                account_type=acct["account_type"],
+                balance_type=acct["balance_type"],
+                values=values,
+            )
+        )
+
+        sign = Decimal(-1) if acct["balance_type"] == "liability" else Decimal(1)
+        for i, v in enumerate(values):
+            if v is None:
+                continue
+            totals_by_category[category][i] += sign * v
+            grand_totals[i] += sign * v
+
+    categories = [
+        BalanceGridCategory(category=cat, rows=rows_by_category[cat], totals=totals_by_category[cat])
+        for cat in category_order
+    ]
+    return BalanceGridResponse(dates=dates, categories=categories, grand_totals=grand_totals)
 
 
 @router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)

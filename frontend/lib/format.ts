@@ -45,3 +45,16 @@ export const KPI_COLOR_HEX: Record<string, string> = {
   red: "var(--nw-coral)",
   coral: "var(--nw-coral)",
 };
+
+// Shared by any balance-over-time table (Accounts, Overview) — % change from the
+// second-to-last to last non-null value ("last"), and from the first to last ("overall").
+export function computeChangePct(values: (number | null)[]): { last: number | null; overall: number | null } {
+  const idxs = values.map((v, i) => (v !== null ? i : -1)).filter((i) => i >= 0);
+  if (idxs.length < 2) return { last: null, overall: null };
+  const first = values[idxs[0]]!;
+  const last = values[idxs[idxs.length - 1]]!;
+  const secondLast = values[idxs[idxs.length - 2]]!;
+  const lastChange = secondLast !== 0 ? ((last - secondLast) / Math.abs(secondLast)) * 100 : null;
+  const overall = first !== 0 ? ((last - first) / Math.abs(first)) * 100 : null;
+  return { last: lastChange, overall };
+}

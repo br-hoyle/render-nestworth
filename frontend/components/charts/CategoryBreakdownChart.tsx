@@ -63,6 +63,7 @@ export function CategoryBreakdownChart({
             fill={PALETTE[i % PALETTE.length]}
             fillOpacity={0.55}
             name={g}
+            isAnimationActive={false}
           />
         ))}
       </AreaChart>

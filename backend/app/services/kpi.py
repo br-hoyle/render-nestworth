@@ -142,18 +142,6 @@ def debt_to_assets_ratio(i: KpiInputs) -> tuple[float | None, str]:
     return ratio_pct, color_for_lower_is_better(ratio_pct, green, red)
 
 
-def capital_deployment_rate(i: KpiInputs) -> tuple[float | None, str]:
-    if i.savings_flow_trailing is None:
-        return None, "yellow"
-    net_income = i.trailing_income - i.trailing_expense
-    if net_income <= 0:
-        return None, "red"
-    rate_pct = float(i.savings_flow_trailing / net_income * 100)
-    red = _threshold(i.settings, "capital_deployment_rate", "red_below", 10)
-    green = _threshold(i.settings, "capital_deployment_rate", "green_at_or_above", 20)
-    return rate_pct, color_for_higher_is_better(rate_pct, red, green)
-
-
 def liquid_runway_months(i: KpiInputs) -> tuple[float | None, str]:
     if i.needs_expense_trailing is not None and i.needs_expense_trailing > 0:
         monthly_needs = i.needs_expense_trailing / i.trailing_months
@@ -220,14 +208,44 @@ def fi_number(i: KpiInputs) -> Decimal:
     return annual_expense / withdrawal_rate
 
 
-def fi_progress(i: KpiInputs) -> tuple[float | None, str]:
+def fi_progress(i: KpiInputs) -> tuple[float | None, str, float | None]:
+    """Returns (target dollar amount, color, progress-to-target percent) — the tile shows the
+    FI number as its headline value and the percent as the progress bar, rather than the
+    reverse, so the dollar goal itself is visible at a glance."""
     target = fi_number(i)
     if target <= 0:
-        return None, "yellow"
+        return None, "yellow", None
     progress_pct = float(i.net_worth / target * 100)
     red = _threshold(i.settings, "fi_progress", "red_below", 50)
     green = _threshold(i.settings, "fi_progress", "green_at_or_above", 100)
-    return progress_pct, color_for_higher_is_better(progress_pct, red, green)
+    color = color_for_higher_is_better(progress_pct, red, green)
+    return float(target), color, progress_pct
+
+
+def target_net_worth(i: KpiInputs) -> tuple[float | None, str, float | None]:
+    """Projects the net worth a household "should" have by now if they'd saved a fixed
+    fraction of income every month from age 20 onward at a fixed annualized return — a
+    future-value-of-an-annuity model, distinct from fi_progress's expense-based FI number.
+    Returns (target dollar amount, color, progress-to-target percent); requires household_age
+    to be configured (no schema field for birth date/age otherwise exists)."""
+    age = i.settings.get("household_age")
+    roi = i.settings.get("target_net_worth_roi", 0.07)
+    savings_rate = i.settings.get("target_net_worth_savings_rate", 0.15)
+    if age is None or i.gross_annual_income <= 0 or roi <= 0:
+        return None, "yellow", None
+    months = (age - 20) * 12
+    if months <= 0:
+        return None, "yellow", None
+    monthly_rate = roi / 12
+    monthly_savings = float(i.gross_annual_income) / 12 * savings_rate
+    target = monthly_savings * (((1 + monthly_rate) ** months) / monthly_rate - 1 / monthly_rate)
+    if target <= 0:
+        return None, "yellow", None
+    progress_pct = float(i.net_worth) / target * 100
+    red = _threshold(i.settings, "target_net_worth", "red_below", 50)
+    green = _threshold(i.settings, "target_net_worth", "green_at_or_above", 100)
+    color = color_for_higher_is_better(progress_pct, red, green)
+    return target, color, progress_pct
 
 
 def debt_to_income(i: KpiInputs) -> tuple[float | None, str]:

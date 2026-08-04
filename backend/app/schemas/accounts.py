@@ -55,3 +55,24 @@ class SparklinePoint(BaseModel):
 class AccountSparkline(BaseModel):
     account_id: uuid.UUID
     points: list[SparklinePoint]
+
+
+class BalanceGridRow(BaseModel):
+    account_id: uuid.UUID
+    account_name: str
+    institution_name: str
+    account_type: str
+    balance_type: Literal["asset", "liability"]
+    values: list[Decimal | None]
+
+
+class BalanceGridCategory(BaseModel):
+    category: str
+    rows: list[BalanceGridRow]
+    totals: list[Decimal]
+
+
+class BalanceGridResponse(BaseModel):
+    dates: list[date]
+    categories: list[BalanceGridCategory]
+    grand_totals: list[Decimal]

@@ -48,10 +48,26 @@ window, from transactions. Thresholds: red `< 5%`, green `≥ 15%`.
 |net worth 1 year ago| × 100`. Green if non-negative, coral (a warning color, not a strict
 "red" threshold) if negative — trend direction matters more than a fixed band here.
 
-**FI progress** (`percent`) — `net worth ÷ FI number × 100`. FI number defaults to
-`(average monthly expense × 12) ÷ withdrawal rate` (the standard "25× annual expenses" at a
-4% withdrawal rate), overridable directly via `fi_number_override`. Green at `≥ 100%`
-(financially independent), yellow `≥ 50%`, red below that.
+**Target net worth** (`dollars`, slug `fi_progress`) — headline value is the FI number
+itself: `(average monthly expense × 12) ÷ withdrawal rate` (the standard "25× annual
+expenses" at a 4% withdrawal rate), overridable directly via `fi_number_override`. The
+tile's progress bar and detail panel show `net worth ÷ FI number × 100` as `progress_pct`.
+Green at `≥ 100%` progress (financially independent), yellow `≥ 50%`, red below that.
+Withdrawal rate is a household-configurable assumption (`fi_withdrawal_rate`, default 4%),
+editable from the tile's detail panel. (Displayed as "Target net worth" per household
+preference — the slug and underlying formula are unchanged from the original "FI progress"
+metric.)
+
+**Financial Independence** (`dollars`, slug `target_net_worth`) — the net worth a household
+"should" have today if they'd saved a fixed share of income every month from age 20 onward,
+growing at a fixed annualized return: a future-value-of-an-annuity projection, distinct from
+the FI number's expense-based approach above. Requires three household-configurable
+assumptions, set from the tile's detail panel — `household_age` (no birth date field exists,
+so age is entered directly and does not advance on its own), `target_net_worth_savings_rate`
+(default 15%), and `target_net_worth_roi` (default 7%) — and returns `None` until
+`household_age` is set. The tile's progress bar and detail panel show `net worth ÷ target ×
+100` as `progress_pct`. Green
+at `≥ 100%` progress, yellow `≥ 50%`, red below that.
 
 ## Debt & mix
 
@@ -77,11 +93,6 @@ from live account balances) rather than as a scored KPI.
 **Debt-to-assets** (`percent`) — `total liabilities ÷ total assets × 100`. Lower is better;
 green `< 30%`, red `≥ 50%`. Unlike debt-to-income, this is a pure balance-sheet ratio (no
 income dependency), so it stays meaningful even for a household with irregular income.
-
-**Capital deployment rate** (`percent`) — `(needs/wants/savings-classified "savings" flow
-transactions) ÷ (trailing income − trailing expense) × 100`. Requires the household to have
-classified at least one transaction via `transaction_categories`; returns "not classified
-yet" (gray/`None`) otherwise rather than a misleading zero. Green `≥ 20%`, red `< 10%`.
 
 **Liquid runway** (`months`) — `liquid balance ÷ average monthly "needs" expense`. Falls back
 to overall trailing expense (same basis as Emergency fund) if the household hasn't
