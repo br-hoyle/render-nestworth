@@ -5,15 +5,70 @@ export const CATEGORY_OPTIONS_BY_BALANCE_TYPE: Record<"asset" | "liability", str
 
 export const TYPE_OPTIONS_BY_BALANCE_AND_CATEGORY: Record<"asset" | "liability", Record<string, string[]>> = {
   asset: {
-    Banking: ["Savings", "Checking", "Other"],
-    Investment: ["Brokerage", "529 College Savings", "Health Savings Account", "Money Market", "Other"],
-    Retirement: ["401K", "Roth 401K", "Traditional IRA", "Roth IRA", "403(b)", "SEP IRA", "SIMPLE IRA", "Solo 401K", "Other"],
-    Property: ["Primary Residence", "Rental Property", "Land", "Other"],
+    Banking: [
+      "Checking",
+      "Savings",
+      "High-Yield Savings",
+      "Certificate of Deposit",
+      "Money Market",
+      "Cash",
+      "Other",
+    ],
+    Investment: [
+      "Brokerage",
+      "529 College Savings",
+      "Health Savings Account",
+      "Crypto Wallet",
+      "Other",
+    ],
+    Retirement: [
+      "401(k)",
+      "Roth 401(k)",
+      "Traditional IRA",
+      "Roth IRA",
+      "403(b)",
+      "457(b)",
+      "SEP IRA",
+      "SIMPLE IRA",
+      "Solo 401(k)",
+      "Pension",
+      "Annuity",
+      "Other",
+    ],
+    Property: [
+      "Primary Residence",
+      "Secondary Residence",
+      "Rental Property",
+      "Commercial Property",
+      "Land",
+      "Other",
+    ],
   },
   liability: {
-    Banking: ["Credit Card", "Other"],
-    Loan: ["Auto Loan", "Personal Loan", "Student Loan", "SBA Loan", "Other"],
-    Property: ["HELOC", "Mortgage", "Other"],
+    Banking: [
+      "Credit Card",
+      "Overdraft Line of Credit",
+      "Personal Line of Credit",
+      "Other",
+    ],
+    Loan: [
+      "Auto Loan",
+      "Personal Loan",
+      "Student Loan",
+      "401(k) Loan",
+      "Margin Debt",
+      "SBA Loan",
+      "Other",
+    ],
+    Property: [
+      "Mortgage",
+      "Secondary Mortgage",
+      "HELOC",
+      "Home Equity Loan",
+      "Construction Loan",
+      "Land Loan",
+      "Other",
+    ],
   },
 };
 
@@ -24,10 +79,10 @@ export const ACCOUNT_TYPES = [
   ...new Set(Object.values(TYPE_OPTIONS_BY_BALANCE_AND_CATEGORY).flatMap((byCategory) => Object.values(byCategory).flat())),
 ];
 
-export const FLOW_TYPE_OPTIONS: { value: "needs" | "wants" | "savings" | "transfer" | "other"; label: string }[] = [
-  { value: "needs", label: "Needs (non-discretionary)" },
-  { value: "wants", label: "Wants (discretionary)" },
-  { value: "savings", label: "Savings / investing" },
-  { value: "transfer", label: "Transfer between accounts" },
-  { value: "other", label: "Other" },
+export const FLOW_TYPE_OPTIONS: { value: "Needs" | "Wants" | "Savings" | "Transfer" | "Other"; label: string }[] = [
+  { value: "Needs", label: "Needs (Non-Discretionary)" },
+  { value: "Wants", label: "Wants (Discretionary)" },
+  { value: "Savings", label: "Savings / Investing" },
+  { value: "Transfer", label: "Transfer between Accounts" },
+  { value: "Other", label: "Other" },
 ];

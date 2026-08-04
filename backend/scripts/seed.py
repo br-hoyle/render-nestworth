@@ -30,6 +30,9 @@ from sqlalchemy import create_engine, text
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BACKEND_DIR / ".env")
+sys.path.insert(0, str(BACKEND_DIR))
+
+from app.security import encrypt_pii, hash_username  # noqa: E402
 
 random.seed(42)
 
@@ -106,15 +109,18 @@ def main() -> None:
         conn.execute(
             text(
                 """
-                insert into users (user_id, household_id, household_name, username, status)
-                values (:user_id, :household_id, :household_name, :username, 'invited')
+                insert into users
+                    (user_id, household_id, household_name, username_lookup_hash, username_encrypted, status)
+                values
+                    (:user_id, :household_id, :household_name, :username_hash, :username_encrypted, 'invited')
                 """
             ),
             {
                 "user_id": user_id,
                 "household_id": household_id,
-                "household_name": "The Harts",
-                "username": "harts",
+                "household_name": encrypt_pii("The Harts"),
+                "username_hash": hash_username("harts"),
+                "username_encrypted": encrypt_pii("harts"),
             },
         )
 

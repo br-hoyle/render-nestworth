@@ -24,7 +24,10 @@ from app.schemas.auth import (
 from app.security import (
     SESSION_COOKIE_NAME,
     create_session_token,
+    decrypt_pii,
+    encrypt_pii,
     hash_secret,
+    hash_username,
     verify_secret,
 )
 
@@ -68,10 +71,10 @@ def login(
 
     row = conn.execute(
         text(
-            "select household_id, household_name, username, password_hash, status "
-            "from users where username = :username"
+            "select household_id, household_name, password_hash, status "
+            "from users where username_lookup_hash = :username_hash"
         ),
-        {"username": payload.username},
+        {"username_hash": hash_username(payload.username)},
     ).mappings().first()
 
     if row is None:
@@ -90,9 +93,11 @@ def login(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=GENERIC_LOGIN_ERROR)
 
     clear_attempts(key)
-    token, expires_at = create_session_token(str(row["household_id"]), row["username"])
+    token, expires_at = create_session_token(str(row["household_id"]), payload.username)
     set_session_cookie(response, token)
-    return _to_session_response(str(row["household_id"]), row["household_name"], row["username"], expires_at)
+    return _to_session_response(
+        str(row["household_id"]), decrypt_pii(row["household_name"]), payload.username, expires_at
+    )
 
 
 @router.post("/setup", response_model=SessionResponse)
@@ -105,8 +110,8 @@ def setup_account(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Passwords do not match.")
 
     row = conn.execute(
-        text("select household_id, household_name, status from users where username = :username"),
-        {"username": payload.username},
+        text("select household_id, household_name, status from users where username_lookup_hash = :username_hash"),
+        {"username_hash": hash_username(payload.username)},
     ).mappings().first()
 
     if row is None or row["status"] != "invited":
@@ -136,7 +141,9 @@ def setup_account(
 
     token, expires_at = create_session_token(str(row["household_id"]), payload.username)
     set_session_cookie(response, token)
-    return _to_session_response(str(row["household_id"]), row["household_name"], payload.username, expires_at)
+    return _to_session_response(
+        str(row["household_id"]), decrypt_pii(row["household_name"]), payload.username, expires_at
+    )
 
 
 @router.post("/signup", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
@@ -153,8 +160,9 @@ def signup(
     if payload.password != payload.confirm_password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Passwords do not match.")
 
+    username_hash = hash_username(payload.username)
     existing = conn.execute(
-        text("select 1 from users where username = :username"), {"username": payload.username}
+        text("select 1 from users where username_lookup_hash = :username_hash"), {"username_hash": username_hash}
     ).first()
     if existing:
         register_failed_attempt(key)
@@ -165,17 +173,18 @@ def signup(
         text(
             """
             insert into users
-                (household_id, household_name, username, password_hash,
-                 security_question, security_answer_hash, status)
+                (household_id, household_name, username_lookup_hash, username_encrypted,
+                 password_hash, security_question, security_answer_hash, status)
             values
-                (:household_id, :household_name, :username, :password_hash,
-                 :security_question, :security_answer_hash, 'active')
+                (:household_id, :household_name, :username_hash, :username_encrypted,
+                 :password_hash, :security_question, :security_answer_hash, 'active')
             """
         ),
         {
             "household_id": household_id,
-            "household_name": payload.household_name,
-            "username": payload.username,
+            "household_name": encrypt_pii(payload.household_name),
+            "username_hash": username_hash,
+            "username_encrypted": encrypt_pii(payload.username),
             "password_hash": hash_secret(payload.password),
             "security_question": payload.security_question,
             "security_answer_hash": hash_secret(payload.security_answer.strip().lower()),
@@ -194,8 +203,11 @@ def forgot_password_question(
     conn: Connection = Depends(get_owner_db),
 ) -> ForgotPasswordQuestionResponse:
     row = conn.execute(
-        text("select security_question from users where username = :username and status = 'active'"),
-        {"username": payload.username},
+        text(
+            "select security_question from users "
+            "where username_lookup_hash = :username_hash and status = 'active'"
+        ),
+        {"username_hash": hash_username(payload.username)},
     ).mappings().first()
 
     question = row["security_question"] if row and row["security_question"] else _decoy_question(payload.username)
@@ -215,9 +227,9 @@ def forgot_password_reset(
     row = conn.execute(
         text(
             "select household_id, security_answer_hash from users "
-            "where username = :username and status = 'active'"
+            "where username_lookup_hash = :username_hash and status = 'active'"
         ),
-        {"username": payload.username},
+        {"username_hash": hash_username(payload.username)},
     ).mappings().first()
 
     answer_hash = row["security_answer_hash"] if row else None
@@ -243,7 +255,9 @@ def me(
     ).mappings().first()
     if row is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Session expired")
-    return _to_session_response(session.household_id, row["household_name"], session.username, session.expires_at)
+    return _to_session_response(
+        session.household_id, decrypt_pii(row["household_name"]), session.username, session.expires_at
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -304,6 +318,6 @@ def update_household_name(
 ) -> SessionResponse:
     conn.execute(
         text("update users set household_name = :name where household_id = :household_id"),
-        {"name": payload.household_name, "household_id": session.household_id},
+        {"name": encrypt_pii(payload.household_name), "household_id": session.household_id},
     )
     return _to_session_response(session.household_id, payload.household_name, session.username, session.expires_at)

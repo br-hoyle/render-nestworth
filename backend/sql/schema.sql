@@ -24,17 +24,39 @@ create extension if not exists pgcrypto;
 -- ----------------------------------------------------------------------------
 -- 1. users (auth / tenancy)
 -- ----------------------------------------------------------------------------
+-- household_name and username are anonymized at rest (see backend/app/security.py):
+--   household_name    — Fernet ciphertext (encrypt_pii/decrypt_pii). Reversible, since the
+--                        household itself still needs to see its own display name; the key
+--                        lives only in backend env vars, never in the database.
+--   username_lookup_hash — HMAC-SHA256(username, pepper) via hash_username(). Deterministic
+--                        and one-way (unlike bcrypt), so it can back a WHERE lookup and a
+--                        UNIQUE constraint. This is what every login/signup/forgot-password
+--                        query matches against.
+--   username_encrypted — Fernet ciphertext of the same username, decrypted only for the
+--                        admin Invites page (the owner already chose these values themselves
+--                        when creating an invite).
+-- Nobody browsing this table directly (Supabase SQL editor, a backup, etc.) can read either
+-- field back to a real username or display name without the app's own encryption key.
 create table if not exists users (
     user_id uuid primary key default gen_random_uuid(),
     household_id uuid not null unique,
     household_name text not null,
-    username text not null unique,
+    username_lookup_hash text not null unique,
+    username_encrypted text not null,
     password_hash text,
     security_question text,
     security_answer_hash text,
     status text not null default 'invited' check (status in ('invited', 'active')),
     created_date timestamptz not null default now()
 );
+
+-- Upgrade path for a table created before the anonymization above (safe to re-run): add the
+-- new columns as nullable so this runs cleanly against existing rows, which still have their
+-- old plaintext `username` column. Do NOT add NOT NULL/UNIQUE or drop `username` here — that
+-- has to wait until every row is backfilled, which is what
+-- backend/scripts/migrate_anonymize_users.py does in one pass (backfill, then finalize).
+alter table users add column if not exists username_lookup_hash text;
+alter table users add column if not exists username_encrypted text;
 
 -- ----------------------------------------------------------------------------
 -- 2. accounts (Type-2 slowly changing dimension)

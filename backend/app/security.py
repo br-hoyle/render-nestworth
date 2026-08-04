@@ -1,6 +1,9 @@
+import hashlib
+import hmac
 import time
 
 import jwt
+from cryptography.fernet import Fernet
 from passlib.context import CryptContext
 
 from app.config import get_settings
@@ -26,6 +29,32 @@ def verify_secret(value: str, hashed: str | None) -> bool:
         pwd_context.verify(value, _DUMMY_HASH)
         return False
     return pwd_context.verify(value, hashed)
+
+
+def hash_username(username: str) -> str:
+    """Deterministic, one-way (HMAC-SHA256, not bcrypt): unlike bcrypt, the same input always
+    produces the same output, so this can back a `WHERE` lookup and a UNIQUE constraint —
+    bcrypt's random salt makes that impossible. Keyed with a pepper so the hash can't be
+    reproduced by anyone without the app's own secret, even knowing the algorithm."""
+    return hmac.new(get_settings().username_hash_pepper.encode(), username.encode(), hashlib.sha256).hexdigest()
+
+
+def _fernet() -> Fernet:
+    return Fernet(get_settings().pii_encryption_key.encode())
+
+
+def encrypt_pii(value: str) -> str:
+    """Reversible, unlike hash_secret/hash_username — for fields (household_name, and a
+    redisplayable copy of username) that must be shown back to the app itself later. The key
+    lives only in backend environment variables, never in the database, so raw DB/SQL
+    browsing sees only ciphertext."""
+    return _fernet().encrypt(value.encode()).decode()
+
+
+def decrypt_pii(value: str | None) -> str | None:
+    if value is None:
+        return None
+    return _fernet().decrypt(value.encode()).decode()
 
 
 def create_session_token(household_id: str, username: str) -> tuple[str, int]:

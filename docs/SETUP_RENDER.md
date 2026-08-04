@@ -30,6 +30,8 @@ Environment variables (Render → Environment):
 | `DATABASE_URL` | Supabase owner connection string (see `docs/SETUP_SUPABASE.md`) |
 | `TENANT_DATABASE_URL` | Supabase `app_user` connection string |
 | `JWT_SECRET` | a long random string — e.g. output of `openssl rand -hex 32` |
+| `USERNAME_HASH_PEPPER` | a separate long random string (e.g. another `openssl rand -hex 32`) — used to hash `username` at rest; do not reuse `JWT_SECRET` |
+| `PII_ENCRYPTION_KEY` | a Fernet key used to encrypt `household_name`/`username` at rest — generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `OWNER_HOUSEHOLD_ID` | printed by `scripts/seed.py` (or `scripts/invite.py` for the first household) |
 | `CORS_ALLOW_ORIGIN` | the frontend service's Render URL, e.g. `https://nestworth-web.onrender.com` |
 | `ENVIRONMENT` | `production` (this switches the session cookie to `Secure`, required for `SameSite=None` to work over HTTPS) |

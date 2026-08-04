@@ -40,6 +40,19 @@ password be auto-generated for `app_user` instead of hand-editing the file), see
 `backend/scripts/apply_schema.py` — it reads `DATABASE_URL` from `backend/.env` and applies
 `schema.sql` directly.
 
+**`username` and `household_name` are anonymized at rest**, the same way `password_hash`
+already is: `username` is stored only as a deterministic HMAC-SHA256 (`username_lookup_hash`,
+keyed with `USERNAME_HASH_PEPPER`) plus a separately-encrypted copy (`username_encrypted`)
+used only to display it back on the admin Invites page; `household_name` is stored as Fernet
+ciphertext (`PII_ENCRYPTION_KEY`). Neither is ever stored as plaintext, so browsing the raw
+table doesn't tell you which household is which — see `backend/app/security.py`
+(`hash_username`/`encrypt_pii`/`decrypt_pii`) and the comment above the `users` table in
+`schema.sql`. Both env vars are required (fill them into `backend/.env`, generation commands
+are in `.env.example`). If you're upgrading an existing deployment that predates this (its
+`users` table still has a plaintext `username` column), run
+`python scripts/migrate_anonymize_users.py` once, after backing up the database — it backfills
+the new columns and drops the plaintext one.
+
 ## 3. Get your connection strings
 
 Project Settings → Database → Connection string:

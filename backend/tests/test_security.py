@@ -4,7 +4,10 @@ from app.rate_limit import clear_attempts, is_rate_limited, register_failed_atte
 from app.security import (
     create_session_token,
     decode_session_token,
+    decrypt_pii,
+    encrypt_pii,
     hash_secret,
+    hash_username,
     refresh_session_token,
     verify_secret,
 )
@@ -44,6 +47,28 @@ def test_refresh_extends_expiry():
     new_payload = decode_session_token(new_token)
     assert new_payload["last_activity"] > payload["last_activity"]
     assert new_expires_at >= expires_at
+
+
+def test_hash_username_is_deterministic():
+    assert hash_username("harts") == hash_username("harts")
+
+
+def test_hash_username_differs_for_different_input():
+    assert hash_username("harts") != hash_username("smiths")
+
+
+def test_hash_username_is_not_the_plaintext():
+    assert hash_username("harts") != "harts"
+
+
+def test_encrypt_pii_roundtrip():
+    ciphertext = encrypt_pii("The Harts")
+    assert ciphertext != "The Harts"
+    assert decrypt_pii(ciphertext) == "The Harts"
+
+
+def test_decrypt_pii_passes_through_none():
+    assert decrypt_pii(None) is None
 
 
 def test_rate_limit_locks_after_threshold():

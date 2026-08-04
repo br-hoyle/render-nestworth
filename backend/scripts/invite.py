@@ -17,6 +17,9 @@ from sqlalchemy import create_engine, text
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BACKEND_DIR / ".env")
+sys.path.insert(0, str(BACKEND_DIR))
+
+from app.security import encrypt_pii, hash_username  # noqa: E402
 
 
 def main() -> None:
@@ -35,9 +38,11 @@ def main() -> None:
     engine = create_engine(database_url)
     household_id = str(uuid.uuid4())
 
+    username_hash = hash_username(args.username)
     with engine.begin() as conn:
         existing = conn.execute(
-            text("select 1 from users where username = :username"), {"username": args.username}
+            text("select 1 from users where username_lookup_hash = :username_hash"),
+            {"username_hash": username_hash},
         ).first()
         if existing:
             print(f"Username '{args.username}' already exists.", file=sys.stderr)
@@ -46,14 +51,17 @@ def main() -> None:
         conn.execute(
             text(
                 """
-                insert into users (household_id, household_name, username, status)
-                values (:household_id, :household_name, :username, 'invited')
+                insert into users
+                    (household_id, household_name, username_lookup_hash, username_encrypted, status)
+                values
+                    (:household_id, :household_name, :username_hash, :username_encrypted, 'invited')
                 """
             ),
             {
                 "household_id": household_id,
-                "household_name": args.household_name,
-                "username": args.username,
+                "household_name": encrypt_pii(args.household_name),
+                "username_hash": username_hash,
+                "username_encrypted": encrypt_pii(args.username),
             },
         )
 

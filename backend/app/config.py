@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     jwt_secret: str
     owner_household_id: str | None = None
 
+    # Separate secrets from jwt_secret so either can be rotated independently.
+    # username_hash_pepper: any random string (e.g. `openssl rand -hex 32`).
+    # pii_encryption_key: must be a valid Fernet key — generate with
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    username_hash_pepper: str
+    pii_encryption_key: str
+
     cors_allow_origin: str = "http://localhost:3000"
 
     session_timeout_seconds: int = 3600
