@@ -1,0 +1,11 @@
+Group,Item,Type,Date,Merchant,Account,Amount,Note
+Income,Paycheck,income,06/03/2026,Acme Co,Chase •1234,6875.00,
+Food,Groceries,expense,06/02/2026,Kroger,Chase •1234,-142.36,
+Food,Restaurants,expense,06/04/2026,Chipotle,Chase •1234,-31.20,
+Housing,Mortgage,expense,06/05/2026,Wells Fargo,Chase •1234,-2450.00,
+Transport,Gas,expense,06/08/2026,Shell,Amex •9002,-52.10,
+Transport,Auto Insurance,expense,06/10/2026,Geico,Chase •1234,-118.00,
+Fun,Streaming,expense,06/12/2026,Netflix,Amex •9002,-15.49,
+Food,Groceries,expense,06/16/2026,Kroger,Chase •1234,-98.44,
+Income,Paycheck,income,06/17/2026,Beta LLC,Chase •1234,4083.00,
+Fun,Dining,expense,06/07/2026,Local Bistro,,12.5o,

@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+/*
+  NestWorth brand palette, lifted directly from the wireframe (NestWorth Wireframes.dc.html).
+  Dark-first design — the app is a single dark theme (matches the wireframe, no light mode).
+*/
+:root {
+  --nw-bg: #0b0f0d;
+  --nw-ground: #070a08;
+  --nw-surface: #171c19;
+  --nw-rail: #101511;
+  --nw-border: #242b26;
+  --nw-text: #f4f8f3;
+  --nw-muted: #7c9385;
+  --nw-green: #37bd57;
+  --nw-mint: #a7e9c2;
+  --nw-coral: #e8664b;
+  --nw-amber: #f2b84b;
+  --nw-green-tint: #132b1b;
+  --nw-green-line: #1f5230;
+  --nw-green-deep: #28893f;
+  --nw-track: #1e2621;
+  --nw-line-hi: #33403a;
+  --nw-coral-tint: #2a1512;
+  --nw-amber-tint: #2a2213;
+}
+
+@theme inline {
+  --color-nw-bg: var(--nw-bg);
+  --color-nw-ground: var(--nw-ground);
+  --color-nw-surface: var(--nw-surface);
+  --color-nw-rail: var(--nw-rail);
+  --color-nw-border: var(--nw-border);
+  --color-nw-text: var(--nw-text);
+  --color-nw-muted: var(--nw-muted);
+  --color-nw-green: var(--nw-green);
+  --color-nw-mint: var(--nw-mint);
+  --color-nw-coral: var(--nw-coral);
+  --color-nw-amber: var(--nw-amber);
+  --color-nw-green-tint: var(--nw-green-tint);
+  --color-nw-green-line: var(--nw-green-line);
+  --color-nw-green-deep: var(--nw-green-deep);
+  --color-nw-track: var(--nw-track);
+  --color-nw-line-hi: var(--nw-line-hi);
+  --color-nw-coral-tint: var(--nw-coral-tint);
+  --color-nw-amber-tint: var(--nw-amber-tint);
+  --font-sans: var(--font-inter);
+}
+
+html {
+  background: var(--nw-ground);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--nw-bg);
+  color: var(--nw-text);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}

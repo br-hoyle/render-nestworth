@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<style>
+:root{
+--nw-bg:#0B0F0D; --nw-surface:#171C19; --nw-border:#242B26; --nw-text:#F4F8F3;
+--nw-muted:#7C9385; --nw-green:#37bd57; --nw-mint:#A7E9C2; --nw-coral:#E8664B; --nw-amber:#F2B84B;
+--nw-green-tint:#132B1B; --nw-green-line:#1F5230; --nw-green-deep:#28893F;
+--nw-rail:#101511; --nw-track:#1E2621; --nw-coral-tint:#2A1512; --nw-amber-tint:#2A2213;
+}
+html{background:#070A08}
+body{margin:0;background:#070A08;min-width:max-content;font-family:Inter,system-ui,sans-serif}
+a{color:var(--nw-mint)}a:hover{color:var(--nw-green)}
+.dv-turn{padding:40px 44px 34px;border-bottom:1px solid rgba(255,255,255,.06);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--nw-green-tint);color:var(--nw-mint);border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 Inter,system-ui,sans-serif;color:var(--nw-text)}
+.dv-opts{display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:var(--nw-surface);border:1px solid var(--nw-border);color:var(--nw-muted);border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11.5px/1.3 Inter,system-ui,sans-serif;color:var(--nw-muted)}
+.dv-card{background:var(--nw-bg);border:1px solid var(--nw-border);border-radius:9px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.5)}
+.dv-opt:target .dv-oid{background:var(--nw-green);color:#08130C;border-color:var(--nw-green)}
+.dv-next{margin:24px 0 0;font:12px/1.6 Inter,system-ui,sans-serif;color:var(--nw-muted)}
+.dv-note{font:11.5px/1.55 Inter,system-ui,sans-serif;color:var(--nw-muted);margin:0;max-width:940px}
+.dv-note b{color:var(--nw-text);font-weight:500}
+.cap{font-size:9.5px;color:var(--nw-muted);letter-spacing:.09em;text-transform:uppercase;margin:2px 0 -2px}
+.pal{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 4px}
+.sw{width:104px;border:1px solid var(--nw-border);border-radius:7px;overflow:hidden}
+.sw i{display:block;height:34px}
+.sw span{display:block;padding:5px 7px;font:500 8.5px/1.5 ui-monospace,Menlo,monospace;color:var(--nw-muted);background:var(--nw-surface)}
+.sw b{display:block;font:500 9.5px Inter;color:var(--nw-text);letter-spacing:.02em}
+.wf{display:flex;font-size:11px;color:var(--nw-text);background:var(--nw-bg)}
+.wf-sb{width:150px;flex:none;background:var(--nw-rail);border-right:1px solid var(--nw-border);padding:12px 9px;display:flex;flex-direction:column;gap:2px}
+.wf-brand{display:flex;align-items:center;gap:7px;margin:2px 0 13px 5px}
+.wf-brand img{width:19px;height:19px;object-fit:contain}
+.wf-brand em{font:600 11.5px Inter;font-style:normal;color:var(--nw-text);letter-spacing:-.01em}
+.wf-brand em i{font-style:normal;color:var(--nw-green)}
+.wf-nav{padding:5px 8px;border-radius:6px;color:var(--nw-muted);font-size:10.5px}
+.wf-nav.on{background:var(--nw-green-tint);color:var(--nw-mint);box-shadow:inset 2px 0 0 var(--nw-green)}
+.wf-navh{font-size:8.5px;letter-spacing:.11em;text-transform:uppercase;color:#4E6255;margin:11px 0 3px 8px}
+.wf-body{flex:1;min-width:0;display:flex;flex-direction:column}
+.wf-top{height:38px;flex:none;display:flex;align-items:center;gap:7px;padding:0 14px;border-bottom:1px solid var(--nw-border)}
+.wf-main{padding:14px;display:flex;flex-direction:column;gap:11px;flex:1;min-height:0}
+.wf-h{font:500 13.5px Inter;margin:0;color:var(--nw-text)}
+.wf-h2{font:500 11px Inter;margin:0;color:var(--nw-text)}
+.wf-sub{font-size:10px;color:var(--nw-muted)}
+.wf-c{background:var(--nw-surface);border:1px solid var(--nw-border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.wf-box{border:1px dashed #33403A;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--nw-muted);font-size:10px;text-align:center;padding:6px;line-height:1.4}
+.wf-bar{height:6px;border-radius:3px;background:var(--nw-track)}
+.wf-btn{border:1px solid #33403A;border-radius:6px;padding:4px 9px;font-size:10px;color:var(--nw-text);white-space:nowrap}
+.wf-btn.pri{border-color:var(--nw-green);color:var(--nw-green)}
+.wf-chip{border:1px solid var(--nw-border);border-radius:999px;padding:2px 8px;font-size:9.5px;color:var(--nw-muted);white-space:nowrap}
+.wf-chip.on{border-color:var(--nw-green-line);color:var(--nw-mint);background:var(--nw-green-tint)}
+.wf-row{display:flex;gap:8px;align-items:center}
+.wf-th{font-size:9px;letter-spacing:.07em;text-transform:uppercase;color:#5C7266}
+.wf-tr{padding:6px 0;border-top:1px solid var(--nw-border);font-size:10px;color:#C4D2C8;align-items:center;display:grid;gap:8px}
+.wf-num{font:500 22px Inter;letter-spacing:-.01em;color:var(--nw-text)}
+.wf-kpi{background:var(--nw-surface);border:1px solid var(--nw-border);border-radius:8px;padding:8px 9px;display:flex;flex-direction:column;gap:4px}
+.wf-kl{font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--nw-muted)}
+.wf-kv{font:500 15px Inter;color:var(--nw-text)}
+.dot{width:6px;height:6px;border-radius:99px;flex:none}
+.g{background:var(--nw-green)}.y{background:var(--nw-amber)}.r{background:var(--nw-coral)}
+.pos{color:var(--nw-green)}.neg{color:var(--nw-coral)}
+.wf-input{border:1px solid var(--nw-border);border-radius:6px;padding:5px 8px;font-size:10px;color:#B6C6BB;background:#101511}
+.wf-ban{border:1px solid var(--nw-green-line);background:var(--nw-green-tint);border-radius:8px;padding:7px 10px;display:flex;align-items:center;gap:9px;font-size:10px;color:var(--nw-mint)}
+.wf-step{display:flex;align-items:center;gap:6px;font-size:9.5px;color:var(--nw-muted)}
+.wf-sn{width:15px;height:15px;border-radius:99px;border:1px solid #33403A;display:flex;align-items:center;justify-content:center;font-size:8.5px}
+.wf-sn.on{border-color:var(--nw-green);color:var(--nw-green);background:var(--nw-green-tint)}
+.wf-line{flex:1;height:1px;background:var(--nw-border)}
+.trk{height:8px;background:var(--nw-track);border-radius:99px;overflow:hidden}
+.trk i{display:block;height:100%}
+.ph{width:280px;flex:none;background:var(--nw-bg);border:1px solid #2E3A33;border-radius:22px;overflow:hidden;display:flex;flex-direction:column;color:var(--nw-text);font-size:11px}
+.ph-bar{height:22px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:8.5px;color:var(--nw-muted)}
+.ph-top{flex:none;display:flex;align-items:center;gap:8px;padding:5px 13px 9px;border-bottom:1px solid var(--nw-border)}
+.ph-ttl{font:500 12px Inter;color:var(--nw-text)}
+.ph-main{padding:11px 12px;display:flex;flex-direction:column;gap:9px;flex:1;min-height:0}
+.ph-tabs{flex:none;display:flex;border-top:1px solid var(--nw-border);background:var(--nw-rail)}
+.ph-tab{flex:1;display:flex;flex-direction:column;gap:4px;align-items:center;padding:8px 0 10px;font-size:8.5px;color:var(--nw-muted)}
+.ph-tab.on{color:var(--nw-green)}
+.ph-ti{width:14px;height:14px;border:1.5px solid currentColor;border-radius:4px;opacity:.85}
+.ph-fab{width:15px;height:15px;border:1.5px solid var(--nw-green);border-radius:99px;color:var(--nw-green);display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1}
+.ph-cta{border:1px solid var(--nw-green);color:var(--nw-green);border-radius:8px;text-align:center;padding:11px;font-size:12px}
+.ph-item{background:var(--nw-surface);border:1px solid var(--nw-border);border-radius:8px;padding:9px;display:flex;flex-direction:column;gap:3px}
+.ph-seg{display:flex;border:1px solid var(--nw-border);border-radius:7px;overflow:hidden}
+.ph-seg div{flex:1;text-align:center;padding:6px 0;font-size:9.5px;color:var(--nw-muted)}
+.ph-seg div.on{background:var(--nw-green-tint);color:var(--nw-mint)}
+.ph-sheet{border:1px solid var(--nw-border);border-top-left-radius:14px;border-top-right-radius:14px;background:var(--nw-surface);padding:11px 12px;display:flex;flex-direction:column;gap:9px}
+.ph-grab{width:34px;height:3px;border-radius:99px;background:#33403A;margin:0 auto 2px}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">NestWorth mobile — every screen at 390pt, five bottom tabs</span></div>
+
+<p class="dv-note" style="margin:0 0 16px"><b>The model.</b> Five tabs — Overview, Trends, <b>Update</b> (centre, the one thing you'll do standing at a bank app), Plan, More. Manage screens (Accounts, Income, Transactions, Settings, Import) live under More. Wide tables become stacked cards; comparison tables keep their label column pinned and scroll horizontally. Every tap target is ≥44px.</p>
+
+<p class="cap" style="margin:0 0 10px">Tabs 1–2 · Overview and Trends</p>
+<div class="dv-opts">
+<div class="dv-opt" id="3a">
+<div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>Overview · Net worth · Cash Flow · Scorecard · KPI detail sheet</div>
+<div class="dv-card" style="padding:18px;display:flex;gap:15px;background:#0D120F">
+
+<div class="ph" style="height:580px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><img src="uploads/Brandmark.png" alt="" style="width:20px"><div><div class="ph-ttl">NestWorth</div><div class="wf-sub" style="font-size:9px">The Harts</div></div><div style="flex:1"></div><div class="wf-chip on">12M ▾</div></div>
+<div class="ph-main">
+<div class="wf-ban" style="border-color:#5A4A20;background:var(--nw-amber-tint);color:var(--nw-amber);font-size:9.5px;padding:8px 9px"><div class="dot y"></div><div style="flex:1">4 accounts stale</div><div>Update →</div></div>
+<div><div class="wf-kl">Net worth</div><div style="font:500 29px Inter;letter-spacing:-.015em">$XXX,XXX</div><div class="wf-sub pos" style="font-size:9.5px">+$X,XXX MoM · +XX% YoY</div></div>
+<div class="wf-box" style="height:100px">Line chart — full bleed, tap-and-hold scrubs a date readout</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+<div class="wf-kpi"><div class="wf-kl">Savings rate</div><div class="wf-row"><div class="wf-kv" style="font-size:13px">XX%</div><div class="dot g"></div></div><div class="trk" style="height:5px"><i style="width:66%;background:var(--nw-green)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">Emergency fund</div><div class="wf-row"><div class="wf-kv" style="font-size:13px">X.X mo</div><div class="dot y"></div></div><div class="trk" style="height:5px"><i style="width:44%;background:var(--nw-amber)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">Debt-to-income</div><div class="wf-row"><div class="wf-kv" style="font-size:13px">XX%</div><div class="dot g"></div></div><div class="trk" style="height:5px"><i style="width:30%;background:var(--nw-green)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">FI progress</div><div class="wf-row"><div class="wf-kv" style="font-size:13px">XX%</div></div><div class="trk" style="height:5px"><i style="width:32%;background:var(--nw-green-deep)"></i></div></div>
+</div>
+<div class="wf-btn" style="text-align:center;padding:10px">All 11 metrics →</div>
+<div class="wf-c" style="flex:1;min-height:70px;gap:6px"><div class="wf-h2" style="font-size:10.5px">Allocation</div><div class="wf-box" style="flex:1">Donut + legend</div></div>
+</div>
+<div class="ph-tabs"><div class="ph-tab on"><div class="ph-ti"></div>Overview</div><div class="ph-tab"><div class="ph-ti"></div>Trends</div><div class="ph-tab"><div class="ph-fab">+</div>Update</div><div class="ph-tab"><div class="ph-ti"></div>Plan</div><div class="ph-tab"><div class="ph-ti"></div>More</div></div>
+</div>
+
+<div class="ph" style="height:580px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">Trends</div><div style="flex:1"></div><div class="wf-chip on">12M ▾</div></div>
+<div class="ph-main">
+<div class="ph-seg"><div class="on">Net worth</div><div>Cash Flow</div><div>Scorecard</div></div>
+<div class="ph-seg" style="border:none"><div class="on" style="border:1px solid var(--nw-green-line);border-radius:7px">Net</div><div>Assets</div><div>Debts</div></div>
+<div class="wf-num" style="font-size:23px">$XXX,XXX</div>
+<div class="wf-box" style="height:116px">Chart · pinch to change range, hold to scrub</div>
+<div class="wf-row" style="gap:5px;overflow:hidden"><div class="wf-chip on">Category</div><div class="wf-chip">Type</div><div class="wf-chip">Institution</div></div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:1fr auto 40px;border-top:none"><div>Investments</div><div>$XX,XXX</div><div class="pos" style="text-align:right">+X%</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto 40px"><div>Retirement</div><div>$XX,XXX</div><div class="pos" style="text-align:right">+X%</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto 40px"><div>Banking</div><div>$XX,XXX</div><div class="neg" style="text-align:right">−X%</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto 40px"><div>Property</div><div>$XXX,XXX</div><div class="pos" style="text-align:right">+X%</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto 40px"><div>Mortgage</div><div class="neg">−$XXX,XXX</div><div class="pos" style="text-align:right">−X%</div></div>
+</div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">Empty state: fewer than 2 snapshots → "Record a second balance to see a trend" + [ Update balances ].</div>
+<div style="flex:1"></div>
+</div>
+<div class="ph-tabs"><div class="ph-tab"><div class="ph-ti"></div>Overview</div><div class="ph-tab on"><div class="ph-ti"></div>Trends</div><div class="ph-tab"><div class="ph-fab">+</div>Update</div><div class="ph-tab"><div class="ph-ti"></div>Plan</div><div class="ph-tab"><div class="ph-ti"></div>More</div></div>
+</div>
+
+<div class="ph" style="height:580px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">Trends</div><div style="flex:1"></div><div class="wf-chip on">12M ▾</div></div>
+<div class="ph-main">
+<div class="ph-seg"><div>Net worth</div><div class="on">Cash Flow</div><div>Scorecard</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+<div class="wf-kpi"><div class="wf-kl">Avg income</div><div class="wf-kv" style="font-size:13px">$X,XXX</div></div>
+<div class="wf-kpi"><div class="wf-kl">Avg expense</div><div class="wf-kv" style="font-size:13px">$X,XXX</div></div>
+<div class="wf-kpi"><div class="wf-kl">Avg net</div><div class="wf-kv pos" style="font-size:13px">$X,XXX</div></div>
+<div class="wf-kpi"><div class="wf-kl">Savings rate</div><div class="wf-row"><div class="wf-kv" style="font-size:13px">XX%</div><div class="dot g"></div></div></div>
+</div>
+<div class="wf-box" style="height:96px">Income vs expense bars — swipe horizontally through months, tap one to filter</div>
+<div class="wf-h2" style="font-size:10.5px">Spending by group</div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:1fr 40px auto;border-top:none"><div>Housing</div><div class="wf-bar" style="background:var(--nw-green-deep)"></div><div>$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 40px auto;color:var(--nw-coral)"><div>Food</div><div class="wf-bar" style="width:28px;background:var(--nw-coral)"></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 40px auto"><div>Transport</div><div class="wf-bar" style="width:18px;background:var(--nw-green-line)"></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 40px auto"><div>Insurance</div><div class="wf-bar" style="width:14px;background:var(--nw-green-line)"></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 40px auto"><div>Fun</div><div class="wf-bar" style="width:11px;background:var(--nw-green-line)"></div><div>$XXX</div></div>
+</div>
+<div class="wf-btn" style="text-align:center;padding:10px">All transactions →</div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">Transactions open as a stacked list: merchant + amount on line one, date · group · account beneath. Filter sheet from the top-right.</div>
+<div style="flex:1"></div>
+</div>
+<div class="ph-tabs"><div class="ph-tab"><div class="ph-ti"></div>Overview</div><div class="ph-tab on"><div class="ph-ti"></div>Trends</div><div class="ph-tab"><div class="ph-fab">+</div>Update</div><div class="ph-tab"><div class="ph-ti"></div>Plan</div><div class="ph-tab"><div class="ph-ti"></div>More</div></div>
+</div>
+
+<div class="ph" style="height:580px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">Trends</div><div style="flex:1"></div><div class="wf-chip">Today ▾</div></div>
+<div class="ph-main">
+<div class="ph-seg"><div>Net worth</div><div>Cash Flow</div><div class="on">Scorecard</div></div>
+<div class="wf-row" style="gap:5px"><div class="wf-chip on">Safety</div><div class="wf-chip">Growth</div><div class="wf-chip">Debt &amp; mix</div></div>
+<div class="wf-kpi" style="border-color:var(--nw-green-line)"><div class="wf-row"><div class="wf-kl" style="flex:1">Emergency fund</div><div class="dot y"></div><div class="wf-sub">›</div></div><div class="wf-kv">X.X mo</div><div class="trk"><i style="width:44%;background:var(--nw-amber)"></i></div><div class="wf-sub" style="font-size:8.5px">red &lt;3 · yellow 3–6 · green &gt;6</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Liquidity ratio</div><div class="dot g"></div><div class="wf-sub">›</div></div><div class="wf-kv">X.Xx</div><div class="trk"><i style="width:72%;background:var(--nw-green)"></i></div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Housing cost ratio</div><div class="dot g"></div><div class="wf-sub">›</div></div><div class="wf-kv">XX%</div><div class="trk"><i style="width:52%;background:var(--nw-green)"></i></div></div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">One column of full-width tiles per group — the desktop 3-and-4 grid would squeeze the numbers below 13px.</div>
+<div style="flex:1"></div>
+</div>
+<div class="ph-tabs"><div class="ph-tab"><div class="ph-ti"></div>Overview</div><div class="ph-tab on"><div class="ph-ti"></div>Trends</div><div class="ph-tab"><div class="ph-fab">+</div>Update</div><div class="ph-tab"><div class="ph-ti"></div>Plan</div><div class="ph-tab"><div class="ph-ti"></div>More</div></div>
+</div>
+
+<div class="ph" style="height:580px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">Trends</div><div style="flex:1"></div><div class="wf-chip">Today ▾</div></div>
+<div class="ph-main" style="opacity:.35;gap:9px">
+<div class="ph-seg"><div>Net worth</div><div>Cash Flow</div><div class="on">Scorecard</div></div>
+<div class="wf-row" style="gap:5px"><div class="wf-chip on">Safety</div><div class="wf-chip">Growth</div><div class="wf-chip">Debt</div></div>
+<div class="wf-kpi"><div class="wf-kl">Emergency fund</div><div class="wf-kv">X.X mo</div></div>
+<div class="wf-kpi"><div class="wf-kl">Liquidity ratio</div><div class="wf-kv">X.Xx</div></div>
+</div>
+<div class="ph-sheet" style="margin-top:-206px;position:relative;z-index:2;height:412px">
+<div class="ph-grab"></div>
+<div class="wf-row"><div class="wf-h2">Emergency fund</div><div style="flex:1"></div><div class="wf-sub">✕</div></div>
+<div class="wf-row"><div class="wf-num" style="font-size:27px">X.X</div><div><div class="wf-sub">months of expenses</div><div class="wf-row" style="gap:5px"><div class="dot y"></div><div class="wf-sub" style="color:var(--nw-amber)">Below target</div></div></div></div>
+<div class="wf-box" style="height:88px">24-month history with threshold bands shaded behind the line</div>
+<div class="wf-row" style="gap:5px"><div class="wf-chip">6M</div><div class="wf-chip on">24M</div><div class="wf-chip">All</div></div>
+<div><div class="wf-kl">Target months</div><div class="wf-row" style="gap:8px;margin-top:5px"><div class="trk" style="flex:1;height:10px"><i style="width:50%;background:var(--nw-green)"></i></div><div class="wf-input" style="padding:5px 8px">6</div></div></div>
+<div><div class="wf-kl">Liquid accounts</div><div class="wf-row" style="gap:4px;flex-wrap:wrap;margin-top:5px"><div class="wf-chip on">Checking</div><div class="wf-chip on">Savings</div><div class="wf-chip">Brokerage</div><div class="wf-chip">HSA</div></div></div>
+<div><div class="wf-kl">Expense basis</div><div class="ph-seg" style="margin-top:5px"><div class="on">3mo</div><div>12mo</div><div>Manual</div></div></div>
+<div style="flex:1"></div>
+<div class="wf-row"><div class="wf-btn" style="flex:1;text-align:center;padding:10px">Reset</div><div class="ph-cta" style="flex:1">Save</div></div>
+</div>
+</div>
+
+</div>
+<p class="dv-note"><b>Notes.</b> Trends is one tab with a three-way segment rather than three destinations — it keeps the tab bar at five. Tapping a scorecard tile raises the parameter sheet (last frame) with the same controls as the desktop side panel, sliders sized for thumbs.</p>
+</div>
+</div>
+
+<p class="cap" style="margin:32px 0 10px">Tab 3 · Update — the reason this app is on a phone</p>
+<div class="dv-opts">
+<div class="dv-opt" id="3b">
+<div class="dv-olabel"><a class="dv-oid" href="#3b">3b</a>Guided update · done state · manual add</div>
+<div class="dv-card" style="padding:18px;display:flex;gap:15px;background:#0D120F">
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">✕</div><div class="ph-ttl">Update balances</div><div style="flex:1"></div><div class="wf-sub">3 / 9</div></div>
+<div class="ph-main">
+<div class="wf-row" style="gap:3px"><div class="wf-bar" style="flex:1;background:var(--nw-green-deep)"></div><div class="wf-bar" style="flex:1;background:var(--nw-green-deep)"></div><div class="wf-bar" style="flex:1;background:var(--nw-green)"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div></div>
+<div class="wf-kl">Fidelity · Investments</div>
+<div class="wf-h" style="font-size:16px">Joint Brokerage</div>
+<div class="wf-row" style="font-size:9.5px;color:var(--nw-amber)"><div class="dot y"></div>Last $XX,XXX on Apr 12 · 108 days</div>
+<div class="wf-input" style="font:500 26px Inter;color:var(--nw-text);padding:14px;text-align:right;border-color:var(--nw-green-line)">$ ______</div>
+<div class="wf-input" style="text-align:center;padding:9px">As of 2026-07-29</div>
+<div class="wf-box" style="height:56px">Account sparkline — last 8 snapshots</div>
+<div style="flex:1"></div>
+<div class="ph-cta">Save &amp; next</div>
+<div class="wf-row" style="gap:7px"><div class="wf-btn" style="flex:1;text-align:center;padding:11px">Skip</div><div class="wf-btn" style="flex:1;text-align:center;padding:11px">Closed</div></div>
+<div class="wf-box" style="padding:7px;font-size:9px">Numeric keypad, decimal only. Swipe left/right also moves between accounts.</div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">All caught up</div><div style="flex:1"></div><div class="wf-sub">✕</div></div>
+<div class="ph-main">
+<div class="wf-box" style="height:98px;flex-direction:column;gap:7px;border-color:var(--nw-green-line);color:var(--nw-mint);background:var(--nw-green-tint)"><img src="uploads/Brandmark.png" alt="" style="width:34px"><div style="font-size:11px">9 accounts updated</div></div>
+<div><div class="wf-kl">Net worth now</div><div style="font:500 27px Inter">$XXX,XXX</div><div class="wf-sub pos" style="font-size:9.5px">+$X,XXX since your last update</div></div>
+<div class="wf-c" style="gap:6px"><div class="wf-h2" style="font-size:10.5px">What moved</div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;border-top:none"><div>Joint Brokerage</div><div class="pos">+$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto"><div>Roth IRA</div><div class="pos">+$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto"><div>Chase Checking</div><div class="neg">−$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto"><div>Mortgage</div><div class="pos">−$XXX</div></div>
+</div>
+<div class="wf-c" style="gap:5px"><div class="wf-row"><div class="wf-kl" style="flex:1">Emergency fund</div><div class="dot y"></div></div><div class="wf-sub" style="font-size:9.5px">Still below 6 months — now X.X</div></div>
+<div style="flex:1"></div>
+<div class="ph-cta">Back to overview</div>
+<div class="wf-btn" style="text-align:center;padding:11px">Undo this update</div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">✕</div><div class="ph-ttl">Add a balance</div></div>
+<div class="ph-main">
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">Reached from Update → "Add one manually", or from an account's detail screen. For backfilling a date the guided flow skipped.</div>
+<div><div class="wf-kl">Account</div><div class="wf-input" style="padding:10px;margin-top:5px">Ally Savings ▾</div></div>
+<div><div class="wf-kl">As of date</div><div class="wf-input" style="padding:10px;margin-top:5px">2026-06-30</div></div>
+<div><div class="wf-kl">Balance</div><div class="wf-input" style="font:500 24px Inter;color:var(--nw-text);padding:13px;text-align:right;margin-top:5px;border-color:var(--nw-green-line)">$ ______</div></div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left;border-color:#5A4A20;color:var(--nw-amber)">A snapshot already exists for this account on this date — saving replaces it. Any other date adds a new row.</div>
+<div class="wf-box" style="height:60px">Existing history for the chosen account</div>
+<div style="flex:1"></div>
+<div class="ph-cta">Save balance</div>
+</div>
+</div>
+
+</div>
+<p class="dv-note"><b>Notes.</b> The done state is deliberate — it's the payoff for the chore, and the only place net worth change is framed as "since your last update" rather than a calendar period.</p>
+</div>
+</div>
+
+<p class="cap" style="margin:32px 0 10px">Tab 4 · Plan</p>
+<div class="dv-opts">
+<div class="dv-opt" id="3c">
+<div class="dv-olabel"><a class="dv-oid" href="#3c">3c</a>Scenario list · comparison (pinned labels) · calculator · house scenarios</div>
+<div class="dv-card" style="padding:18px;display:flex;gap:15px;background:#0D120F">
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">Plan</div><div style="flex:1"></div><div class="wf-btn">+ New</div></div>
+<div class="ph-main">
+<div class="ph-seg"><div class="on">Scenarios</div><div>Calculators</div></div>
+<div class="wf-kl">Retirement</div>
+<div class="wf-c" style="gap:6px"><div class="wf-row"><div class="dot" style="background:var(--nw-green)"></div><div style="flex:1;font-size:11.5px">Retire at 57</div><div class="dot y"></div></div><div class="wf-box" style="height:44px">Projection sparkline</div><div class="wf-row"><div class="wf-sub" style="flex:1">Balance $X.XM</div><div class="wf-sub" style="color:var(--nw-amber)">lasts to 84</div></div></div>
+<div class="wf-c" style="gap:6px"><div class="wf-row"><div class="dot" style="background:var(--nw-mint)"></div><div style="flex:1;font-size:11.5px">Retire at 65 + SS</div><div class="dot g"></div></div><div class="wf-box" style="height:44px">Projection sparkline</div><div class="wf-row"><div class="wf-sub" style="flex:1">Balance $X.XM</div><div class="wf-sub pos">lasts past 92</div></div></div>
+<div class="wf-kl">House</div>
+<div class="wf-c" style="gap:6px"><div class="wf-row"><div class="dot" style="background:var(--nw-muted)"></div><div style="flex:1;font-size:11.5px">Move in 2027</div><div class="dot r"></div></div><div class="wf-row"><div class="wf-sub" style="flex:1">$XXX,XXX · $X,XXX/mo</div><div class="wf-sub" style="color:var(--nw-coral)">EF drops to X.X</div></div></div>
+<div class="wf-btn" style="text-align:center;padding:11px">Compare side by side →</div>
+<div style="flex:1"></div>
+</div>
+<div class="ph-tabs"><div class="ph-tab"><div class="ph-ti"></div>Overview</div><div class="ph-tab"><div class="ph-ti"></div>Trends</div><div class="ph-tab"><div class="ph-fab">+</div>Update</div><div class="ph-tab on"><div class="ph-ti"></div>Plan</div><div class="ph-tab"><div class="ph-ti"></div>More</div></div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Compare</div><div style="flex:1"></div><div class="wf-chip on">Retirement</div></div>
+<div class="ph-main">
+<div class="wf-box" style="height:96px">Both projections, depletion points marked</div>
+<div class="wf-box" style="padding:7px;font-size:9px;text-align:left">Label column pinned left; scenario columns scroll horizontally — two visible, a third peeking.</div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr;border-top:none;font-size:9.5px;color:var(--nw-muted)"><div></div><div class="wf-row" style="gap:4px"><div class="dot" style="background:var(--nw-green)"></div>at 57</div><div class="wf-row" style="gap:4px"><div class="dot" style="background:var(--nw-mint)"></div>at 65</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr"><div class="wf-th">Age</div><div>57</div><div>65</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr"><div class="wf-th">Monthly contrib</div><div>$X,XXX</div><div>$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr"><div class="wf-th">Real return</div><div>X.X%</div><div>X.X%</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr"><div class="wf-th">Withdrawal</div><div>4.0%</div><div>4.0%</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr"><div class="wf-th">Soc. Security</div><div>$0</div><div>$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr;background:var(--nw-surface);border-top-color:transparent;border-radius:5px;padding:8px 5px"><div class="wf-th" style="color:var(--nw-text)">At retirement</div><div style="color:var(--nw-text)">$X.XM</div><div style="color:var(--nw-text)">$X.XM</div></div>
+<div class="wf-tr" style="grid-template-columns:88px 1fr 1fr"><div class="wf-th">Lasts until</div><div class="wf-row" style="gap:4px"><div class="dot y"></div>84</div><div class="wf-row" style="gap:4px"><div class="dot g"></div>92+</div></div>
+</div>
+<div class="wf-box" style="padding:7px;font-size:9px;text-align:left">Tap a cell to edit in a sheet — no inline editing at this width.</div>
+<div style="flex:1"></div>
+<div class="ph-cta">Save changes</div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Mortgage</div><div style="flex:1"></div><div class="wf-chip on">Prefilled</div></div>
+<div class="ph-main">
+<div class="ph-seg"><div class="on">Results</div><div>Inputs</div><div>Schedule</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
+<div class="wf-kpi"><div class="wf-kl">Monthly P&amp;I</div><div class="wf-kv" style="font-size:13px">$X,XXX</div></div>
+<div class="wf-kpi"><div class="wf-kl">Payoff date</div><div class="wf-kv" style="font-size:13px">Mar 2044</div></div>
+<div class="wf-kpi"><div class="wf-kl">Total interest</div><div class="wf-kv" style="font-size:13px">$XXX,XXX</div></div>
+<div class="wf-kpi"><div class="wf-kl">Interest saved</div><div class="wf-kv pos" style="font-size:13px">$XX,XXX</div></div>
+</div>
+<div class="wf-box" style="height:96px">Balance curve — baseline vs. with extra payments</div>
+<div class="wf-c" style="gap:8px"><div class="wf-h2" style="font-size:10.5px">Quick adjust</div>
+<div><div class="wf-kl">Extra monthly</div><div class="wf-row" style="gap:8px;margin-top:5px"><div class="trk" style="flex:1;height:10px"><i style="width:38%;background:var(--nw-green)"></i></div><div class="wf-input" style="padding:5px 8px">$XXX</div></div></div>
+<div><div class="wf-kl">Rate</div><div class="wf-row" style="gap:8px;margin-top:5px"><div class="trk" style="flex:1;height:10px"><i style="width:44%;background:var(--nw-green)"></i></div><div class="wf-input" style="padding:5px 8px">X.XX%</div></div></div>
+</div>
+<div class="wf-box" style="padding:7px;font-size:9px;text-align:left">Full input list and the amortization table live behind the other two segments — the schedule scrolls horizontally.</div>
+<div style="flex:1"></div>
+<div class="ph-cta">Save as scenario</div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Move in 2027</div><div style="flex:1"></div><div class="wf-chip on">28/36</div></div>
+<div class="ph-main">
+<div class="wf-c" style="gap:7px"><div class="wf-h2" style="font-size:10.5px">Affordable today</div>
+<div class="wf-row" style="gap:7px"><div class="wf-kpi" style="flex:1"><div class="wf-kl">Max price</div><div class="wf-kv" style="font-size:12px">$XXX,XXX</div></div><div class="wf-kpi" style="flex:1"><div class="wf-kl">PITI</div><div class="wf-kv" style="font-size:12px">$X,XXX</div></div></div></div>
+<div class="wf-kl">This scenario</div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:1fr auto;border-top:none"><div class="wf-th">Purchase price</div><div>$XXX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto"><div class="wf-th">Down payment</div><div>XX%</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto"><div class="wf-th">Rate / term</div><div>X.X% · 30y</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto"><div class="wf-th">Tax / ins / HOA</div><div>$XXX/mo</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;background:var(--nw-surface);border-top-color:transparent;border-radius:5px;padding:8px 6px"><div class="wf-th" style="color:var(--nw-text)">Monthly payment</div><div style="color:var(--nw-text)">$X,XXX</div></div>
+</div>
+<div class="wf-kl">What it does to you</div>
+<div class="wf-item" style="border-color:#5A3228"><div class="wf-row"><div style="flex:1;font-size:10.5px">Emergency fund</div><div class="dot r"></div><div style="font:500 12px Inter">X.X mo</div></div><div class="wf-sub" style="font-size:9px">was X.X — drops below 3 months</div></div>
+<div class="wf-item" style="border-color:#5A4A20"><div class="wf-row"><div style="flex:1;font-size:10.5px">Housing ratio</div><div class="dot y"></div><div style="font:500 12px Inter">XX%</div></div><div class="wf-sub" style="font-size:9px">over the 28% guideline</div></div>
+<div class="wf-item"><div class="wf-row"><div style="flex:1;font-size:10.5px">Savings rate</div><div class="dot y"></div><div style="font:500 12px Inter">XX%</div></div><div class="wf-sub" style="font-size:9px">was XX%</div></div>
+<div style="flex:1"></div>
+<div class="ph-cta">Save scenario</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+<p class="cap" style="margin:32px 0 10px">Tab 5 · More — manage screens, import, settings, auth</p>
+<div class="dv-opts">
+<div class="dv-opt" id="3d">
+<div class="dv-olabel"><a class="dv-oid" href="#3d">3d</a>More · Accounts · Income · CSV import · Settings · Login</div>
+<div class="dv-card" style="padding:18px;display:flex;gap:15px;background:#0D120F;flex-wrap:wrap">
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">More</div></div>
+<div class="ph-main">
+<div class="wf-kl">Manage</div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:1fr auto;border-top:none;font-size:11.5px;padding:11px 0"><div>Accounts</div><div class="wf-sub">›</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:11.5px;padding:11px 0"><div>Income</div><div class="wf-sub">›</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:11.5px;padding:11px 0"><div>Balances history</div><div class="wf-sub">›</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:11.5px;padding:11px 0"><div>Transactions</div><div class="wf-sub">›</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:11.5px;padding:11px 0"><div>Import CSV</div><div class="wf-sub">›</div></div>
+</div>
+<div class="wf-kl">Household</div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:1fr auto;border-top:none;font-size:11.5px;padding:11px 0"><div>Settings</div><div class="wf-sub">›</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:11.5px;padding:11px 0"><div>Invites <span class="wf-chip" style="padding:1px 5px">owner</span></div><div class="wf-sub">›</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:11.5px;padding:11px 0;color:var(--nw-muted)"><div>Sign out</div><div class="wf-sub">›</div></div>
+</div>
+<div class="wf-c" style="gap:5px"><div class="wf-h2" style="font-size:10.5px">Session</div><div class="wf-sub" style="font-size:9.5px">Signs out after 1 hour of inactivity. A countdown appears in the last 5 minutes with [ Stay signed in ].</div></div>
+<div style="flex:1"></div>
+</div>
+<div class="ph-tabs"><div class="ph-tab"><div class="ph-ti"></div>Overview</div><div class="ph-tab"><div class="ph-ti"></div>Trends</div><div class="ph-tab"><div class="ph-fab">+</div>Update</div><div class="ph-tab"><div class="ph-ti"></div>Plan</div><div class="ph-tab on"><div class="ph-ti"></div>More</div></div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Accounts</div><div style="flex:1"></div><div class="wf-btn">+ New</div></div>
+<div class="ph-main">
+<div class="wf-row" style="gap:5px"><div class="wf-chip on">Active</div><div class="wf-chip">Closed</div><div class="wf-chip">Assets</div><div class="wf-chip">Debts</div></div>
+<div class="wf-kl">Banking</div>
+<div class="ph-item"><div class="wf-row"><div style="flex:1;font-size:11.5px">Chase Checking</div><div style="font-size:11.5px">$X,XXX</div></div><div class="wf-sub" style="font-size:9px">Chase · updated 3d ago</div></div>
+<div class="ph-item"><div class="wf-row"><div style="flex:1;font-size:11.5px">Ally Savings</div><div style="font-size:11.5px">$XX,XXX</div></div><div class="wf-row" style="gap:5px"><div class="dot y"></div><div class="wf-sub" style="font-size:9px">Ally · 41 days stale</div></div></div>
+<div class="wf-kl">Investments</div>
+<div class="ph-item"><div class="wf-row"><div style="flex:1;font-size:11.5px">Joint Brokerage</div><div style="font-size:11.5px">$XX,XXX</div></div><div class="wf-row" style="gap:5px"><div class="dot y"></div><div class="wf-sub" style="font-size:9px">Fidelity · 108 days stale</div></div></div>
+<div class="wf-kl">Liabilities</div>
+<div class="ph-item"><div class="wf-row"><div style="flex:1;font-size:11.5px">Mortgage</div><div class="neg" style="font-size:11.5px">−$XXX,XXX</div></div><div class="wf-sub" style="font-size:9px">Wells Fargo · 94 days stale</div></div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">Tap = detail + snapshot history. Edit opens the dated-revision sheet — same "saving opens a new revision" copy as desktop.</div>
+<div style="flex:1"></div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Income</div><div style="flex:1"></div><div class="wf-btn">+ Add</div></div>
+<div class="ph-main">
+<div class="wf-c"><div class="wf-kl">Household income today</div><div class="wf-num" style="font-size:19px">$XXX,XXX<span class="wf-sub"> /yr</span></div></div>
+<div class="wf-box" style="height:74px;flex-direction:column;gap:6px;align-items:stretch;padding:9px">
+<div class="wf-row"><div style="width:32px;font-size:9px;color:var(--nw-muted)">Dana</div><div class="wf-bar" style="width:36%;background:var(--nw-green-line)"></div><div class="wf-bar" style="flex:1;background:var(--nw-green)"></div></div>
+<div class="wf-row"><div style="width:32px;font-size:9px;color:var(--nw-muted)">Ross</div><div style="width:12%"></div><div class="wf-bar" style="width:28%;background:var(--nw-green-line)"></div><div style="width:6%"></div><div class="wf-bar" style="flex:1;background:var(--nw-green-deep)"></div></div>
+</div>
+<div class="ph-item"><div class="wf-row"><div style="flex:1;font-size:11.5px">Dana · Acme Co</div><div style="font-size:11.5px">$XXX,XXX</div></div><div class="wf-sub" style="font-size:9px">2024-04 → open</div></div>
+<div class="ph-item" style="opacity:.55"><div class="wf-row"><div style="flex:1;font-size:11.5px">Dana · Acme Co</div><div style="font-size:11.5px">$XX,XXX</div></div><div class="wf-sub" style="font-size:9px">2021-01 → 2024-04</div></div>
+<div class="ph-item"><div class="wf-row"><div style="flex:1;font-size:11.5px">Ross · Beta LLC</div><div style="font-size:11.5px">$XX,XXX</div></div><div class="wf-sub" style="font-size:9px">2023-09 → open</div></div>
+<div class="ph-item" style="opacity:.55"><div class="wf-row"><div style="flex:1;font-size:11.5px">Ross · Gamma Inc</div><div style="font-size:11.5px">$XX,XXX</div></div><div class="wf-sub" style="font-size:9px">2019-06 → 2023-08</div></div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left;border-color:#5A3228;color:var(--nw-coral)">Overlap warning appears in the add sheet, with "end the previous record the day before" as a one-tap fix.</div>
+<div style="flex:1"></div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Import</div><div style="flex:1"></div><div class="wf-step"><div class="wf-sn on">2</div><span class="wf-sub">of 3</span></div></div>
+<div class="ph-main">
+<div class="wf-c" style="gap:5px"><div class="wf-kl">everydollar-jun.csv</div><div class="wf-sub" style="font-size:9.5px">184 rows · header matched · Jun 1–30</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+<div class="wf-kpi" style="padding:7px"><div class="wf-kl">New</div><div class="wf-kv pos" style="font-size:13px">142</div></div>
+<div class="wf-kpi" style="padding:7px"><div class="wf-kl">Dupes</div><div class="wf-kv" style="font-size:13px">38</div></div>
+<div class="wf-kpi" style="padding:7px"><div class="wf-kl">Errors</div><div class="wf-kv" style="font-size:13px;color:var(--nw-coral)">4</div></div>
+</div>
+<div class="wf-row" style="gap:5px"><div class="wf-chip on">All</div><div class="wf-chip">New</div><div class="wf-chip">Dupes</div><div class="wf-chip" style="border-color:#5A3228;color:var(--nw-coral)">Errors</div></div>
+<div class="ph-item" style="gap:2px"><div class="wf-row"><div class="pos" style="width:12px">✓</div><div style="flex:1;font-size:11px">Kroger</div><div style="font-size:11px">−$XXX</div></div><div class="wf-sub" style="font-size:9px;padding-left:20px">Jun 02 · Food › Groceries · Chase •1234</div></div>
+<div class="ph-item" style="gap:2px"><div class="wf-row"><div class="pos" style="width:12px">✓</div><div style="flex:1;font-size:11px">Acme Co</div><div class="pos" style="font-size:11px">+$X,XXX</div></div><div class="wf-sub" style="font-size:9px;padding-left:20px">Jun 03 · Income › Paycheck</div></div>
+<div class="ph-item" style="gap:2px;opacity:.45"><div class="wf-row"><div style="width:12px">⊘</div><div style="flex:1;font-size:11px">Wells Fargo</div><div style="font-size:11px">−$X,XXX</div></div><div class="wf-sub" style="font-size:9px;padding-left:20px">Jun 05 · duplicate — tap to force include</div></div>
+<div class="ph-item" style="gap:2px;border-color:#5A3228"><div class="wf-row"><div style="width:12px;color:var(--nw-coral)">!</div><div style="flex:1;font-size:11px;color:var(--nw-coral)">Row 61</div><div style="font-size:11px;color:var(--nw-coral)">"12.5o"</div></div><div class="wf-sub" style="font-size:9px;padding-left:20px">unparseable amount — excluded</div></div>
+<div style="flex:1"></div>
+<div class="wf-sub" style="font-size:9px">Nothing written yet. Step 3 offers Undo, scoped by file.</div>
+<div class="ph-cta">Import 142</div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="wf-sub">‹</div><div class="ph-ttl">Settings</div></div>
+<div class="ph-main">
+<div class="wf-c" style="gap:7px"><div class="wf-h2" style="font-size:10.5px">Household</div><div class="wf-row"><div style="flex:1" class="wf-sub">Display name</div><div class="wf-input">The Harts</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Username</div><div class="wf-sub" style="font-size:9.5px">harts</div></div></div>
+<div class="wf-c" style="gap:7px"><div class="wf-h2" style="font-size:10.5px">Security</div><div class="wf-row"><div style="flex:1" class="wf-sub">Password</div><div class="wf-btn" style="padding:6px 10px">Change</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Security question</div><div class="wf-btn" style="padding:6px 10px">Change</div></div></div>
+<div class="wf-c" style="gap:7px"><div class="wf-h2" style="font-size:10.5px">Preferences</div><div class="wf-row"><div style="flex:1" class="wf-sub">Stale threshold</div><div class="wf-input">30 days</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Default range</div><div class="wf-input">12 months</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">KPI thresholds</div><div class="wf-btn" style="padding:6px 10px">Edit</div></div></div>
+<div class="wf-c" style="gap:7px"><div class="wf-h2" style="font-size:10.5px">Data</div><div class="wf-btn" style="text-align:center;padding:10px">Export all data</div><div class="wf-btn" style="text-align:center;padding:10px;border-color:#5A3228;color:var(--nw-coral)">Delete household</div></div>
+<div style="flex:1"></div>
+</div>
+</div>
+
+<div class="ph" style="height:560px">
+<div class="ph-bar"><span>9:41</span><span>▮▮▮</span></div>
+<div class="ph-top"><div class="ph-ttl">&nbsp;</div></div>
+<div class="ph-main" style="justify-content:center;gap:12px;padding:16px 18px">
+<img src="uploads/Wordmark%20Vertical.png" alt="NestWorth" style="width:150px;align-self:center;margin-bottom:2px">
+<div class="wf-sub" style="text-align:center">Sign in to your household.</div>
+<div><div class="wf-kl">Username</div><div class="wf-input" style="padding:11px;margin-top:5px">&nbsp;</div></div>
+<div><div class="wf-kl">Password</div><div class="wf-input" style="padding:11px;margin-top:5px">••••••••</div></div>
+<div class="ph-cta">Sign in</div>
+<div style="text-align:center;font-size:10.5px;color:var(--nw-mint)">Forgot password?</div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">Setup and forgot-password are the same three-step flows as desktop, one step per screen with a back chevron. No sign-up link.</div>
+</div>
+</div>
+
+</div>
+<p class="dv-note"><b>Notes.</b> CSV import is a real mobile flow now rather than a "use your laptop" wall — the file picker works on both platforms, and the preview reads as stacked cards with the same New / Dupe / Error semantics. The only thing it loses is the wide column view.</p>
+</div>
+</div>
+
+<p class="dv-next">Next: "add the account-detail and transaction-list screens", "show the tablet breakpoint", or "hand this to Claude Code as a build spec".</p>
+</section>
+
+<section class="dv-turn" id="t2">
+<div class="dv-thd"><a class="dv-tid" href="#t2">2</a><span class="dv-tname">NestWorth — desktop screens on the 1a shell, brand palette applied</span></div>
+
+<p class="cap" style="margin:0 0 10px">Palette — your eight, plus five derived steps the UI needs</p>
+<div class="pal">
+<div class="sw"><i style="background:#0B0F0D"></i><span><b>Ground</b>#0B0F0D</span></div>
+<div class="sw"><i style="background:#171C19"></i><span><b>Surface</b>#171C19</span></div>
+<div class="sw"><i style="background:#242B26"></i><span><b>Border</b>#242B26</span></div>
+<div class="sw"><i style="background:#F4F8F3"></i><span><b>Text</b>#F4F8F3</span></div>
+<div class="sw"><i style="background:#7C9385"></i><span><b>Muted</b>#7C9385</span></div>
+<div class="sw"><i style="background:#37bd57"></i><span><b>Nest Green</b>#37bd57</span></div>
+<div class="sw"><i style="background:#A7E9C2"></i><span><b>Light Green</b>#A7E9C2</span></div>
+<div class="sw"><i style="background:#E8664B"></i><span><b>Coral</b>#E8664B</span></div>
+<div class="sw"><i style="background:#F2B84B"></i><span><b>Amber</b>#F2B84B</span></div>
+<div class="sw" style="border-style:dashed"><i style="background:#132B1B"></i><span><b>Green tint +</b>#132B1B</span></div>
+<div class="sw" style="border-style:dashed"><i style="background:#1F5230"></i><span><b>Green line +</b>#1F5230</span></div>
+<div class="sw" style="border-style:dashed"><i style="background:#28893F"></i><span><b>Green deep +</b>#28893F</span></div>
+<div class="sw" style="border-style:dashed"><i style="background:#1E2621"></i><span><b>Track +</b>#1E2621</span></div>
+<div class="sw" style="border-style:dashed"><i style="background:#33403A"></i><span><b>Line hi +</b>#33403A</span></div>
+</div>
+<p class="dv-note" style="margin:8px 0 0">Nest Green is reserved for the active state, the primary outline and positive values; coral and amber never appear except on a real warning. Light Green carries small text on green tints (Nest Green itself is too dark against the ground for body copy). The four dashed steps are additions — chart bands, progress tracks and hover fills need mid-tones your list doesn't cover.</p>
+
+<p class="cap" style="margin:34px 0 10px">1 · Overview</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2a">
+<div class="dv-olabel"><a class="dv-oid" href="#2a">2a</a>Overview — net worth, KPIs, stale nudge</div>
+<div class="dv-card">
+<div class="wf" style="width:1000px;height:620px">
+<div class="wf-sb">
+<div class="wf-brand"><img src="uploads/Brandmark.png" alt=""><em>Nest<i>Worth</i></em></div>
+<div class="wf-nav on">Overview</div>
+<div class="wf-navh">Track</div>
+<div class="wf-nav">Net worth</div>
+<div class="wf-nav">Cash Flow</div>
+<div class="wf-nav">Scorecard</div>
+<div class="wf-navh">Manage</div>
+<div class="wf-nav">Accounts</div>
+<div class="wf-nav">Income</div>
+<div class="wf-nav">Balances</div>
+<div class="wf-nav">Transactions</div>
+<div class="wf-navh">Plan</div>
+<div class="wf-nav">Calculators</div>
+<div class="wf-nav">Scenarios</div>
+<div style="flex:1"></div>
+<div class="wf-nav">Settings</div>
+<div class="wf-row" style="padding:7px 8px;border-top:1px solid var(--nw-border);margin-top:4px"><div class="dot" style="background:var(--nw-green-line);width:16px;height:16px"></div><div style="font-size:9.5px;color:#B6C6BB">The Harts<div class="wf-sub" style="font-size:8.5px">session 47m left</div></div></div>
+</div>
+<div class="wf-body">
+<div class="wf-top">
+<div class="wf-h" style="font-size:12px">Overview</div>
+<div style="flex:1"></div>
+<div class="wf-chip">3M</div><div class="wf-chip">6M</div><div class="wf-chip on">12M</div><div class="wf-chip">YTD</div><div class="wf-chip">All</div><div class="wf-chip">Custom ▾</div>
+<div class="wf-btn pri">Update balances</div>
+</div>
+<div class="wf-main">
+<div class="wf-ban" style="border-color:#5A4A20;background:var(--nw-amber-tint);color:var(--nw-amber)"><div class="dot y"></div><div style="flex:1"><b style="font-weight:500">4 accounts are stale</b> — no snapshot in 30+ days. Net worth below may be understated.</div><div class="wf-btn" style="border-color:var(--nw-amber);color:var(--nw-amber)">Start update →</div></div>
+<div style="display:grid;grid-template-columns:1fr 300px;gap:11px">
+<div class="wf-c">
+<div class="wf-row"><div><div class="wf-kl">Net worth</div><div class="wf-num">$XXX,XXX</div></div><div style="flex:1"></div>
+<div style="text-align:right"><div class="wf-kl">MoM</div><div class="pos" style="font-size:11px">+$X,XXX · +X.X%</div></div>
+<div style="text-align:right"><div class="wf-kl">YoY</div><div class="pos" style="font-size:11px">+$XX,XXX · +XX%</div></div></div>
+<div class="wf-box" style="height:158px">Line chart — net worth in Nest Green, assets and liabilities as muted lines<br>forward-filled daily series · 12-month window</div>
+</div>
+<div class="wf-c">
+<div class="wf-h2">Allocation today</div>
+<div class="wf-box" style="height:98px">Donut — cash / investments / retirement / property</div>
+<div style="display:flex;flex-direction:column;gap:5px">
+<div class="wf-row"><div class="dot" style="background:var(--nw-mint)"></div><div style="flex:1;font-size:10px">Cash</div><div class="wf-sub">XX%</div></div>
+<div class="wf-row"><div class="dot" style="background:var(--nw-green)"></div><div style="flex:1;font-size:10px">Investments</div><div class="wf-sub">XX%</div></div>
+<div class="wf-row"><div class="dot" style="background:var(--nw-green-deep)"></div><div style="flex:1;font-size:10px">Retirement</div><div class="wf-sub">XX%</div></div>
+<div class="wf-row"><div class="dot" style="background:var(--nw-green-line)"></div><div style="flex:1;font-size:10px">Property</div><div class="wf-sub">XX%</div></div>
+</div>
+</div>
+</div>
+<div class="wf-row" style="justify-content:space-between"><div class="wf-h2">Key metrics — 5 of 11</div><div style="font-size:10px;color:var(--nw-mint)">Full scorecard →</div></div>
+<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:9px">
+<div class="wf-kpi"><div class="wf-kl">Savings rate</div><div class="wf-row"><div class="wf-kv">XX%</div><div class="dot g"></div><div class="wf-sub pos">↑</div></div><div class="trk"><i style="width:66%;background:var(--nw-green)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">Emergency fund</div><div class="wf-row"><div class="wf-kv">X.X mo</div><div class="dot y"></div><div class="wf-sub">→</div></div><div class="trk"><i style="width:44%;background:var(--nw-amber)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">Debt-to-income</div><div class="wf-row"><div class="wf-kv">XX%</div><div class="dot g"></div><div class="wf-sub pos">↓</div></div><div class="trk"><i style="width:30%;background:var(--nw-green)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">Housing ratio</div><div class="wf-row"><div class="wf-kv">XX%</div><div class="dot g"></div><div class="wf-sub">→</div></div><div class="trk"><i style="width:52%;background:var(--nw-green)"></i></div></div>
+<div class="wf-kpi"><div class="wf-kl">FI progress</div><div class="wf-row"><div class="wf-kv">XX%</div><div class="wf-sub">of $X.XM</div></div><div class="trk"><i style="width:32%;background:var(--nw-green-deep)"></i></div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:11px;flex:1;min-height:0">
+<div class="wf-c"><div class="wf-row"><div class="wf-h2">Cash flow — last 6 months</div><div style="flex:1"></div><div class="wf-sub">from transactions</div></div><div class="wf-box" style="flex:1;min-height:74px">Green income bars vs. muted expense bars, net line</div></div>
+<div class="wf-c"><div class="wf-row"><div class="wf-h2">Recent activity</div><div style="flex:1"></div><div class="wf-sub">imports &amp; edits</div></div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:1fr auto;border-top:none">Imported everydollar-jun.csv · 142 new, 38 dupes<span class="wf-sub">2d</span></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto">Balance added — Fidelity Brokerage<span class="wf-sub">5d</span></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto">Income record ended — Acme Co<span class="wf-sub">3w</span></div>
+</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p class="dv-note"><b>Change from 1a.</b> Five KPIs instead of four (housing ratio added — it's the one the house planner moves) and each carries a threshold track, so a yellow reads as "how far off" not just "not green". The stale banner is amber, not green, since it's a warning.</p>
+</div>
+</div>
+
+<p class="cap" style="margin:34px 0 10px">2 · Auth</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2b">
+<div class="dv-olabel"><a class="dv-oid" href="#2b">2b</a>Login · Set up account · Forgot password</div>
+<div class="dv-card">
+<div style="display:flex;background:var(--nw-bg)">
+<div style="width:333px;padding:24px 22px;border-right:1px solid var(--nw-border);display:flex;flex-direction:column;gap:11px;height:426px">
+<div class="cap">Login</div>
+<img src="uploads/Full%20Logo.png" alt="NestWorth" style="width:196px;margin:8px 0 2px">
+<div class="wf-sub">Sign in to your household.</div>
+<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px"><div class="wf-kl">Username</div><div class="wf-input">&nbsp;</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Password</div><div class="wf-input">••••••••</div></div>
+<div class="wf-btn pri" style="text-align:center;padding:8px">Sign in</div>
+<div style="font-size:10px;color:var(--nw-mint)">Forgot password?</div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left;border-color:#5A3228;color:var(--nw-coral);line-height:1.45">Error states, same slot:<br>· "Username or password is incorrect" — never say which<br>· "This invite hasn't been set up yet"<br>· Rate-limited after N failures</div>
+<div style="flex:1"></div>
+<div class="wf-sub">No sign-up link. Accounts exist only by invite.</div>
+</div>
+<div style="width:333px;padding:24px 22px;border-right:1px solid var(--nw-border);display:flex;flex-direction:column;gap:9px;height:426px">
+<div class="cap">Set up your account</div>
+<div class="wf-row" style="margin-top:4px"><img src="uploads/Brandmark.png" alt="" style="width:22px"><div class="wf-h" style="font-size:13px">Welcome, The Harts</div></div>
+<div class="wf-sub">Your household was invited. Choose a password to activate it.</div>
+<div style="display:flex;flex-direction:column;gap:4px;margin-top:4px"><div class="wf-kl">Username</div><div class="wf-input">harts</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">New password</div><div class="wf-input">••••••••</div><div class="trk" style="height:5px"><i style="width:62%;background:var(--nw-green)"></i></div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Confirm password</div><div class="wf-input">••••••••</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Security question</div><div class="wf-input">Select a question ▾</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Your answer</div><div class="wf-input">&nbsp;</div></div>
+<div class="wf-btn pri" style="text-align:center;padding:8px">Activate household</div>
+<div class="wf-sub">Sets password_hash + answer_hash, flips status → active.</div>
+</div>
+<div style="width:333px;padding:24px 22px;display:flex;flex-direction:column;gap:10px;height:426px">
+<div class="cap">Forgot password — 3 steps, one screen</div>
+<div class="wf-row" style="margin-top:4px"><div class="wf-sn on">1</div><div class="wf-line"></div><div class="wf-sn">2</div><div class="wf-line"></div><div class="wf-sn">3</div></div>
+<div style="display:flex;flex-direction:column;gap:4px;margin-top:4px"><div class="wf-kl">Step 1 · Username</div><div class="wf-input">harts</div></div>
+<div style="display:flex;flex-direction:column;gap:4px;opacity:.5"><div class="wf-kl">Step 2 · What was your first pet's name?</div><div class="wf-input">&nbsp;</div></div>
+<div style="display:flex;flex-direction:column;gap:4px;opacity:.3"><div class="wf-kl">Step 3 · New password</div><div class="wf-input">&nbsp;</div></div>
+<div class="wf-btn pri" style="text-align:center;padding:8px">Continue</div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left;line-height:1.45">Unknown username gets the same neutral "if that account exists…" copy as a wrong answer — no account enumeration. No email or SMS anywhere in this flow.</div>
+<div style="flex:1"></div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left">Session-expiry modal (any screen): "Signed out after 1 hour of inactivity" → username + password, returns you to the same page.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<p class="cap" style="margin:34px 0 10px">3 · Update balances</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2c">
+<div class="dv-olabel"><a class="dv-oid" href="#2c">2c</a>Guided walk of every stale account, with the table escape hatch</div>
+<div class="dv-card">
+<div style="display:flex;background:var(--nw-bg)">
+<div style="width:500px;border-right:1px solid var(--nw-border);height:548px;display:flex;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Update balances</div><div style="flex:1"></div><div class="wf-sub">Account 3 of 9</div><div class="wf-btn">Save &amp; finish later</div></div>
+<div class="wf-main">
+<div class="wf-row" style="gap:3px">
+<div class="wf-bar" style="flex:1;background:var(--nw-green-deep)"></div><div class="wf-bar" style="flex:1;background:var(--nw-green-deep)"></div><div class="wf-bar" style="flex:1;background:var(--nw-green)"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div><div class="wf-bar" style="flex:1"></div>
+</div>
+<div class="wf-c" style="gap:11px;padding:14px">
+<div><div class="wf-kl">Fidelity · Investments · Brokerage</div><div class="wf-h" style="margin-top:3px">Joint Brokerage</div></div>
+<div class="wf-row" style="gap:14px">
+<div style="flex:1"><div class="wf-kl">As of date</div><div class="wf-input" style="margin-top:4px">2026-07-29</div></div>
+<div style="flex:1.3"><div class="wf-kl">Balance</div><div class="wf-input" style="margin-top:4px;font-size:15px;color:var(--nw-text);padding:8px;border-color:var(--nw-green-line)">$ ______</div></div>
+</div>
+<div class="wf-row" style="font-size:10px;color:var(--nw-amber)"><div class="dot y"></div>Last snapshot $XX,XXX on Apr 12 · 108 days ago</div>
+<div class="wf-box" style="height:64px">This account's own last 8 snapshots — a fat-fingered entry looks obviously wrong</div>
+<div class="wf-row"><div class="wf-btn">Skip</div><div class="wf-btn">Account closed →</div><div style="flex:1"></div><div class="wf-btn pri">Save &amp; next ⏎</div></div>
+</div>
+<div class="wf-box" style="padding:8px;font-size:9.5px">Enter submits and advances. The whole flow is tab-and-type — no mouse needed.</div>
+<div class="wf-h2">Queue</div>
+<div style="display:flex;flex-direction:column">
+<div class="wf-tr" style="grid-template-columns:14px 1fr auto;border-top:none;color:var(--nw-muted)"><span class="pos">✓</span>Chase Checking<span>$X,XXX</span></div>
+<div class="wf-tr" style="grid-template-columns:14px 1fr auto;color:var(--nw-muted)"><span class="pos">✓</span>Ally Savings<span>$XX,XXX</span></div>
+<div class="wf-tr" style="grid-template-columns:14px 1fr auto;color:var(--nw-mint)"><span>›</span>Joint Brokerage<span>—</span></div>
+<div class="wf-tr" style="grid-template-columns:14px 1fr auto"><span></span>Roth IRA — Vanguard<span class="wf-sub">108d</span></div>
+<div class="wf-tr" style="grid-template-columns:14px 1fr auto"><span></span>Mortgage — Wells Fargo<span class="wf-sub">94d</span></div>
+</div>
+</div>
+</div>
+<div style="width:500px;height:548px;display:flex;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Balances — table view</div><div style="flex:1"></div><div class="wf-chip">All accounts ▾</div><div class="wf-btn">+ Add</div></div>
+<div class="wf-main">
+<div class="wf-box" style="padding:7px;font-size:9.5px">Escape hatch from the guided flow: same data as a grid, for backfilling history or fixing one number.</div>
+<div class="wf-tr wf-th" style="grid-template-columns:1.5fr .8fr .8fr .8fr 16px;border-top:none"><div>Account</div><div>Jul</div><div>Jun</div><div>May</div><div></div></div>
+<div class="wf-tr" style="grid-template-columns:1.5fr .8fr .8fr .8fr 16px"><div>Chase Checking</div><div>$X,XXX</div><div>$X,XXX</div><div>$X,XXX</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:1.5fr .8fr .8fr .8fr 16px"><div>Ally Savings</div><div>$XX,XXX</div><div>$XX,XXX</div><div class="wf-sub">— ff</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:1.5fr .8fr .8fr .8fr 16px"><div>Joint Brokerage</div><div class="wf-sub">— ff</div><div class="wf-sub">— ff</div><div>$XX,XXX</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:1.5fr .8fr .8fr .8fr 16px"><div>Roth IRA</div><div class="wf-sub">— ff</div><div>$XX,XXX</div><div class="wf-sub">— ff</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:1.5fr .8fr .8fr .8fr 16px"><div>Mortgage <span class="wf-sub">liability</span></div><div class="wf-sub">— ff</div><div class="neg">$XXX,XXX</div><div class="wf-sub">— ff</div><div>⋯</div></div>
+<div class="wf-sub" style="font-size:9.5px"><span style="color:#5C7266">— ff</span> = no snapshot; forward-filled from the last known value. Never invented before an account's first snapshot.</div>
+<div class="wf-c" style="margin-top:4px"><div class="wf-h2">Empty state — no balances yet</div><div class="wf-box" style="height:78px">"Add your first account, then record a balance."<br>[ Add account ] [ Import history CSV ] · same panel on Accounts, Income and Transactions</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<p class="cap" style="margin:34px 0 10px">4 · Accounts</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2d">
+<div class="dv-olabel"><a class="dv-oid" href="#2d">2d</a>Accounts — Type-2 history, edit opens a dated revision</div>
+<div class="dv-card">
+<div class="wf" style="width:1000px;height:530px">
+<div class="wf-sb"><div class="wf-brand"><img src="uploads/Brandmark.png" alt=""><em>Nest<i>Worth</i></em></div><div class="wf-nav">Overview</div><div class="wf-navh">Track</div><div class="wf-nav">Net worth</div><div class="wf-nav">Cash Flow</div><div class="wf-nav">Scorecard</div><div class="wf-navh">Manage</div><div class="wf-nav on">Accounts</div><div class="wf-nav">Income</div><div class="wf-nav">Balances</div><div class="wf-nav">Transactions</div><div class="wf-navh">Plan</div><div class="wf-nav">Calculators</div><div class="wf-nav">Scenarios</div></div>
+<div class="wf-body">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Accounts</div><div style="flex:1"></div><div class="wf-chip on">Active</div><div class="wf-chip">Closed</div><div class="wf-chip">All revisions</div><div class="wf-btn pri">+ New account</div></div>
+<div style="display:flex;flex:1;min-height:0">
+<div class="wf-main" style="flex:1">
+<div class="wf-tr wf-th" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px;border-top:none"><div>Account</div><div>Institution</div><div>Category</div><div>Type</div><div>Effective</div><div>Latest</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px;background:var(--nw-green-tint);border-radius:5px;border-top-color:transparent"><div style="color:var(--nw-mint)">Joint Brokerage</div><div>Fidelity</div><div>Investments</div><div>Brokerage</div><div>2019-03 → open</div><div>$XX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px;color:var(--nw-muted);font-size:9.5px"><div style="padding-left:12px">↳ was "Fidelity Taxable"</div><div>Fidelity</div><div>Investments</div><div>Brokerage</div><div>2016-01 → 2019-03</div><div>—</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px"><div>Chase Checking</div><div>Chase</div><div>Banking</div><div>Checking</div><div>2015-06 → open</div><div>$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px"><div>Ally Savings</div><div>Ally</div><div>Banking</div><div>Savings</div><div>2018-02 → open</div><div>$XX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px"><div>Roth IRA</div><div>Vanguard</div><div>Retirement</div><div>Roth IRA</div><div>2017-01 → open</div><div>$XX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px"><div>Mortgage <span class="wf-chip" style="padding:1px 5px;border-color:#5A3228;color:var(--nw-coral)">liability</span></div><div>Wells Fargo</div><div>Property</div><div>Mortgage</div><div>2020-08 → open</div><div class="neg">$XXX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.4fr .8fr .8fr .9fr .9fr 62px;opacity:.45"><div>Old Amex <span class="wf-sub">closed</span></div><div>Amex</div><div>Credit</div><div>Credit</div><div>2014 → 2021-11</div><div>$0</div></div>
+</div>
+<div style="width:300px;flex:none;border-left:1px solid var(--nw-border);padding:13px;display:flex;flex-direction:column;gap:9px;background:var(--nw-rail)">
+<div class="wf-row"><div class="wf-h2">Edit Joint Brokerage</div><div style="flex:1"></div><div class="wf-sub">✕</div></div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left;border-color:var(--nw-green-line);color:var(--nw-mint);background:var(--nw-green-tint)">Editing never rewrites history. Saving closes the current row at the date below and opens a new one, so past net worth stays correct.</div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Account name</div><div class="wf-input">Joint Brokerage</div></div>
+<div class="wf-row" style="gap:7px"><div style="flex:1"><div class="wf-kl">Category</div><div class="wf-input" style="margin-top:4px">Investments ▾</div></div><div style="flex:1"><div class="wf-kl">Type</div><div class="wf-input" style="margin-top:4px">Brokerage ▾</div></div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Institution</div><div class="wf-input">Fidelity</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">Asset / liability</div><div class="wf-row" style="gap:0;border:1px solid var(--nw-border);border-radius:6px;overflow:hidden"><div style="flex:1;text-align:center;padding:5px;font-size:10px;background:var(--nw-green-tint);color:var(--nw-mint)">Asset</div><div style="flex:1;text-align:center;padding:5px;font-size:10px;color:var(--nw-muted)">Liability</div></div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div class="wf-kl">New revision starts</div><div class="wf-input">2026-07-29</div></div>
+<div class="wf-box" style="padding:7px;font-size:9.5px;text-align:left;border-color:#5A3228;color:var(--nw-coral)">Validation: end ≥ start · no overlapping windows for this account name in this household.</div>
+<div style="flex:1"></div>
+<div class="wf-row"><div class="wf-btn" style="border-color:#5A3228;color:var(--nw-coral)">Close account…</div><div style="flex:1"></div><div class="wf-btn pri">Save revision</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p class="dv-note"><b>Notes.</b> Superseded revisions indent under their current row so the slowly-changing dimension is visible. "Close account" sets effective_end_date; the sentinel 9999-12-31 renders as "open" and never as a chart point.</p>
+</div>
+</div>
+
+<p class="cap" style="margin:34px 0 10px">5 · Income &nbsp;·&nbsp; 6 · CSV import</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2e">
+<div class="dv-olabel"><a class="dv-oid" href="#2e">2e</a>Income — overlapping windows per person</div>
+<div class="dv-card">
+<div class="wf" style="width:470px;height:530px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Income</div><div style="flex:1"></div><div class="wf-btn pri">+ Add record</div></div>
+<div class="wf-main">
+<div class="wf-c"><div class="wf-row"><div class="wf-kl">Household income today</div><div style="flex:1"></div><div class="wf-sub">sum of active records</div></div><div class="wf-num">$XXX,XXX<span class="wf-sub"> /yr gross</span></div></div>
+<div class="wf-h2">Timeline</div>
+<div class="wf-box" style="height:108px;text-align:left;padding:9px;align-items:flex-start;justify-content:flex-start;flex-direction:column;gap:8px">
+<div style="font-size:9.5px">Gantt bars, one lane per person — overlaps and gaps visible at a glance</div>
+<div style="width:100%;display:flex;flex-direction:column;gap:6px">
+<div class="wf-row"><div style="width:34px;font-size:9px;color:var(--nw-muted)">Dana</div><div class="wf-bar" style="width:38%;background:var(--nw-green-line)"></div><div class="wf-bar" style="flex:1;background:var(--nw-green)"></div></div>
+<div class="wf-row"><div style="width:34px;font-size:9px;color:var(--nw-muted)">Ross</div><div style="width:14%"></div><div class="wf-bar" style="width:30%;background:var(--nw-green-line)"></div><div style="width:6%"></div><div class="wf-bar" style="flex:1;background:var(--nw-green-deep)"></div></div>
+</div>
+</div>
+<div class="wf-tr wf-th" style="grid-template-columns:.7fr 1fr .8fr 1fr 16px;border-top:none"><div>Person</div><div>Company</div><div>Annual</div><div>Effective</div><div></div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr .8fr 1fr 16px"><div>Dana</div><div>Acme Co</div><div>$XXX,XXX</div><div>2024-04 → open</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr .8fr 1fr 16px;opacity:.55"><div>Dana</div><div>Acme Co</div><div>$XX,XXX</div><div>2021-01 → 2024-04</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr .8fr 1fr 16px"><div>Ross</div><div>Beta LLC</div><div>$XX,XXX</div><div>2023-09 → open</div><div>⋯</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr .8fr 1fr 16px;opacity:.55"><div>Ross</div><div>Gamma Inc</div><div>$XX,XXX</div><div>2019-06 → 2023-08</div><div>⋯</div></div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;border-color:#5A3228;color:var(--nw-coral);text-align:left">Overlap warning fires inline when a new record collides with an existing one for the same person — offer "end the previous record the day before" as a one-click fix.</div>
+<div class="wf-sub" style="font-size:9.5px">A raise is a new dated record, not an edit.</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2f">
+<div class="dv-olabel"><a class="dv-oid" href="#2f">2f</a>CSV import — upload → preview → confirm</div>
+<div class="dv-card">
+<div class="wf" style="width:1000px;height:530px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Import transactions</div><div style="flex:1"></div>
+<div class="wf-step"><div class="wf-sn on">1</div>Upload</div><div class="wf-line" style="max-width:26px"></div>
+<div class="wf-step"><div class="wf-sn on">2</div>Preview</div><div class="wf-line" style="max-width:26px"></div>
+<div class="wf-step"><div class="wf-sn">3</div>Confirm</div>
+</div>
+<div style="display:flex;flex:1;min-height:0">
+<div style="width:256px;border-right:1px solid var(--nw-border);padding:13px;display:flex;flex-direction:column;gap:10px">
+<div class="cap">Step 1</div>
+<div class="wf-box" style="height:100px;flex-direction:column;gap:5px;border-color:var(--nw-green-line);color:var(--nw-mint)"><div style="font-size:17px">↑</div>Drop an EveryDollar export<br>or browse</div>
+<div class="wf-c" style="gap:5px"><div class="wf-kl">everydollar-jun.csv</div><div class="wf-sub">184 rows · header matched</div><div class="wf-row" style="gap:4px;flex-wrap:wrap"><div class="wf-chip">Group</div><div class="wf-chip">Item</div><div class="wf-chip">Type</div><div class="wf-chip">Date</div><div class="wf-chip">Merchant</div><div class="wf-chip">Account</div><div class="wf-chip">Amount</div><div class="wf-chip">Note</div></div></div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left">Unexpected header → column-mapping fallback appears here. Malformed rows are listed, not silently dropped.</div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left;border-color:var(--nw-green-line);color:var(--nw-mint)">v2: map each distinct CSV "Account" value to a real account. The dropdown lands in this panel; nothing above changes.</div>
+</div>
+<div class="wf-main" style="flex:1">
+<div class="cap">Step 2 · Preview before anything is written</div>
+<div class="wf-row" style="gap:8px">
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">New</div><div class="wf-row"><div class="wf-kv pos">142</div></div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Duplicates skipped</div><div class="wf-row"><div class="wf-kv">38</div><div class="wf-sub">fingerprint</div></div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Rows with errors</div><div class="wf-row"><div class="wf-kv" style="color:var(--nw-coral)">4</div><div class="dot r"></div></div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Date range</div><div class="wf-kv" style="font-size:11px">Jun 1 – Jun 30</div></div>
+</div>
+<div class="wf-row" style="gap:6px"><div class="wf-chip on">All 184</div><div class="wf-chip">New 142</div><div class="wf-chip">Dupes 38</div><div class="wf-chip" style="border-color:#5A3228;color:var(--nw-coral)">Errors 4</div><div style="flex:1"></div><div class="wf-chip">Search</div></div>
+<div class="wf-tr wf-th" style="grid-template-columns:18px .7fr .8fr .8fr 1fr .8fr .7fr;border-top:none"><div></div><div>Date</div><div>Group</div><div>Item</div><div>Merchant</div><div>Account</div><div>Amount</div></div>
+<div class="wf-tr" style="grid-template-columns:18px .7fr .8fr .8fr 1fr .8fr .7fr"><div class="pos">✓</div><div>2026-06-02</div><div>Food</div><div>Groceries</div><div>Kroger</div><div>Chase •1234</div><div>−$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:18px .7fr .8fr .8fr 1fr .8fr .7fr"><div class="pos">✓</div><div>2026-06-03</div><div>Income</div><div>Paycheck</div><div>Acme Co</div><div>Chase •1234</div><div class="pos">+$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:18px .7fr .8fr .8fr 1fr .8fr .7fr;opacity:.45"><div>⊘</div><div>2026-06-05</div><div>Housing</div><div>Mortgage</div><div>Wells Fargo</div><div>Chase •1234</div><div>−$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:18px .7fr .8fr .8fr 1fr .8fr .7fr;color:var(--nw-coral)"><div>!</div><div>06/07/26 ?</div><div>Fun</div><div>Dining</div><div>—</div><div>—</div><div>"12.5o"</div></div>
+<div class="wf-tr" style="grid-template-columns:18px .7fr .8fr .8fr 1fr .8fr .7fr"><div class="pos">✓</div><div>2026-06-08</div><div>Transport</div><div>Gas</div><div>Shell</div><div>Amex •9002</div><div>−$XX</div></div>
+<div class="wf-row" style="font-size:9.5px;color:var(--nw-muted)"><div>⊘ duplicate — matched on date + merchant + amount + note</div><div style="flex:1"></div><div>! error — row excluded, downloadable as a fix-and-reupload CSV</div></div>
+<div style="flex:1"></div>
+<div class="wf-row" style="border-top:1px solid var(--nw-border);padding-top:9px"><div class="wf-sub">Nothing has been written yet. Step 3 is a summary with <b style="color:var(--nw-text);font-weight:500">Undo this import</b>, scoped by source_file.</div><div style="flex:1"></div><div class="wf-btn">Cancel</div><div class="wf-btn pri">Import 142 transactions</div></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<p class="cap" style="margin:34px 0 10px">7 · Net worth detail &nbsp;·&nbsp; 8 · Cash Flow detail</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2g">
+<div class="dv-olabel"><a class="dv-oid" href="#2g">2g</a>Net worth detail</div>
+<div class="dv-card">
+<div class="wf" style="width:640px;height:566px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Net worth</div><div style="flex:1"></div><div class="wf-chip">3M</div><div class="wf-chip">6M</div><div class="wf-chip on">12M</div><div class="wf-chip">24M</div><div class="wf-chip">YTD</div><div class="wf-chip">All</div></div>
+<div class="wf-main">
+<div class="wf-row" style="gap:16px">
+<div><div class="wf-kl">Net worth</div><div class="wf-num">$XXX,XXX</div></div>
+<div><div class="wf-kl">Assets</div><div class="wf-num" style="font-size:16px">$XXX,XXX</div></div>
+<div><div class="wf-kl">Liabilities</div><div class="wf-num neg" style="font-size:16px">$XX,XXX</div></div>
+<div style="flex:1"></div>
+<div style="text-align:right"><div class="wf-kl">MoM / YoY</div><div class="pos" style="font-size:11px">+X.X% / +XX%</div></div>
+</div>
+<div class="wf-box" style="height:158px">Line chart — net worth (Nest Green), assets, liabilities · forward-filled<br>dots mark real snapshot dates so gaps stay honest</div>
+<div class="wf-row" style="gap:6px"><div class="wf-sub" style="margin-right:2px">Break down by</div><div class="wf-chip on">Category</div><div class="wf-chip">Account type</div><div class="wf-chip">Institution</div></div>
+<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:9px;flex:1;min-height:0">
+<div class="wf-box">Stacked area over the same range</div>
+<div class="wf-c" style="gap:6px"><div class="wf-h2">Change by category</div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;border-top:none;font-size:10px"><div>Investments</div><div class="pos">+$XX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:10px"><div>Retirement</div><div class="pos">+$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:10px"><div>Banking</div><div class="neg">−$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr auto;font-size:10px"><div>Property debt</div><div class="pos">−$X,XXX</div></div>
+<div class="wf-sub" style="font-size:9px">Debt going down is green — sign, not direction.</div>
+</div>
+</div>
+<div class="wf-box" style="padding:7px;font-size:9.5px;text-align:left"><b style="color:var(--nw-text);font-weight:500">Empty state:</b> fewer than 2 snapshots → chart replaced by "Record a second balance to see a trend" + [ Update balances ].</div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2h">
+<div class="dv-olabel"><a class="dv-oid" href="#2h">2h</a>Cash Flow &amp; spending</div>
+<div class="dv-card">
+<div class="wf" style="width:640px;height:566px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Cash Flow</div><div style="flex:1"></div><div class="wf-chip on">12M</div><div class="wf-chip">Custom</div><div class="wf-btn">Import CSV</div></div>
+<div class="wf-main">
+<div class="wf-row" style="gap:8px">
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Avg income</div><div class="wf-kv">$X,XXX</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Avg expense</div><div class="wf-kv">$X,XXX</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Avg net</div><div class="wf-row"><div class="wf-kv pos">$X,XXX</div></div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Savings rate</div><div class="wf-row"><div class="wf-kv">XX%</div><div class="dot g"></div></div></div>
+</div>
+<div class="wf-box" style="height:130px">Income (green) vs expense (muted) bars by month + net line · click a month to filter everything below</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;flex:1;min-height:0">
+<div class="wf-c" style="gap:6px"><div class="wf-row"><div class="wf-h2">Spending by group</div><div style="flex:1"></div><div class="wf-sub">click to expand</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 46px auto;border-top:none;font-size:10px"><div>Housing</div><div class="wf-bar" style="background:var(--nw-green-deep)"></div><div>$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 46px auto;font-size:10px;color:var(--nw-coral)"><div>Food <span class="wf-sub" style="color:var(--nw-coral)">over budget</span></div><div class="wf-bar" style="width:34px;background:var(--nw-coral)"></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 46px auto;font-size:10px;color:var(--nw-muted)"><div style="padding-left:11px">↳ Groceries</div><div></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 46px auto;font-size:10px;color:var(--nw-muted)"><div style="padding-left:11px">↳ Restaurants</div><div></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 46px auto;font-size:10px"><div>Transport</div><div class="wf-bar" style="width:22px;background:var(--nw-green-line)"></div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr 46px auto;font-size:10px"><div>Insurance</div><div class="wf-bar" style="width:18px;background:var(--nw-green-line)"></div><div>$XXX</div></div>
+</div>
+<div class="wf-c" style="gap:6px"><div class="wf-row"><div class="wf-h2">Transactions</div><div style="flex:1"></div><div class="wf-chip">Filters</div></div>
+<div class="wf-tr wf-th" style="grid-template-columns:.7fr 1fr auto;border-top:none"><div>Date</div><div>Merchant</div><div>Amount</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr auto;font-size:10px"><div>Jun 02</div><div>Kroger</div><div>−$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr auto;font-size:10px"><div>Jun 03</div><div>Acme Co</div><div class="pos">+$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr auto;font-size:10px"><div>Jun 05</div><div>Wells Fargo</div><div>−$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:.7fr 1fr auto;font-size:10px"><div>Jun 08</div><div>Shell</div><div>−$XX</div></div>
+<div class="wf-sub" style="font-size:9px;margin-top:2px">Virtualized list · account_name shown as the raw CSV label</div>
+</div>
+</div>
+<div class="wf-box" style="padding:7px;font-size:9.5px;text-align:left"><b style="color:var(--nw-text);font-weight:500">Empty state:</b> no transactions → "Import an EveryDollar export to see cash flow" + [ Import CSV ]. Net worth still works without it.</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<p class="cap" style="margin:34px 0 10px">9 · KPI scorecard — tiles, and a tile opened</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2i">
+<div class="dv-olabel"><a class="dv-oid" href="#2i">2i</a>Grid of 11 tiles → click one for history + parameters</div>
+<div class="dv-card">
+<div class="wf" style="width:1000px;height:600px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Scorecard</div><div style="flex:1"></div><div class="wf-sub">Projection uses</div><div class="wf-chip on">Scenario: Retire at 57 ▾</div><div class="wf-chip">Today</div><div class="wf-chip">At retirement</div></div>
+<div style="display:flex;flex:1;min-height:0">
+<div class="wf-main" style="flex:1">
+<div class="cap">Safety</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:9px">
+<div class="wf-kpi" style="border-color:var(--nw-green-line);background:var(--nw-green-tint)"><div class="wf-row"><div class="wf-kl" style="flex:1;color:var(--nw-mint)">Emergency fund</div><div class="dot y"></div></div><div class="wf-kv">X.X mo</div><div class="trk"><i style="width:44%;background:var(--nw-amber)"></i></div><div class="wf-sub" style="font-size:8.5px">red &lt;3 · yellow 3–6 · green &gt;6</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Liquidity ratio</div><div class="dot g"></div></div><div class="wf-kv">X.Xx</div><div class="trk"><i style="width:72%;background:var(--nw-green)"></i></div><div class="wf-sub" style="font-size:8.5px">green &gt;1.0</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Housing cost ratio</div><div class="dot g"></div></div><div class="wf-kv">XX%</div><div class="trk"><i style="width:52%;background:var(--nw-green)"></i></div><div class="wf-sub" style="font-size:8.5px">green &lt;28 · yellow 28–36</div></div>
+</div>
+<div class="cap">Growth</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Savings rate</div><div class="dot g"></div></div><div class="wf-kv">XX%</div><div class="trk"><i style="width:66%;background:var(--nw-green)"></i></div><div class="wf-sub" style="font-size:8.5px">3mo XX% · 12mo XX%</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Retirement contrib.</div><div class="dot g"></div></div><div class="wf-kv">XX%</div><div class="trk"><i style="width:58%;background:var(--nw-green)"></i></div><div class="wf-sub" style="font-size:8.5px">green &gt;15</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Net worth growth</div></div><div class="wf-kv pos">+XX%</div><div class="wf-box" style="height:20px;border:none;background:var(--nw-track);border-radius:4px;font-size:8.5px">sparkline YoY</div><div class="wf-sub" style="font-size:8.5px">trend only, no band</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">FI progress</div></div><div class="wf-kv">XX%</div><div class="trk"><i style="width:32%;background:var(--nw-green-deep)"></i></div><div class="wf-sub" style="font-size:8.5px">of $X.XM FI number</div></div>
+</div>
+<div class="cap">Debt &amp; mix</div>
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:9px">
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Debt-to-income</div><div class="dot g"></div></div><div class="wf-kv">XX%</div><div class="trk"><i style="width:30%;background:var(--nw-green)"></i></div><div class="wf-sub" style="font-size:8.5px">green &lt;36 · red &gt;43</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Debt payoff runway</div></div><div class="wf-kv">XX mo</div><div class="trk"><i style="width:40%;background:var(--nw-green-deep)"></i></div><div class="wf-sub" style="font-size:8.5px">at current pace</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Net worth</div></div><div class="wf-kv">$XXX,XXX</div><div class="wf-box" style="height:20px;border:none;background:var(--nw-track);border-radius:4px;font-size:8.5px">sparkline</div><div class="wf-sub" style="font-size:8.5px">↑ vs last month</div></div>
+<div class="wf-kpi"><div class="wf-row"><div class="wf-kl" style="flex:1">Allocation mix</div></div><div class="wf-row" style="gap:2px;height:13px;margin:2px 0"><div style="flex:2;background:var(--nw-mint);border-radius:2px"></div><div style="flex:4;background:var(--nw-green);border-radius:2px"></div><div style="flex:3;background:var(--nw-green-deep);border-radius:2px"></div></div><div class="wf-sub" style="font-size:8.5px">cash · investments · retirement</div></div>
+</div>
+<div style="flex:1"></div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left">Any tile is clickable; the selected one is outlined in green and opens the panel at right.</div>
+</div>
+<div style="width:308px;flex:none;border-left:1px solid var(--nw-border);background:var(--nw-rail);padding:13px;display:flex;flex-direction:column;gap:9px">
+<div class="wf-row"><div class="wf-h2">Emergency fund</div><div style="flex:1"></div><div class="wf-sub">✕</div></div>
+<div class="wf-row"><div class="wf-num" style="font-size:26px">X.X</div><div><div class="wf-sub">months of expenses</div><div class="wf-row" style="gap:5px"><div class="dot y"></div><div class="wf-sub" style="color:var(--nw-amber)">Below target</div></div></div></div>
+<div class="wf-box" style="height:96px">This metric over time — 24 months, threshold bands shaded green / amber / coral behind the line</div>
+<div class="wf-row" style="gap:5px"><div class="wf-chip">6M</div><div class="wf-chip on">24M</div><div class="wf-chip">All</div></div>
+<div class="wf-c" style="gap:7px;padding:9px">
+<div class="wf-h2">Parameters</div>
+<div><div class="wf-kl">Target months</div><div class="wf-row" style="gap:7px;margin-top:4px"><div class="trk" style="flex:1"><i style="width:50%;background:var(--nw-green)"></i></div><div class="wf-input" style="padding:3px 6px">6</div></div></div>
+<div><div class="wf-kl">Which accounts count as liquid</div><div class="wf-row" style="gap:4px;flex-wrap:wrap;margin-top:4px"><div class="wf-chip on">Checking</div><div class="wf-chip on">Savings</div><div class="wf-chip">Brokerage</div><div class="wf-chip">HSA</div></div></div>
+<div><div class="wf-kl">Monthly expense basis</div><div class="wf-row" style="gap:0;border:1px solid var(--nw-border);border-radius:6px;overflow:hidden;margin-top:4px"><div style="flex:1;text-align:center;padding:4px;font-size:9.5px;background:var(--nw-green-tint);color:var(--nw-mint)">Trailing 3mo</div><div style="flex:1;text-align:center;padding:4px;font-size:9.5px;color:var(--nw-muted)">12mo</div><div style="flex:1;text-align:center;padding:4px;font-size:9.5px;color:var(--nw-muted)">Manual</div></div></div>
+<div><div class="wf-kl">Thresholds</div><div class="wf-row" style="gap:5px;margin-top:4px"><div class="wf-input" style="flex:1">red &lt; 3</div><div class="wf-input" style="flex:1">green &gt; 6</div></div></div>
+</div>
+<div class="wf-box" style="padding:8px;font-size:9.5px;text-align:left">Formula: liquid balances ÷ avg monthly expense. Inputs used: 2 accounts, Apr–Jun transactions. Changes save per household and re-color the tile everywhere.</div>
+<div style="flex:1"></div>
+<div class="wf-row"><div class="wf-btn">Reset to default</div><div style="flex:1"></div><div class="wf-btn pri">Save</div></div>
+</div>
+</div>
+</div>
+</div>
+<p class="dv-note"><b>Notes.</b> Grouped tiles rather than a flat eleven; the detail panel is where "audit the math" lives — history with threshold bands behind it, the editable parameters, and a plain statement of the formula and the rows it consumed.</p>
+</div>
+</div>
+
+<p class="cap" style="margin:34px 0 10px">10 · Calculators</p>
+<div class="dv-opts">
+<div class="dv-opt" id="2j">
+<div class="dv-olabel"><a class="dv-oid" href="#2j">2j</a>Calculator sidebar + one open (mortgage) — one frame serves all seven</div>
+<div class="dv-card">
+<div class="wf" style="width:1000px;height:530px">
+<div style="width:196px;flex:none;border-right:1px solid var(--nw-border);padding:12px 10px;display:flex;flex-direction:column;gap:2px;background:var(--nw-rail)">
+<div class="wf-brand"><img src="uploads/Brandmark.png" alt=""><em>Nest<i>Worth</i></em></div>
+<div class="wf-navh" style="margin-top:0">Calculators</div>
+<div class="wf-nav">Compound growth</div>
+<div class="wf-nav">Debt payoff</div>
+<div class="wf-nav">Emergency fund</div>
+<div class="wf-nav on">Mortgage / amortization</div>
+<div class="wf-nav">House affordability</div>
+<div class="wf-nav">Retirement / FI</div>
+<div class="wf-nav">Rebalancing <span class="wf-sub" style="font-size:8.5px">opt</span></div>
+<div class="wf-navh">Saved scenarios</div>
+<div class="wf-nav">Retire at 57</div>
+<div class="wf-nav">Retire at 65 + SS</div>
+<div class="wf-nav">Move in 2028</div>
+<div style="flex:1"></div>
+<div class="wf-box" style="padding:8px;font-size:9px;text-align:left">Every calculator opens pre-filled from your real data, with a "reset to my numbers" link.</div>
+</div>
+<div class="wf-body">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Mortgage &amp; amortization</div><div style="flex:1"></div><div class="wf-chip on">Prefilled from Wells Fargo mortgage</div><div class="wf-btn pri">Save as scenario</div></div>
+<div style="display:flex;flex:1;min-height:0">
+<div style="width:250px;border-right:1px solid var(--nw-border);padding:13px;display:flex;flex-direction:column;gap:10px">
+<div class="cap">Inputs</div>
+<div><div class="wf-kl">Principal</div><div class="wf-input" style="margin-top:3px">$XXX,XXX</div></div>
+<div><div class="wf-kl">Rate</div><div class="wf-input" style="margin-top:3px">X.XX%</div><div class="trk" style="margin-top:6px"><i style="width:44%;background:var(--nw-green)"></i></div></div>
+<div><div class="wf-kl">Term</div><div class="wf-row" style="gap:5px;margin-top:4px"><div class="wf-chip">15y</div><div class="wf-chip on">30y</div><div class="wf-chip">Custom</div></div></div>
+<div><div class="wf-kl">Start date</div><div class="wf-input" style="margin-top:3px">2020-08</div></div>
+<div><div class="wf-kl">Extra monthly payment</div><div class="wf-input" style="margin-top:3px">$XXX</div></div>
+<div><div class="wf-kl">One-time extra</div><div class="wf-input" style="margin-top:3px">$X,XXX at month XX</div></div>
+<div style="flex:1"></div>
+<div class="wf-btn">Reset to my numbers</div>
+</div>
+<div class="wf-main" style="flex:1">
+<div class="wf-row" style="gap:8px">
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Monthly P&amp;I</div><div class="wf-kv">$X,XXX</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Payoff date</div><div class="wf-kv" style="font-size:12px">Mar 2044</div><div class="wf-sub pos" style="font-size:9px">6y 2mo earlier</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Total interest</div><div class="wf-kv">$XXX,XXX</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Interest saved</div><div class="wf-kv pos">$XX,XXX</div></div>
+</div>
+<div class="wf-box" style="height:138px">Balance curve — baseline (muted) vs. with extra payments (Nest Green), principal/interest split shaded</div>
+<div class="wf-row"><div class="wf-h2">Amortization schedule</div><div style="flex:1"></div><div class="wf-chip on">Yearly</div><div class="wf-chip">Monthly</div><div class="wf-chip">Export CSV</div></div>
+<div class="wf-tr wf-th" style="grid-template-columns:.5fr 1fr 1fr 1fr 1fr;border-top:none"><div>Yr</div><div>Payment</div><div>Principal</div><div>Interest</div><div>Balance</div></div>
+<div class="wf-tr" style="grid-template-columns:.5fr 1fr 1fr 1fr 1fr"><div>1</div><div>$XX,XXX</div><div>$X,XXX</div><div>$XX,XXX</div><div>$XXX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:.5fr 1fr 1fr 1fr 1fr"><div>2</div><div>$XX,XXX</div><div>$X,XXX</div><div>$XX,XXX</div><div>$XXX,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:.5fr 1fr 1fr 1fr 1fr"><div>3</div><div>$XX,XXX</div><div>$X,XXX</div><div>$XX,XXX</div><div>$XXX,XXX</div></div>
+<div class="wf-sub" style="font-size:9px">…scrolls</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<p class="dv-note"><b>The shared pattern.</b> Left rail = inputs, top strip = headline results, middle = chart, bottom = schedule table. "Save as scenario" is the only bridge into the scenarios table, so assumptions are never entered twice.</p>
+</div>
+</div>
+
+<p class="cap" style="margin:34px 0 10px">11 · Scenarios &nbsp;·&nbsp; 12 · Settings</p>
+<div class="dv-opts">
+
+<div class="dv-opt" id="2k">
+<div class="dv-olabel"><a class="dv-oid" href="#2k">2k</a>Scenarios — retirement and house affordability, one screen with two tabs</div>
+<div class="dv-card">
+<div class="wf" style="width:1000px;height:676px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Scenarios</div><div style="width:10px"></div><div class="wf-chip on">Retirement</div><div class="wf-chip">House affordability</div><div style="flex:1"></div><div class="wf-btn">Duplicate</div><div class="wf-btn pri">+ New scenario</div></div>
+<div style="display:flex;flex:1;min-height:0">
+
+<div class="wf-main" style="flex:1;border-right:1px solid var(--nw-border)">
+<div class="cap">Retirement</div>
+<div class="wf-box" style="height:126px">Projected balance by year — one line per scenario, depletion point marked<br>shaded band = post-retirement drawdown</div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr;border-top:none;font-size:9.5px;color:var(--nw-muted)">
+<div></div><div class="wf-row"><div class="dot" style="background:var(--nw-green)"></div>Retire at 57</div><div class="wf-row"><div class="dot" style="background:var(--nw-mint)"></div>Retire at 65 + SS</div><div class="wf-row"><div class="dot" style="background:var(--nw-muted)"></div>Coast at 60</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Retirement age</div><div>57</div><div>65</div><div>60</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Monthly contribution</div><div class="wf-input" style="padding:3px 6px;border-color:var(--nw-green-line)">$X,XXX</div><div>$X,XXX</div><div>$XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Real return</div><div>X.X%</div><div>X.X%</div><div>X.X%</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Inflation</div><div>X.X%</div><div>X.X%</div><div>X.X%</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Withdrawal rate</div><div>4.0%</div><div>4.0%</div><div>3.5%</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Social Security</div><div>$0</div><div>$X,XXX/mo</div><div>$X,XXX/mo</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr;background:var(--nw-surface);border-radius:5px;padding:7px 6px;border-top-color:transparent"><div class="wf-th" style="color:var(--nw-text)">Balance at retirement</div><div style="color:var(--nw-text)">$X.XM</div><div style="color:var(--nw-text)">$X.XM</div><div style="color:var(--nw-text)">$X.XM</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .9fr .9fr .9fr"><div class="wf-th">Funds last until</div><div class="wf-row"><div class="dot y"></div>age 84</div><div class="wf-row"><div class="dot g"></div>past 92</div><div class="wf-row"><div class="dot r"></div>age 79</div></div>
+<div class="wf-box" style="padding:7px;font-size:9.5px;text-align:left">Deterministic projection. Stretch: a Monte Carlo band behind each line and "success in NN% of runs" in this row.</div>
+<div class="wf-row"><div class="wf-sub">Edit any cell inline — recalculates live, saves to the scenario's assumptions.</div><div style="flex:1"></div><div class="wf-btn" style="border-color:#5A3228;color:var(--nw-coral)">Delete</div><div class="wf-btn pri">Save</div></div>
+</div>
+
+<div style="width:404px;flex:none;display:flex;flex-direction:column">
+<div class="wf-main">
+<div class="cap">House affordability</div>
+<div class="wf-c" style="gap:7px"><div class="wf-row"><div class="wf-h2">What you can afford today</div><div style="flex:1"></div><div class="wf-chip on">28/36 rule</div></div>
+<div class="wf-row" style="gap:8px">
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Max price</div><div class="wf-kv">$XXX,XXX</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Monthly PITI</div><div class="wf-kv">$X,XXX</div></div>
+<div class="wf-kpi" style="flex:1"><div class="wf-kl">Front / back DTI</div><div class="wf-row"><div class="wf-kv" style="font-size:12px">XX/XX%</div><div class="dot g"></div></div></div>
+</div></div>
+<div class="wf-h2">Compare purchases</div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr;border-top:none;font-size:9.5px;color:var(--nw-muted)"><div></div><div>Move 2027</div><div>Move 2029</div><div>Stay put</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">Purchase price</div><div class="wf-input" style="padding:3px 6px">$XXX,XXX</div><div>$XXX,XXX</div><div>—</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">Down payment</div><div>XX%</div><div>XX%</div><div>—</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">Rate / term</div><div>X.X% 30y</div><div>X.X% 30y</div><div>—</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">Tax / ins / HOA</div><div>$XXX/mo</div><div>$XXX/mo</div><div>—</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr;background:var(--nw-surface);border-radius:5px;padding:7px 6px;border-top-color:transparent"><div class="wf-th" style="color:var(--nw-text)">Monthly payment</div><div style="color:var(--nw-text)">$X,XXX</div><div style="color:var(--nw-text)">$X,XXX</div><div style="color:var(--nw-text)">$X,XXX</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">Savings rate after</div><div class="wf-row"><div class="dot y"></div>XX%</div><div class="wf-row"><div class="dot g"></div>XX%</div><div class="wf-row"><div class="dot g"></div>XX%</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">EF months after</div><div class="wf-row"><div class="dot r"></div>X.X</div><div class="wf-row"><div class="dot y"></div>X.X</div><div class="wf-row"><div class="dot g"></div>X.X</div></div>
+<div class="wf-tr" style="grid-template-columns:1.1fr .8fr .8fr .7fr"><div class="wf-th">Housing ratio</div><div class="wf-row"><div class="dot r"></div>XX%</div><div class="wf-row"><div class="dot y"></div>XX%</div><div class="wf-row"><div class="dot g"></div>XX%</div></div>
+<div class="wf-box" style="flex:1;min-height:60px">Projected net worth with each purchase vs. staying put</div>
+<div class="wf-box" style="padding:7px;font-size:9.5px;text-align:left">The point of this tab is the three KPI rows: what the house does to your safety margin, not just whether you'd get the loan.</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="2l">
+<div class="dv-olabel"><a class="dv-oid" href="#2l">2l</a>Settings — household, security, preferences, data, invites</div>
+<div class="dv-card">
+<div class="wf" style="width:470px;height:664px;flex-direction:column">
+<div class="wf-top"><div class="wf-h" style="font-size:12px">Settings</div></div>
+<div class="wf-main">
+<div class="wf-c" style="gap:6px"><div class="wf-h2">Household</div><div class="wf-row"><div style="flex:1" class="wf-sub">Display name</div><div class="wf-input">The Harts</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Username</div><div class="wf-sub">harts · not changeable</div></div></div>
+<div class="wf-c" style="gap:6px"><div class="wf-h2">Security</div><div class="wf-row"><div style="flex:1" class="wf-sub">Password</div><div class="wf-btn">Change</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Security question</div><div class="wf-btn">Change</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Session timeout</div><div class="wf-sub">1 hour inactivity · fixed</div></div></div>
+<div class="wf-c" style="gap:6px"><div class="wf-h2">Preferences</div><div class="wf-row"><div style="flex:1" class="wf-sub">Stale threshold</div><div class="wf-input">30 days</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Default date range</div><div class="wf-input">12 months</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Liquid account types</div><div class="wf-btn">Edit</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">KPI thresholds</div><div class="wf-btn">Edit all</div></div></div>
+<div class="wf-c" style="gap:6px"><div class="wf-h2">Data</div><div class="wf-row"><div class="wf-btn">Export all data</div><div class="wf-btn">Import history</div></div><div class="wf-row"><div style="flex:1" class="wf-sub">Danger zone</div><div class="wf-btn" style="border-color:#5A3228;color:var(--nw-coral)">Delete household</div></div></div>
+<div class="wf-c" style="gap:6px"><div class="wf-row"><div class="wf-h2">Invites</div><div class="wf-chip on">Owner only</div><div style="flex:1"></div><div class="wf-btn pri">+ Invite</div></div>
+<div class="wf-tr" style="grid-template-columns:1fr .8fr auto;border-top:none;font-size:10px"><div>Nguyen family</div><div>nguyens</div><div class="wf-row"><div class="dot g"></div><span class="wf-sub">active</span></div></div>
+<div class="wf-tr" style="grid-template-columns:1fr .8fr auto;font-size:10px"><div>Beckett house</div><div>becketts</div><div class="wf-row"><div class="dot y"></div><span class="wf-sub">invited</span></div></div>
+<div class="wf-sub" style="font-size:9px">Non-owners hitting this route get a 404, not a 403 — the page shouldn't confirm it exists.</div>
+</div>
+<div style="flex:1"></div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<p class="dv-next">Next: mobile pass on all twelve. Or adjust here first — "make the Overview KPI row 4 tiles again", "add a first-run onboarding screen", "show the transactions list as its own full screen".</p>
+</section>
+
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,91 @@
+import time
+
+from app.rate_limit import clear_attempts, is_rate_limited, register_failed_attempt
+from app.security import (
+    create_session_token,
+    decode_session_token,
+    decrypt_pii,
+    encrypt_pii,
+    hash_secret,
+    hash_username,
+    refresh_session_token,
+    verify_secret,
+)
+
+
+def test_hash_and_verify_roundtrip():
+    hashed = hash_secret("correct horse battery staple")
+    assert verify_secret("correct horse battery staple", hashed) is True
+    assert verify_secret("wrong", hashed) is False
+
+
+def test_verify_secret_handles_missing_hash_without_raising():
+    # No user found — must still run bcrypt work and return False, not raise.
+    assert verify_secret("anything", None) is False
+
+
+def test_session_token_roundtrip():
+    token, expires_at = create_session_token("household-123", "harts")
+    payload = decode_session_token(token)
+    assert payload is not None
+    assert payload["household_id"] == "household-123"
+    assert payload["username"] == "harts"
+    assert expires_at > time.time()
+
+
+def test_decode_rejects_tampered_token():
+    token, _ = create_session_token("household-123", "harts")
+    header, payload, signature = token.split(".")
+    # Flip a character inside the header segment (index 5, well before its final character) —
+    # any non-trailing base64url character swap is guaranteed to change the decoded bytes.
+    # Flipping the very last character of a segment is flaky: base64url's trailing group can
+    # carry unused padding bits, so some swaps there leave the decoded bytes (and the tampered
+    # token's validity) unchanged, making the test pass or fail non-deterministically.
+    idx = 5
+    replacement = "a" if header[idx] != "a" else "b"
+    tampered_header = header[:idx] + replacement + header[idx + 1 :]
+    tampered = ".".join([tampered_header, payload, signature])
+    assert decode_session_token(tampered) is None
+
+
+def test_refresh_extends_expiry():
+    token, expires_at = create_session_token("household-123", "harts")
+    payload = decode_session_token(token)
+    time.sleep(1)
+    new_token, new_expires_at = refresh_session_token(payload)
+    new_payload = decode_session_token(new_token)
+    assert new_payload["last_activity"] > payload["last_activity"]
+    assert new_expires_at >= expires_at
+
+
+def test_hash_username_is_deterministic():
+    assert hash_username("harts") == hash_username("harts")
+
+
+def test_hash_username_differs_for_different_input():
+    assert hash_username("harts") != hash_username("smiths")
+
+
+def test_hash_username_is_not_the_plaintext():
+    assert hash_username("harts") != "harts"
+
+
+def test_encrypt_pii_roundtrip():
+    ciphertext = encrypt_pii("The Harts")
+    assert ciphertext != "The Harts"
+    assert decrypt_pii(ciphertext) == "The Harts"
+
+
+def test_decrypt_pii_passes_through_none():
+    assert decrypt_pii(None) is None
+
+
+def test_rate_limit_locks_after_threshold():
+    key = "test-rate-limit-key"
+    clear_attempts(key)
+    for _ in range(8):  # matches app.rate_limit._MAX_ATTEMPTS
+        assert is_rate_limited(key) is False
+        register_failed_attempt(key)
+    assert is_rate_limited(key) is True
+    clear_attempts(key)
+    assert is_rate_limited(key) is False
