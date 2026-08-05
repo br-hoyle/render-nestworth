@@ -1,3 +1,5 @@
+from bisect import bisect_left, bisect_right
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -204,9 +206,237 @@ def monthly_income_transaction_sums(conn: Connection, household_id: str, start: 
     return {r["month"]: r["total"] for r in rows}
 
 
-def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings: dict) -> KpiInputs:
-    total_assets, total_liabilities, assets_by_category, liabilities_by_category, balance_by_type = balances_totals_at(
-        conn, household_id, as_of
+# ---------------------------------------------------------------------------------------
+# Batched dataset for build_kpi_inputs across MANY as_of dates in a handful of queries total
+# ---------------------------------------------------------------------------------------
+# The naive approach — call build_kpi_inputs() once per as_of date — issues ~8 sequential
+# DB round trips per date (balances x4, transactions x3, income x1). For a 12-month history
+# (13 dates) that's 100+ round trips to a remote Postgres instance; at ~50-60ms/round-trip
+# that's 6-13+ seconds, reproduced against the real Supabase DB. The fix: fetch every
+# underlying table ONCE across the whole date range this request needs, then compute each
+# date's KpiInputs snapshot in memory (bisect/prefix-sum lookups, no further queries) — turns
+# O(dates x 8) round trips into O(1), independent of how many dates are requested.
+
+
+@dataclass
+class _AccountMeta:
+    account_id: str
+    category: str
+    account_type: str
+    balance_type: str
+    effective_start_date: date
+    effective_end_date: date
+
+
+@dataclass
+class _TxnSeries:
+    """Per-day category sums, as parallel prefix-sum arrays over `dates` (sorted, unique days
+    that have at least one transaction) — window_sum(key, start, end) below answers any
+    [start, end] range in O(log n) via bisect, matching `WHERE date >= start AND date <= end`
+    exactly without a fresh query per window."""
+
+    dates: list[date] = field(default_factory=list)
+    prefixes: dict[str, list[Decimal]] = field(default_factory=dict)
+
+    def window_sum(self, key: str, start: date, end: date) -> Decimal:
+        prefix = self.prefixes[key]
+        lo = bisect_left(self.dates, start)
+        hi = bisect_right(self.dates, end)
+        return prefix[hi] - prefix[lo]
+
+
+@dataclass
+class _KpiDataset:
+    accounts: list[_AccountMeta]
+    balances_by_account: dict[str, tuple[list[date], list[Decimal]]]
+    income_records: list[dict]
+    txn: _TxnSeries
+    monthly_income: dict[str, Decimal]
+
+
+def _load_kpi_dataset(conn: Connection, household_id: str, as_of_dates: list[date]) -> _KpiDataset:
+    account_rows = conn.execute(
+        text(
+            """
+            select account_id, category, account_type, balance_type,
+                   effective_start_date, effective_end_date
+            from accounts
+            where household_id = :household_id
+            """
+        ),
+        {"household_id": household_id},
+    ).mappings().all()
+    accounts = [
+        _AccountMeta(
+            account_id=str(r["account_id"]),
+            category=r["category"],
+            account_type=r["account_type"],
+            balance_type=r["balance_type"],
+            effective_start_date=r["effective_start_date"],
+            effective_end_date=r["effective_end_date"],
+        )
+        for r in account_rows
+    ]
+
+    # No lower date bound on balances — forward-fill needs the true latest-known balance as
+    # of even the earliest requested date, however old that snapshot is.
+    balance_rows = conn.execute(
+        text(
+            """
+            select b.account_id, b.full_date, b.balance
+            from balances b
+            join accounts a on a.account_id = b.account_id
+            where a.household_id = :household_id
+            order by b.account_id, b.full_date
+            """
+        ),
+        {"household_id": household_id},
+    ).mappings().all()
+    balances_by_account: dict[str, tuple[list[date], list[Decimal]]] = {}
+    for r in balance_rows:
+        acct_id = str(r["account_id"])
+        dates_list, values_list = balances_by_account.setdefault(acct_id, ([], []))
+        dates_list.append(r["full_date"])
+        values_list.append(r["balance"])
+
+    income_rows = conn.execute(
+        text(
+            "select income, effective_start_date, effective_end_date from income where household_id = :household_id"
+        ),
+        {"household_id": household_id},
+    ).mappings().all()
+    income_records = [dict(r) for r in income_rows]
+
+    # Transactions bounded to the widest lookback any as_of date could need (13 months, for
+    # Income Growth Rate's trailing-12mo comparison) — not the household's entire history.
+    txn_start = min(as_of_dates) - relativedelta(months=13)
+    txn_end = max(as_of_dates)
+
+    category_rows = conn.execute(
+        text('select "group", item, flow_type from transaction_categories where household_id = :household_id'),
+        {"household_id": household_id},
+    ).mappings().all()
+    exact_flow = {(r["group"], r["item"]): r["flow_type"] for r in category_rows}
+    group_flow = {r["group"]: r["flow_type"] for r in category_rows if r["item"] == ""}
+
+    txn_rows = conn.execute(
+        text(
+            """
+            select date, amount, type, "group", item
+            from transactions
+            where household_id = :household_id and date >= :start and date <= :end
+            order by date
+            """
+        ),
+        {"household_id": household_id, "start": txn_start, "end": txn_end},
+    ).mappings().all()
+
+    keys = ("income", "expense", "housing", "needs", "wants", "savings", "classified")
+    day_agg: dict[date, dict[str, Decimal]] = {}
+    for r in txn_rows:
+        d = r["date"]
+        agg = day_agg.setdefault(d, {k: Decimal(0) for k in keys})
+        amount = r["amount"]
+        if r["type"] == "income":
+            agg["income"] += amount
+            continue
+        expense_amt = -amount
+        agg["expense"] += expense_amt
+        group = r["group"] or ""
+        item = r["item"] or ""
+        if "housing" in group.lower() or "mortgage" in item.lower():
+            agg["housing"] += expense_amt
+        flow_type = exact_flow.get((group, item), group_flow.get(group))
+        if flow_type is not None:
+            agg["classified"] += 1
+            if flow_type == "needs":
+                agg["needs"] += expense_amt
+            elif flow_type == "wants":
+                agg["wants"] += expense_amt
+            elif flow_type == "savings":
+                agg["savings"] += expense_amt
+
+    sorted_dates = sorted(day_agg.keys())
+    prefixes: dict[str, list[Decimal]] = {}
+    for k in keys:
+        prefix = [Decimal(0)]
+        for d in sorted_dates:
+            prefix.append(prefix[-1] + day_agg[d][k])
+        prefixes[k] = prefix
+    txn_series = _TxnSeries(dates=sorted_dates, prefixes=prefixes)
+
+    monthly_income: dict[str, Decimal] = {}
+    for d, agg in day_agg.items():
+        month = d.strftime("%Y-%m")
+        monthly_income[month] = monthly_income.get(month, Decimal(0)) + agg["income"]
+
+    return _KpiDataset(
+        accounts=accounts,
+        balances_by_account=balances_by_account,
+        income_records=income_records,
+        txn=txn_series,
+        monthly_income=monthly_income,
+    )
+
+
+def _balances_totals_at_dataset(
+    dataset: _KpiDataset, as_of: date
+) -> tuple[Decimal, Decimal, dict[str, Decimal], dict[str, Decimal], dict[str, Decimal]]:
+    """In-memory equivalent of balances_totals_at — same account-open-window + latest-known-
+    balance-per-account logic, looked up via bisect instead of a correlated SQL subquery."""
+    total_assets = Decimal(0)
+    total_liabilities = Decimal(0)
+    assets_by_category: dict[str, Decimal] = {}
+    liabilities_by_category: dict[str, Decimal] = {}
+    balance_by_type: dict[str, Decimal] = {}
+
+    for acct in dataset.accounts:
+        if not (acct.effective_start_date <= as_of <= acct.effective_end_date):
+            continue
+        dates_list, values_list = dataset.balances_by_account.get(acct.account_id, ([], []))
+        idx = bisect_right(dates_list, as_of)
+        balance = values_list[idx - 1] if idx > 0 else Decimal(0)
+
+        balance_by_type[acct.account_type] = balance_by_type.get(acct.account_type, Decimal(0)) + balance
+        if acct.balance_type == "asset":
+            total_assets += balance
+            assets_by_category[acct.category] = assets_by_category.get(acct.category, Decimal(0)) + balance
+        else:
+            total_liabilities += balance
+            liabilities_by_category[acct.category] = liabilities_by_category.get(acct.category, Decimal(0)) + balance
+
+    return total_assets, total_liabilities, assets_by_category, liabilities_by_category, balance_by_type
+
+
+def _gross_annual_income_at_dataset(dataset: _KpiDataset, as_of: date) -> Decimal:
+    return sum(
+        (r["income"] for r in dataset.income_records if r["effective_start_date"] <= as_of <= r["effective_end_date"]),
+        Decimal(0),
+    )
+
+
+def _transaction_sums_dataset(dataset: _KpiDataset, start: date, end: date) -> dict[str, Decimal]:
+    return {
+        "income": dataset.txn.window_sum("income", start, end),
+        "expense": dataset.txn.window_sum("expense", start, end),
+        "housing": dataset.txn.window_sum("housing", start, end),
+    }
+
+
+def _classified_expense_sums_dataset(dataset: _KpiDataset, start: date, end: date) -> dict:
+    return {
+        "needs": dataset.txn.window_sum("needs", start, end),
+        "wants": dataset.txn.window_sum("wants", start, end),
+        "savings": dataset.txn.window_sum("savings", start, end),
+        "classified_count": dataset.txn.window_sum("classified", start, end),
+    }
+
+
+def _build_kpi_inputs_from_dataset(dataset: _KpiDataset, as_of: date, settings: dict) -> KpiInputs:
+    """Pure in-memory computation — identical logic to the old build_kpi_inputs, just reading
+    from the pre-fetched dataset instead of issuing a query per lookup."""
+    total_assets, total_liabilities, assets_by_category, liabilities_by_category, balance_by_type = (
+        _balances_totals_at_dataset(dataset, as_of)
     )
 
     liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
@@ -217,15 +447,15 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
     net_worth = total_assets - total_liabilities
 
     one_year_ago = as_of - relativedelta(years=1)
-    assets_1y, liabilities_1y, _, _, _ = balances_totals_at(conn, household_id, one_year_ago)
+    assets_1y, liabilities_1y, _, _, _ = _balances_totals_at_dataset(dataset, one_year_ago)
     net_worth_1y = assets_1y - liabilities_1y
 
     six_months_ago = as_of - relativedelta(months=6)
-    _, liabilities_6mo, _, _, _ = balances_totals_at(conn, household_id, six_months_ago)
+    _, liabilities_6mo, _, _, _ = _balances_totals_at_dataset(dataset, six_months_ago)
     liability_reduction_6mo = liabilities_6mo - total_liabilities
 
     three_months_ago = as_of - relativedelta(months=3)
-    _, liabilities_3mo, _, _, _ = balances_totals_at(conn, household_id, three_months_ago)
+    _, liabilities_3mo, _, _, _ = _balances_totals_at_dataset(dataset, three_months_ago)
     liability_reduction_3mo = liabilities_3mo - total_liabilities
 
     property_asset_value = _category_total(assets_by_category, "Property")
@@ -235,26 +465,24 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
 
     # Income Growth Rate: this month's actual income transactions vs. the average of the 12
     # full calendar months before it.
-    income_window_start = as_of - relativedelta(months=13)
-    monthly_income = monthly_income_transaction_sums(conn, household_id, income_window_start, as_of)
-    current_month_income = monthly_income.get(as_of.strftime("%Y-%m"), Decimal(0))
+    current_month_income = dataset.monthly_income.get(as_of.strftime("%Y-%m"), Decimal(0))
     prior_month_values = [
-        monthly_income[key]
+        dataset.monthly_income[key]
         for key in (
             (as_of - relativedelta(months=k)).strftime("%Y-%m") for k in range(1, 13)
         )
-        if key in monthly_income
+        if key in dataset.monthly_income
     ]
     trailing_12mo_avg_income = (
         sum(prior_month_values, Decimal(0)) / len(prior_month_values) if prior_month_values else None
     )
 
-    gross_annual_income = gross_annual_income_at(conn, household_id, as_of)
+    gross_annual_income = _gross_annual_income_at_dataset(dataset, as_of)
 
     expense_basis = settings.get("expense_basis", "3mo")
     window_months = 12 if expense_basis == "12mo" else 3
     window_start = as_of - relativedelta(months=window_months)
-    txn = transaction_sums(conn, household_id, window_start, as_of)
+    txn = _transaction_sums_dataset(dataset, window_start, as_of)
 
     trailing_income = txn["income"]
     if expense_basis == "manual" and settings.get("manual_monthly_expense") is not None:
@@ -262,7 +490,7 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
     else:
         trailing_expense = txn["expense"]
 
-    classified = classified_expense_sums(conn, household_id, window_start, as_of)
+    classified = _classified_expense_sums_dataset(dataset, window_start, as_of)
     has_classified = classified["classified_count"] > 0
     needs_trailing = classified["needs"] if has_classified else None
     wants_trailing = classified["wants"] if has_classified else None
@@ -270,7 +498,7 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
 
     # Fixed 12-month window for Savings Efficiency / Net Worth Velocity, independent of the
     # expense_basis-driven trailing window above (matches net_worth_growth_yoy's 1yr compare).
-    txn_12mo = transaction_sums(conn, household_id, one_year_ago, as_of)
+    txn_12mo = _transaction_sums_dataset(dataset, one_year_ago, as_of)
     gross_income_12mo = txn_12mo["income"]
     net_income_12mo = txn_12mo["income"] - txn_12mo["expense"]
 
@@ -301,6 +529,21 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
         current_month_income=current_month_income,
         trailing_12mo_avg_income=trailing_12mo_avg_income,
     )
+
+
+def build_kpi_inputs_many(
+    conn: Connection, household_id: str, as_of_dates: list[date], settings: dict
+) -> dict[date, KpiInputs]:
+    """Batched entry point — one dataset fetch (a handful of queries total) shared across
+    every requested date. Use this instead of calling build_kpi_inputs() in a loop."""
+    dataset = _load_kpi_dataset(conn, household_id, as_of_dates)
+    return {d: _build_kpi_inputs_from_dataset(dataset, d, settings) for d in as_of_dates}
+
+
+def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings: dict) -> KpiInputs:
+    """Single-date convenience wrapper around build_kpi_inputs_many — still issues only a
+    handful of queries total (not the old ~8), just for one date instead of many."""
+    return build_kpi_inputs_many(conn, household_id, [as_of], settings)[as_of]
 
 
 def apply_birthdate_age_override(conn: Connection, household_id: str, settings: dict) -> dict:
@@ -375,11 +618,12 @@ def get_metric_history(
     settings = get_household_settings(conn, session.household_id)
     today = end or date.today()
 
+    cutoffs = [today - relativedelta(months=i) for i in range(months, -1, -1)]
+    inputs_by_date = build_kpi_inputs_many(conn, session.household_id, cutoffs, settings)
+
     points = []
-    for i in range(months, -1, -1):
-        cutoff = today - relativedelta(months=i)
-        inputs = build_kpi_inputs(conn, session.household_id, cutoff, settings)
-        result = fn(inputs)
+    for cutoff in cutoffs:
+        result = fn(inputs_by_date[cutoff])
         value = result[2] if slug in _CHART_PROGRESS_PCT_SLUGS else result[0]
         points.append(KpiHistoryPoint(date=cutoff.isoformat(), value=value))
 
@@ -394,18 +638,19 @@ def get_all_metric_history(
     conn: Connection = Depends(get_tenant_db),
 ) -> AllKpiHistoryResponse:
     """Batched counterpart to /scorecard/{slug}/history for the tile-embedded sparklines on
-    the Scorecard page: build_kpi_inputs is computed ONCE per cutoff date and reused across
-    every metric function, instead of once per metric per date — an O(months) query cost
-    instead of O(metrics × months). Mirrors /accounts/sparklines' same batch-to-avoid-N+1
-    pattern for the same reason (~20 metrics × 13 dates would otherwise mean ~260 repeated
-    balance/transaction lookups on a single page load)."""
+    the Scorecard page: build_kpi_inputs_many fetches every underlying table ONCE (not once
+    per date, and not once per metric per date) and reuses it for every metric at every
+    cutoff — an O(1) query cost instead of O(months) (previously) or O(metrics × months)
+    (before that)."""
     settings = get_household_settings(conn, session.household_id)
     today = end or date.today()
 
+    cutoffs = [today - relativedelta(months=i) for i in range(months, -1, -1)]
+    inputs_by_date = build_kpi_inputs_many(conn, session.household_id, cutoffs, settings)
+
     series: dict[str, list[KpiHistoryPoint]] = {slug: [] for slug, _, _, _, _ in METRICS}
-    for i in range(months, -1, -1):
-        cutoff = today - relativedelta(months=i)
-        inputs = build_kpi_inputs(conn, session.household_id, cutoff, settings)
+    for cutoff in cutoffs:
+        inputs = inputs_by_date[cutoff]
         for slug, _, _, _, fn in METRICS:
             result = fn(inputs)
             value = result[2] if slug in _CHART_PROGRESS_PCT_SLUGS else result[0]

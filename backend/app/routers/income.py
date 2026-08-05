@@ -8,7 +8,6 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
-from app.routers.scorecard import gross_annual_income_at
 from app.schemas.income import (
     IncomeConflict,
     IncomeCreate,
@@ -168,6 +167,21 @@ def income_summary(
     )
 
 
+def _all_income_records(conn: Connection, household_id: str) -> list[dict]:
+    rows = conn.execute(
+        text("select income, effective_start_date, effective_end_date from income where household_id = :household_id"),
+        {"household_id": household_id},
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
+def _gross_annual_income_at(records: list[dict], as_of: date) -> Decimal:
+    return sum(
+        (r["income"] for r in records if r["effective_start_date"] <= as_of <= r["effective_end_date"]),
+        Decimal(0),
+    )
+
+
 @router.get("/series", response_model=IncomeSeriesResponse)
 def income_series(
     months: int = 24,
@@ -175,9 +189,12 @@ def income_series(
     conn: Connection = Depends(get_tenant_db),
 ) -> IncomeSeriesResponse:
     """Gross (from the effective-dated income table, per CLAUDE.md's "household income at
-    any point in time" definition — reuses gross_annual_income_at, the same function the
-    scorecard KPIs use) vs. Net (actual income-type transactions, month by month) — lets a
-    household see how what they actually banked compares to their on-paper income."""
+    any point in time" definition) vs. Net (actual income-type transactions, month by month)
+    — lets a household see how what they actually banked compares to their on-paper income.
+
+    Fetches all income records and net-income-by-month ONCE (2 queries total), then computes
+    every requested month's gross figure in memory — not one query per month, which used to
+    mean `months + 2` sequential round trips to the DB for this one endpoint."""
     today = date.today()
     start = today - relativedelta(months=months)
 
@@ -194,11 +211,12 @@ def income_series(
         {"household_id": session.household_id, "start": start},
     ).mappings().all()
     net_by_month = {r["month"]: r["net"] for r in net_rows}
+    income_records = _all_income_records(conn, session.household_id)
 
     points = []
     for i in range(months, -1, -1):
         cutoff = today - relativedelta(months=i)
-        gross_monthly = gross_annual_income_at(conn, session.household_id, cutoff) / 12
+        gross_monthly = _gross_annual_income_at(income_records, cutoff) / 12
         net_monthly = net_by_month.get(cutoff.strftime("%Y-%m"))
 
         diff_dollar = (gross_monthly - net_monthly) if net_monthly is not None else None
