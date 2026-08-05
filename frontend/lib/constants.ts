@@ -79,10 +79,10 @@ export const ACCOUNT_TYPES = [
   ...new Set(Object.values(TYPE_OPTIONS_BY_BALANCE_AND_CATEGORY).flatMap((byCategory) => Object.values(byCategory).flat())),
 ];
 
-export const FLOW_TYPE_OPTIONS: { value: "Needs" | "Wants" | "Savings" | "Transfer" | "Other"; label: string }[] = [
-  { value: "Needs", label: "Needs (Non-Discretionary)" },
-  { value: "Wants", label: "Wants (Discretionary)" },
-  { value: "Savings", label: "Savings / Investing" },
-  { value: "Transfer", label: "Transfer between Accounts" },
-  { value: "Other", label: "Other" },
+export const FLOW_TYPE_OPTIONS: { value: "needs" | "wants" | "savings" | "transfer" | "other"; label: string }[] = [
+  { value: "needs", label: "Needs (Non-Discretionary)" },
+  { value: "wants", label: "Wants (Discretionary)" },
+  { value: "savings", label: "Savings / Investing" },
+  { value: "transfer", label: "Transfer between Accounts" },
+  { value: "other", label: "Other" },
 ];

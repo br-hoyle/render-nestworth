@@ -137,6 +137,11 @@ function monthsAgo(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+function formatDateLabel(isoDate: string): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function OverviewPage() {
   const [range, setRange] = useState(12);
   const [stale, setStale] = useState<StaleAccountInfo[] | null>(null);
@@ -146,6 +151,7 @@ export default function OverviewPage() {
   const [transactions, setTransactions] = useState<TransactionRecord[] | null>(null);
   const [typeGrid, setTypeGrid] = useState<BalanceGridResponse | null>(null);
   const [selectedMetric, setSelectedMetric] = useState<KpiMetric | null>(null);
+  const [dailySeries, setDailySeries] = useState<NetWorthSeriesResponse | null>(null);
 
   useEffect(() => {
     api.get<StaleAccountInfo[]>("/accounts/stale").then(setStale);
@@ -153,12 +159,17 @@ export default function OverviewPage() {
     api.get<ScorecardResponse>("/scorecard").then(setScorecard);
     api.get<TransactionListResponse>(`/transactions?start=${monthsAgo(6)}&limit=1000`).then((res) => setTransactions(res.items));
     api.get<BalanceGridResponse>("/accounts/balance-grid?limit=6").then(setTypeGrid);
+    // Day-level series, independent of the range selector, purely to compare the current net
+    // worth against the immediately preceding balance point ("BoB") rather than a month bucket.
+    api.get<NetWorthSeriesResponse>(`/networth/series?start=${monthsAgo(1)}&granularity=daily`).then(setDailySeries);
   }, []);
 
+  const rangeStart = range === 0 ? "2000-01-01" : monthsAgo(range);
+  const rangeEnd = new Date().toISOString().slice(0, 10);
+
   useEffect(() => {
-    const start = range === 0 ? "2000-01-01" : monthsAgo(range);
-    api.get<NetWorthSeriesResponse>(`/networth/series?start=${start}&granularity=monthly`).then(setSeries);
-  }, [range]);
+    api.get<NetWorthSeriesResponse>(`/networth/series?start=${rangeStart}&granularity=monthly`).then(setSeries);
+  }, [rangeStart]);
 
   function refetchScorecard() {
     api.get<ScorecardResponse>("/scorecard").then(setScorecard);
@@ -170,6 +181,11 @@ export default function OverviewPage() {
   const previousMonth = points[points.length - 2];
   const netWorthNow = latest ? Number(latest.net_worth) : null;
   const momDelta = latest && previousMonth ? Number(latest.net_worth) - Number(previousMonth.net_worth) : null;
+
+  const dailyPoints = dailySeries?.net_worth ?? [];
+  const latestDaily = dailyPoints[dailyPoints.length - 1];
+  const previousDaily = dailyPoints[dailyPoints.length - 2];
+  const bobDelta = latestDaily && previousDaily ? Number(latestDaily.net_worth) - Number(previousDaily.net_worth) : null;
 
   const keyMetrics = KEY_METRIC_SLUGS.map((slug) => scorecard?.metrics.find((m) => m.slug === slug)).filter(
     (m): m is KpiMetric => !!m
@@ -205,26 +221,12 @@ export default function OverviewPage() {
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 max-w-6xl mx-auto w-full">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-lg font-medium">Overview</h1>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1">
-            {RANGES.map((r) => (
-              <button
-                key={r.label}
-                onClick={() => setRange(r.months ?? 0)}
-                className={
-                  "px-2.5 py-1 rounded-full text-xs border " +
-                  ((r.months ?? 0) === range ? "border-nw-green-line text-nw-mint bg-nw-green-tint" : "border-nw-border text-nw-muted")
-                }
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-          <Link href="/update">
-            <Button variant="primary">Update balances</Button>
-          </Link>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <h1 className="text-lg font-medium">Overview</h1>
         </div>
+        <Link href="/update">
+          <Button variant="primary">Update balances</Button>
+        </Link>
       </div>
 
       {staleCount > 0 && (
@@ -246,20 +248,45 @@ export default function OverviewPage() {
         <div className="flex-1 min-w-0 flex flex-col gap-4">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-3">
             <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-              <div className="flex items-center gap-6 flex-wrap">
-                <div>
-                  <div className="text-[10px] uppercase tracking-wide text-nw-muted">Net worth</div>
-                  <div className="text-2xl font-medium">{netWorthNow !== null ? money(netWorthNow) : "—"}</div>
-                </div>
-                {momDelta !== null && (
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase tracking-wide text-nw-muted">MoM</div>
-                    <div className={momDelta >= 0 ? "text-nw-green text-sm" : "text-nw-coral text-sm"}>
-                      {momDelta >= 0 ? "+" : ""}
-                      {money(momDelta)}
-                    </div>
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-6 flex-wrap">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wide text-nw-muted">Net worth</div>
+                    <div className="text-2xl font-medium">{netWorthNow !== null ? money(netWorthNow) : "—"}</div>
                   </div>
-                )}
+                  {momDelta !== null && (
+                    <div className="text-right">
+                      <div className="text-[10px] uppercase tracking-wide text-nw-muted">MoM</div>
+                      <div className={momDelta >= 0 ? "text-nw-green text-sm" : "text-nw-coral text-sm"}>
+                        {momDelta >= 0 ? "+" : ""}
+                        {money(momDelta)}
+                      </div>
+                    </div>
+                  )}
+                  {bobDelta !== null && (
+                    <div className="text-right">
+                      <div className="text-[10px] uppercase tracking-wide text-nw-muted">BoB</div>
+                      <div className={bobDelta >= 0 ? "text-nw-green text-sm" : "text-nw-coral text-sm"}>
+                        {bobDelta >= 0 ? "+" : ""}
+                        {money(bobDelta)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  {RANGES.map((r) => (
+                    <button
+                      key={r.label}
+                      onClick={() => setRange(r.months ?? 0)}
+                      className={
+                        "px-2.5 py-1 rounded-full text-xs border " +
+                        ((r.months ?? 0) === range ? "border-nw-green-line text-nw-mint bg-nw-green-tint" : "border-nw-border text-nw-muted")
+                      }
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               {points.length >= 2 ? (
                 <NetWorthChart points={points} />
@@ -290,7 +317,10 @@ export default function OverviewPage() {
 
           <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-              <div className="text-sm font-medium">Cash Flow — Last 6 Months</div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-medium">Cash Flow</span>
+                <span className="text-xs text-nw-muted">Last 6 Months</span>
+              </div>
               <Link href="/trends/cash-flow" className="text-xs text-nw-mint">
                 Cash Flow →
               </Link>

@@ -9,6 +9,6 @@ class CategoryMonthPoint(BaseModel):
 
 
 class CategoryTrend(BaseModel):
-    group: str
+    label: str  # group name, or item name (bare if scoped to one group, "Group · Item" otherwise)
     points: list[CategoryMonthPoint]
-    drift_pct: float | None  # % change: most recent month vs. the prior 3-month average
+    ratio_pct: float | None  # current month ÷ trailing 6-month average × 100 (100% = on pace)

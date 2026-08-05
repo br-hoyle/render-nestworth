@@ -241,6 +241,7 @@ _METRIC_FNS = {slug: fn for slug, _, _, _, fn in METRICS}
 def get_metric_history(
     slug: str,
     months: int = 24,
+    end: date | None = None,
     session: Session = Depends(get_current_session),
     conn: Connection = Depends(get_tenant_db),
 ) -> KpiHistoryResponse:
@@ -249,7 +250,7 @@ def get_metric_history(
 
     fn = _METRIC_FNS[slug]
     settings = get_household_settings(conn, session.household_id)
-    today = date.today()
+    today = end or date.today()
 
     points = []
     for i in range(months, -1, -1):

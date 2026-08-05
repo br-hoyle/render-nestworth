@@ -35,7 +35,16 @@ def test_session_token_roundtrip():
 
 def test_decode_rejects_tampered_token():
     token, _ = create_session_token("household-123", "harts")
-    tampered = token[:-1] + ("a" if token[-1] != "a" else "b")
+    header, payload, signature = token.split(".")
+    # Flip a character inside the header segment (index 5, well before its final character) —
+    # any non-trailing base64url character swap is guaranteed to change the decoded bytes.
+    # Flipping the very last character of a segment is flaky: base64url's trailing group can
+    # carry unused padding bits, so some swaps there leave the decoded bytes (and the tampered
+    # token's validity) unchanged, making the test pass or fail non-deterministically.
+    idx = 5
+    replacement = "a" if header[idx] != "a" else "b"
+    tampered_header = header[:idx] + replacement + header[idx + 1 :]
+    tampered = ".".join([tampered_header, payload, signature])
     assert decode_session_token(tampered) is None
 
 
