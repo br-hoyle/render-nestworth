@@ -28,6 +28,7 @@ export default function SignupPage() {
     confirmPassword: "",
     securityQuestion: SECURITY_QUESTIONS[0],
     securityAnswer: "",
+    birthdate: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -52,6 +53,7 @@ export default function SignupPage() {
         confirm_password: form.confirmPassword,
         security_question: form.securityQuestion,
         security_answer: form.securityAnswer,
+        birthdate: form.birthdate || null,
       });
       await login(form.username, form.password);
       router.push("/overview");
@@ -133,6 +135,16 @@ export default function SignupPage() {
             onChange={(e) => update("securityAnswer", e.target.value)}
             required
           />
+          <TextField
+            label="Birthdate (optional)"
+            name="birthdate"
+            type="date"
+            value={form.birthdate}
+            onChange={(e) => update("birthdate", e.target.value)}
+          />
+          <p className="text-xs text-nw-muted -mt-2">
+            Used to calculate your age for retirement and FI projections — you can add this later in Settings.
+          </p>
           {error && (
             <div className="rounded-md border border-[#5A3228] bg-nw-coral-tint px-3 py-2 text-xs text-nw-coral">
               {error}

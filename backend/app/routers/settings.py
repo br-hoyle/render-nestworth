@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
+from app.routers.scorecard import apply_birthdate_age_override
 from app.schemas.settings import HouseholdSettings, merge_with_defaults
 from app.security import SESSION_COOKIE_NAME
 
@@ -33,7 +34,8 @@ def get_settings_route(
     conn: Connection = Depends(get_tenant_db),
 ) -> HouseholdSettings:
     stored = _get_or_create_settings_row(conn, session.household_id)
-    return HouseholdSettings(**merge_with_defaults(stored))
+    settings = apply_birthdate_age_override(conn, session.household_id, merge_with_defaults(stored))
+    return HouseholdSettings(**settings)
 
 
 @router.patch("", response_model=HouseholdSettings)
@@ -56,7 +58,11 @@ def update_settings_route(
         ),
         {"settings": validated.model_dump_json(), "household_id": session.household_id},
     )
-    return validated
+    # Re-apply the birthdate override on the response — a stored manual household_age (if the
+    # household hasn't entered a birthdate) passes through untouched; a household with a
+    # birthdate on file always sees the live-computed age, even if this exact PATCH touched
+    # some other field.
+    return HouseholdSettings(**apply_birthdate_age_override(conn, session.household_id, validated.model_dump()))
 
 
 @router.delete("/household", status_code=status.HTTP_204_NO_CONTENT)

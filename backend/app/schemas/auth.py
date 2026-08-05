@@ -1,3 +1,5 @@
+from datetime import date
+
 from pydantic import BaseModel, field_validator
 
 SECURITY_QUESTIONS = [
@@ -19,6 +21,7 @@ class SessionResponse(BaseModel):
     username: str
     session_expires_at: int
     is_owner: bool
+    birthdate: date | None = None
 
 
 class SetupAccountRequest(BaseModel):
@@ -27,6 +30,7 @@ class SetupAccountRequest(BaseModel):
     confirm_password: str
     security_question: str
     security_answer: str
+    birthdate: date | None = None
 
     @field_validator("password")
     @classmethod
@@ -43,6 +47,7 @@ class SignupRequest(BaseModel):
     confirm_password: str
     security_question: str
     security_answer: str
+    birthdate: date | None = None
 
     @field_validator("password")
     @classmethod
@@ -93,3 +98,7 @@ class ChangeSecurityQuestionRequest(BaseModel):
 
 class UpdateHouseholdNameRequest(BaseModel):
     household_name: str
+
+
+class UpdateBirthdateRequest(BaseModel):
+    birthdate: date | None = None

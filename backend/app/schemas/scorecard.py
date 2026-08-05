@@ -26,3 +26,9 @@ class KpiHistoryPoint(BaseModel):
 class KpiHistoryResponse(BaseModel):
     slug: str
     points: list[KpiHistoryPoint]
+
+
+class AllKpiHistoryResponse(BaseModel):
+    # slug -> points, every registered metric (including the hidden Budget-rule ones —
+    # harmless to include, the frontend just ignores slugs it doesn't render as a tile).
+    series: dict[str, list[KpiHistoryPoint]]

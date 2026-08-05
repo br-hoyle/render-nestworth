@@ -37,10 +37,10 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     howToInterpret: "Positive is growth; the color here tracks direction, not a fixed target.",
   },
   fi_progress: {
-    description: "The net worth you'd need to cover your spending indefinitely (25× annual expenses, or your chosen withdrawal rate), and how close you are.",
-    formula: "Target = annual expenses ÷ withdrawal rate; progress = net worth ÷ target × 100",
+    description: "The net worth you'd need to cover your spending indefinitely (25× annual expenses, or your chosen withdrawal rate).",
+    formula: "Target = annual expenses ÷ withdrawal rate",
     whyItMatters: "Turns your expenses into a concrete net-worth number to aim for, not just a vague savings goal.",
-    howToInterpret: "100% progress means your assets could theoretically sustain your spending indefinitely at your chosen withdrawal rate.",
+    howToInterpret: "This tile shows the target figure only — your progress toward it is on the Net Worth tile instead.",
   },
   debt_to_income: {
     description: "Your estimated recurring monthly debt payment measured against your monthly gross income.",
@@ -55,10 +55,10 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     howToInterpret: "Under 36 months is on track, over 84 months means debt is barely moving.",
   },
   net_worth: {
-    description: "Everything you own minus everything you owe, right now.",
-    formula: "Total assets − total liabilities",
-    whyItMatters: "The single most-cited number for overall financial health.",
-    howToInterpret: "What matters most is the trend over time, not the absolute number in isolation.",
+    description: "Everything you own minus everything you owe, right now — plus how close that is to your Target Net Worth (the 25×-expenses FI number).",
+    formula: "Total assets − total liabilities; progress = net worth ÷ Target Net Worth × 100",
+    whyItMatters: "The single most-cited number for overall financial health, now paired with a concrete goalpost instead of standing alone.",
+    howToInterpret: "What matters most is the trend over time. The color stays tied to solvency (negative net worth is always coral) — the progress bar and % are about the FI goal, not a pass/fail on the number itself.",
   },
   debt_to_assets_ratio: {
     description: "How much of what you own is offset by debt.",
@@ -70,7 +70,7 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     description: "The net worth you'd have today if you'd saved a fixed share of income every month since age 20, growing at an expected rate of return.",
     formula: "Future value of a monthly savings annuity: (income ÷ 12 × savings rate), compounded monthly from age 20 to today",
     whyItMatters: "A benchmark grounded in your own income and age, rather than a generic rule of thumb — shows whether you're ahead of or behind a steady savings pace.",
-    howToInterpret: "Requires setting your current age in this tile's assumptions. 100%+ means you're at or ahead of the pace this savings rate and return would imply.",
+    howToInterpret: "Requires a birthdate set in Settings (or a manually-entered age, as a fallback). 100%+ means you're at or ahead of the pace this savings rate and return would imply.",
   },
   liquid_runway: {
     description: "How many months your liquid assets (checking, savings, and similar) could sustain your total spending with zero income.",
@@ -142,12 +142,12 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     description: "A projection of what your taxable investment accounts could be worth by your target retirement age.",
     formula: "Current Investment-category balance, compounded monthly at your expected return rate, plus a flat monthly contribution, from your age to your target retirement age",
     whyItMatters: "Turns today's balance and a savings habit into a concrete future number, rather than an abstract goal.",
-    howToInterpret: "Requires setting your current age, target retirement age, expected return, and monthly contribution in this tile's assumptions.",
+    howToInterpret: "Requires a birthdate set in Settings (or a manually-entered age, as a fallback), plus target retirement age, expected return, and monthly contribution in this tile's assumptions.",
   },
   future_retirement_balance: {
     description: "A projection of what your tax-advantaged retirement accounts could be worth at your target retirement age.",
     formula: "Current Retirement-category balance, compounded monthly at your expected return rate, plus a flat monthly contribution, from your age to your target retirement age",
     whyItMatters: "The retirement-account counterpart to Future Investment Balance — shows whether current contributions are on track for a real number at retirement.",
-    howToInterpret: "Requires setting your current age, target retirement age, expected return, and monthly contribution in this tile's assumptions.",
+    howToInterpret: "Requires a birthdate set in Settings (or a manually-entered age, as a fallback), plus target retirement age, expected return, and monthly contribution in this tile's assumptions.",
   },
 };

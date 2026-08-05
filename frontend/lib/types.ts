@@ -3,6 +3,7 @@ export interface SessionInfo {
   username: string;
   session_expires_at: number; // unix seconds
   is_owner: boolean;
+  birthdate: string | null;
 }
 
 export type BalanceType = "asset" | "liability";
@@ -262,4 +263,8 @@ export interface KpiHistoryPoint {
 export interface KpiHistoryResponse {
   slug: string;
   points: KpiHistoryPoint[];
+}
+
+export interface AllKpiHistoryResponse {
+  series: Record<string, KpiHistoryPoint[]>;
 }

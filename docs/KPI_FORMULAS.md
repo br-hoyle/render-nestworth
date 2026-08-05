@@ -54,6 +54,17 @@ above/below-1.0x read rather than a duplicate signal. Thresholds: red `< 0.5`, g
 
 **Total Debt** (`dollars`) — sum of every liability account balance. Informational only
 (neutral color) — there's no household-size-independent threshold for an absolute total.
+The household's goal for this figure is $0. %-to-goal has no natural non-zero denominator
+to divide by (target ÷ value and value ÷ target both degenerate at target=0), so it's
+computed frontend-side, relative to the metric's own trailing-12-month history instead:
+`(oldest charted value − current) ÷ oldest charted value × 100` — i.e. % reduction over the
+charted window, toward the $0 goal, rather than a ratio against a fixed threshold. See
+`targetInfoFor` in `frontend/lib/kpiThresholds.ts`.
+
+**Total Non-Property Debt** (`dollars`) — `total liabilities − property-category
+liabilities` (mortgages, HELOCs, secondary property loans, etc. excluded). The debt that
+isn't secured by a home's value, so it reads as the more urgent payoff target. Same $0-goal,
+history-relative %-to-goal treatment as Total Debt.
 
 **Debt to Income (DTI)** (`percent`) — estimated monthly debt payment ÷ monthly gross
 income × 100. **Documented simplification**: the schema has no loan-payment/APR/term
@@ -75,7 +86,10 @@ home equity × 100`, where equity = property assets − property liabilities. Re
 underwater (equity ≤ 0) or when a liability exists with no matching property asset — the
 ratio is undefined/unbounded in both cases rather than a finite percentage worth showing.
 Thresholds: green `< 100%`, red `≥ 300%` — a fresh mortgage starts highly leveraged and
-should trend down as equity builds.
+should trend down as equity builds. The household's goal for this ratio is 0% (fully paid
+off, or equity fully covering the mortgage) — like Total Debt above, %-to-goal is computed
+history-relative rather than as a ratio against a fixed threshold, since dividing by a
+target of 0 degenerates.
 
 **Debt Payoff Runway** (`months`) — `total liability balance ÷ average monthly principal
 reduction over the trailing 6 months`. Returns "no data" (red) if liabilities haven't
@@ -87,7 +101,11 @@ shrunk in that window. Thresholds: green `≤ 36` months, yellow `≤ 84` months
 100`. Thresholds: red `< 5%`, green `≥ 15%`.
 
 **Net Cash Flow** (`dollars`) — `trailing income − trailing expense`. The dollar-amount
-counterpart to Savings Rate. Green if non-negative, coral if negative.
+counterpart to Savings Rate. Green if non-negative, coral if negative. Goal is 15% of
+income, expressed as a dollar figure: `trailing income × 0.15`. Trailing income isn't a
+value the frontend has directly, so it's derived from the Savings Rate sibling metric
+(`net_cash_flow.value ÷ (savings_rate.value ÷ 100)`) rather than adding a new backend field
+— the same "borrow from a sibling metric" approach Net Worth uses for its own target.
 
 **Discretionary Spending Rate** (`percent`) — `trailing "wants"-classified expense ÷
 trailing income × 100`. `null` until transactions are classified. Thresholds: green `< 30%`,
@@ -119,19 +137,25 @@ reflects market/valuation movement too). Thresholds: green `≥ 20%`, red `< 0%`
 
 ## Wealth Accumulation & Balance Sheet Health
 
-**Net Worth** (`dollars`) — total assets minus total liabilities, as of today. Green if
-non-negative, coral if negative.
+**Net Worth** (`dollars`) — total assets minus total liabilities, as of today. Color is
+sign-based (green if non-negative, coral if negative) — a solvency read, unrelated to
+progress toward any target. The tile's progress bar and %-to-target instead show
+`net worth ÷ FI number × 100` (the same FI number Target Net Worth targets) — this moved
+here from Target Net Worth's tile per the household's explicit request, since Net Worth is
+the figure that's actually progressing.
 
 **Net Worth Velocity** (`percent`) — `(net worth now − net worth 1 year ago) ÷ net income
 (income − expense) over the same trailing 12 months × 100`. Above 100% means net worth grew
 by more than take-home cash flow alone would explain. Thresholds: green `≥ 100%`, red `< 0%`.
 
-**Target Net Worth** (`dollars`, slug `fi_progress`) — headline value is the FI number
-itself: `(average monthly expense × 12) ÷ withdrawal rate` (the standard "25× annual
-expenses" at a 4% withdrawal rate), overridable via `fi_number_override`. The tile's
-progress bar shows `net worth ÷ FI number × 100`. Also shown on Overview under the same
-name. Green at `≥ 100%` progress, yellow `≥ 50%`, red below. Withdrawal rate
-(`fi_withdrawal_rate`, default 4%) is editable from the tile's detail panel.
+**Target Net Worth** (`dollars`, slug `fi_progress`) — no longer shown as its own Scorecard
+tile (removed per the household's explicit request), but still computed backend-side: the
+FI number itself, `(average monthly expense × 12) ÷ withdrawal rate` (the standard "25×
+annual expenses" at a 4% withdrawal rate, overridable via `fi_number_override`), is Net
+Worth's borrowed target (see above). Still shown on Overview under this name. Withdrawal
+rate (`fi_withdrawal_rate`, default 4%) no longer has a UI surface to edit it now that the
+tile is gone — still settable via `PATCH /settings` directly if it ever needs tuning away
+from the 4% default.
 
 Asset allocation by category/type is shown directly on Overview (a sunburst chart) rather
 than as a scored KPI.
@@ -145,6 +169,12 @@ from Target Net Worth's expense-based approach above. Requires `household_age`,
 `target_net_worth_savings_rate` (default 15%), and `target_net_worth_roi` (default 7%),
 editable from the tile's detail panel; returns `null` until `household_age` is set. Progress
 bar shows `net worth ÷ target × 100`. Green at `≥ 100%` progress, yellow `≥ 50%`, red below.
+
+`household_age` is derived automatically from the birthdate set on the Settings page
+(`users.birthdate_encrypted`, see `app.routers.scorecard.apply_birthdate_age_override`) —
+it's no longer a directly-editable per-metric assumption. A household that hasn't entered a
+birthdate yet falls back to a manually-entered `household_age` setting value (legacy, kept
+for backward compatibility, but there's no UI to set it anymore other than the API itself).
 
 **Future Investment Balance** (`dollars`) — the current Investment-category asset balance,
 compounded monthly at `expected_return_rate` (default 10%) with `monthly_investment_

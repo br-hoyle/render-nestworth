@@ -7,9 +7,11 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
-from app.schemas.scorecard import KpiHistoryPoint, KpiHistoryResponse, KpiMetric, ScorecardResponse
+from app.schemas.scorecard import AllKpiHistoryResponse, KpiHistoryPoint, KpiHistoryResponse, KpiMetric, ScorecardResponse
 from app.schemas.settings import merge_with_defaults
+from app.security import decrypt_pii
 from app.services import kpi as kpi_service
+from app.services.age import age_from_birthdate
 from app.services.kpi import KpiInputs
 
 router = APIRouter(tags=["scorecard"])
@@ -23,19 +25,31 @@ METRICS = [
     ("emergency_fund", "Emergency Fund", "Liquidity & Emergency Reserves", "months", kpi_service.emergency_fund_months),
     ("liquid_runway", "Liquid Runway", "Liquidity & Emergency Reserves", "months", kpi_service.liquid_runway_months),
     ("liquidity_ratio", "Liquidity Ratio", "Liquidity & Emergency Reserves", "ratio", kpi_service.liquidity_ratio),
-    # Debt & Leverage Management
+    # Debt & Leverage Management — order matches the household's requested 2-row layout
+    # (row 1: Total Debt / Debt Payoff Runway / Debt to Assets; row 2: Total Non-Property
+    # Debt / Housing Debt to Equity / Debt to Income), enforced explicitly by the Scorecard
+    # page's per-group row layout rather than relied on for flex-wrap ordering alone.
     ("total_debt", "Total Debt", "Debt & Leverage Management", "dollars", kpi_service.total_debt_value),
-    ("debt_to_income", "Debt to Income (DTI)", "Debt & Leverage Management", "percent", kpi_service.debt_to_income),
-    ("debt_to_assets_ratio", "Debt to Assets", "Debt & Leverage Management", "percent", kpi_service.debt_to_assets_ratio),
-    ("housing_debt_to_equity", "Housing Debt to Equity", "Debt & Leverage Management", "percent", kpi_service.housing_debt_to_equity),
     ("debt_payoff_runway", "Debt Payoff Runway", "Debt & Leverage Management", "months", kpi_service.debt_payoff_runway_months),
-    # Cash Flow & Budgeting Efficiency
-    ("savings_rate", "Savings Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.savings_rate),
+    ("debt_to_assets_ratio", "Debt to Assets", "Debt & Leverage Management", "percent", kpi_service.debt_to_assets_ratio),
+    (
+        "total_non_property_debt",
+        "Total Non-Property Debt",
+        "Debt & Leverage Management",
+        "dollars",
+        kpi_service.total_non_property_debt_value,
+    ),
+    ("housing_debt_to_equity", "Housing Debt to Equity", "Debt & Leverage Management", "percent", kpi_service.housing_debt_to_equity),
+    ("debt_to_income", "Debt to Income (DTI)", "Debt & Leverage Management", "percent", kpi_service.debt_to_income),
+    # Cash Flow & Budgeting Efficiency — row 1: Net Cash Flow / Net Income Rate / Savings
+    # Rate / Discretionary Spending Rate; row 2: Income Growth Rate / Housing Cost Ratio /
+    # Savings Efficiency (same explicit-row-layout note as above).
     ("net_cash_flow", "Net Cash Flow", "Cash Flow & Budgeting Efficiency", "dollars", kpi_service.net_cash_flow),
-    ("discretionary_spending_rate", "Discretionary Spending Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.discretionary_spending_rate),
-    ("housing_cost_ratio", "Housing Cost Ratio", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.housing_cost_ratio),
     ("net_income_rate", "Net Income Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.net_income_rate),
+    ("savings_rate", "Savings Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.savings_rate),
+    ("discretionary_spending_rate", "Discretionary Spending Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.discretionary_spending_rate),
     ("income_growth_rate", "Income Growth Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.income_growth_rate),
+    ("housing_cost_ratio", "Housing Cost Ratio", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.housing_cost_ratio),
     ("savings_efficiency", "Savings Efficiency", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.savings_efficiency),
     # Wealth Accumulation & Balance Sheet Health
     ("net_worth", "Net Worth", "Wealth Accumulation & Balance Sheet Health", "dollars", kpi_service.net_worth_value),
@@ -289,12 +303,30 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
     )
 
 
+def apply_birthdate_age_override(conn: Connection, household_id: str, settings: dict) -> dict:
+    """Overrides settings["household_age"] with the live age computed from the household's
+    on-file birthdate (users.birthdate_encrypted), when one is set. Birthdate is the source
+    of truth for age going forward; the manually-entered household_age setting is only a
+    fallback for households that haven't entered a birthdate yet. Shared by both this
+    router's build_kpi_inputs and app.routers.settings' GET/PATCH handlers so every surface
+    that reads household_age agrees on the same value."""
+    row = conn.execute(
+        text("select birthdate_encrypted from users where household_id = :household_id"),
+        {"household_id": household_id},
+    ).mappings().first()
+    if row and row["birthdate_encrypted"]:
+        birthdate = date.fromisoformat(decrypt_pii(row["birthdate_encrypted"]))
+        return {**settings, "household_age": age_from_birthdate(birthdate)}
+    return settings
+
+
 def get_household_settings(conn: Connection, household_id: str) -> dict:
     row = conn.execute(
         text("select settings from household_settings where household_id = :household_id"),
         {"household_id": household_id},
     ).mappings().first()
-    return merge_with_defaults(row["settings"] if row else {})
+    settings = merge_with_defaults(row["settings"] if row else {})
+    return apply_birthdate_age_override(conn, household_id, settings)
 
 
 @router.get("/scorecard", response_model=ScorecardResponse)
@@ -320,6 +352,13 @@ def get_scorecard(
 
 _METRIC_FNS = {slug: fn for slug, _, _, _, fn in METRICS}
 
+# Metrics whose progress_pct is the meaningful trend to chart (the dollar target itself barely
+# moves month to month). Deliberately an explicit allowlist rather than "any 3-tuple result" —
+# net_worth_value also returns a progress_pct now (borrowed from fi_progress's FI number, for
+# its own tile's progress bar), but its raw dollar value is still the right thing to chart
+# here: net worth genuinely trends over time, unlike a slow-moving target.
+_CHART_PROGRESS_PCT_SLUGS = {"target_net_worth"}
+
 
 @router.get("/scorecard/{slug}/history", response_model=KpiHistoryResponse)
 def get_metric_history(
@@ -341,9 +380,35 @@ def get_metric_history(
         cutoff = today - relativedelta(months=i)
         inputs = build_kpi_inputs(conn, session.household_id, cutoff, settings)
         result = fn(inputs)
-        # For dollar-target metrics, chart progress-to-target over time (the meaningful
-        # trend) rather than the target itself, which barely moves month to month.
-        value = result[2] if len(result) == 3 else result[0]
+        value = result[2] if slug in _CHART_PROGRESS_PCT_SLUGS else result[0]
         points.append(KpiHistoryPoint(date=cutoff.isoformat(), value=value))
 
     return KpiHistoryResponse(slug=slug, points=points)
+
+
+@router.get("/scorecard/history", response_model=AllKpiHistoryResponse)
+def get_all_metric_history(
+    months: int = 12,
+    end: date | None = None,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> AllKpiHistoryResponse:
+    """Batched counterpart to /scorecard/{slug}/history for the tile-embedded sparklines on
+    the Scorecard page: build_kpi_inputs is computed ONCE per cutoff date and reused across
+    every metric function, instead of once per metric per date — an O(months) query cost
+    instead of O(metrics × months). Mirrors /accounts/sparklines' same batch-to-avoid-N+1
+    pattern for the same reason (~20 metrics × 13 dates would otherwise mean ~260 repeated
+    balance/transaction lookups on a single page load)."""
+    settings = get_household_settings(conn, session.household_id)
+    today = end or date.today()
+
+    series: dict[str, list[KpiHistoryPoint]] = {slug: [] for slug, _, _, _, _ in METRICS}
+    for i in range(months, -1, -1):
+        cutoff = today - relativedelta(months=i)
+        inputs = build_kpi_inputs(conn, session.household_id, cutoff, settings)
+        for slug, _, _, _, fn in METRICS:
+            result = fn(inputs)
+            value = result[2] if slug in _CHART_PROGRESS_PCT_SLUGS else result[0]
+            series[slug].append(KpiHistoryPoint(date=cutoff.isoformat(), value=value))
+
+    return AllKpiHistoryResponse(series=series)
