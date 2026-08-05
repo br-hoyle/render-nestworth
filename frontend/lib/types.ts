@@ -54,6 +54,24 @@ export interface BalanceGridResponse {
   grand_totals: string[];
 }
 
+export interface BalanceHistoryAccount {
+  account_id: string;
+  account_name: string;
+  balance_type: BalanceType;
+  values: (string | null)[];
+}
+
+export interface BalanceHistoryInstitution {
+  institution_name: string;
+  accounts: BalanceHistoryAccount[];
+}
+
+export interface BalanceHistoryResponse {
+  dates: string[];
+  net_worth: string[];
+  institutions: BalanceHistoryInstitution[];
+}
+
 export interface BalanceImportResult {
   inserted_count: number;
   errors: { row_number: number; raw: Record<string, string>; reason: string }[];

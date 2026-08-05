@@ -76,3 +76,21 @@ class BalanceGridResponse(BaseModel):
     dates: list[date]
     categories: list[BalanceGridCategory]
     grand_totals: list[Decimal]
+
+
+class BalanceHistoryAccount(BaseModel):
+    account_id: uuid.UUID
+    account_name: str
+    balance_type: Literal["asset", "liability"]
+    values: list[Decimal | None]
+
+
+class BalanceHistoryInstitution(BaseModel):
+    institution_name: str
+    accounts: list[BalanceHistoryAccount]
+
+
+class BalanceHistoryResponse(BaseModel):
+    dates: list[date]
+    net_worth: list[Decimal]
+    institutions: list[BalanceHistoryInstitution]

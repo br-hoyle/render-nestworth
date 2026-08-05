@@ -18,6 +18,9 @@ from app.schemas.accounts import (
     BalanceGridCategory,
     BalanceGridResponse,
     BalanceGridRow,
+    BalanceHistoryAccount,
+    BalanceHistoryInstitution,
+    BalanceHistoryResponse,
     SparklinePoint,
     StaleAccountInfo,
 )
@@ -249,6 +252,90 @@ def account_balance_grid(
         for cat in category_order
     ]
     return BalanceGridResponse(dates=dates, categories=categories, grand_totals=grand_totals)
+
+
+@router.get("/balance-history", response_model=BalanceHistoryResponse)
+def account_balance_history(
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> BalanceHistoryResponse:
+    """All-time, all-account balance history for the Accounts page's spreadsheet tab: every
+    distinct snapshot date ever recorded for the household (not just the last N), one column
+    per account grouped by institution, plus a net-worth total column. Closed accounts are
+    included since their history still belongs in a full-history view — only /balance-grid
+    (the "current" view) restricts to open accounts."""
+    accounts = conn.execute(
+        text(
+            """
+            select account_id, account_name, institution_name, balance_type, effective_end_date
+            from accounts
+            where household_id = :household_id
+            order by institution_name, account_name
+            """
+        ),
+        {"household_id": session.household_id},
+    ).mappings().all()
+    if not accounts:
+        return BalanceHistoryResponse(dates=[], net_worth=[], institutions=[])
+
+    date_rows = conn.execute(
+        text(
+            """
+            select distinct b.full_date
+            from balances b
+            join accounts a on a.account_id = b.account_id
+            where a.household_id = :household_id
+            order by b.full_date
+            """
+        ),
+        {"household_id": session.household_id},
+    ).all()
+    dates_asc = [r.full_date for r in date_rows]
+    if not dates_asc:
+        return BalanceHistoryResponse(dates=[], net_worth=[], institutions=[])
+
+    net_worth_asc = [Decimal(0) for _ in dates_asc]
+    institution_order: list[str] = []
+    accounts_by_institution: dict[str, list[BalanceHistoryAccount]] = {}
+
+    for acct in accounts:
+        snapshot_rows = conn.execute(
+            text("select full_date, balance from balances where account_id = :account_id order by full_date"),
+            {"account_id": acct["account_id"]},
+        ).all()
+        snapshots = [Snapshot(r.full_date, r.balance) for r in snapshot_rows]
+        account_end = None if acct["effective_end_date"] == OPEN_ENDED else acct["effective_end_date"]
+        points = forward_fill_series(snapshots, dates_asc, account_effective_end=account_end)
+        by_date = {p.full_date: p.balance for p in points}
+        values_asc = [by_date.get(d) for d in dates_asc]
+
+        sign = Decimal(-1) if acct["balance_type"] == "liability" else Decimal(1)
+        for i, v in enumerate(values_asc):
+            if v is not None:
+                net_worth_asc[i] += sign * v
+
+        institution = acct["institution_name"]
+        if institution not in accounts_by_institution:
+            institution_order.append(institution)
+            accounts_by_institution[institution] = []
+        accounts_by_institution[institution].append(
+            BalanceHistoryAccount(
+                account_id=acct["account_id"],
+                account_name=acct["account_name"],
+                balance_type=acct["balance_type"],
+                values=list(reversed(values_asc)),
+            )
+        )
+
+    institutions = [
+        BalanceHistoryInstitution(institution_name=inst, accounts=accounts_by_institution[inst])
+        for inst in institution_order
+    ]
+    return BalanceHistoryResponse(
+        dates=list(reversed(dates_asc)),
+        net_worth=list(reversed(net_worth_asc)),
+        institutions=institutions,
+    )
 
 
 @router.post("", response_model=AccountRead, status_code=status.HTTP_201_CREATED)

@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Account, AccountSparkline, BalanceGridCategory, BalanceGridResponse, BulkBalanceImportResult } from "@/lib/types";
+import type {
+  Account,
+  AccountSparkline,
+  BalanceGridResponse,
+  BalanceHistoryResponse,
+  BulkBalanceImportResult,
+} from "@/lib/types";
 import { money as fmtMoney, titleCase, computeChangePct } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Sparkline } from "@/components/charts/Sparkline";
@@ -17,111 +23,212 @@ function money(v: string | null) {
   return fmtMoney(v);
 }
 
-// A subtle right-edge shadow on the sticky column, shown only once the table has actually
+// A subtle right-edge shadow on the sticky column(s), shown only once the table has actually
 // been scrolled — the common "there's more content this way" affordance — rather than a
 // permanent divider that's misleading when there's nothing left to reveal.
-const STICKY_COL = "sticky left-0 z-10 bg-nw-surface";
+const STICKY_COL = "sticky left-0 z-10";
 const SCROLL_SHADOW = "shadow-[6px_0_8px_-6px_rgba(0,0,0,0.6)]";
+const GRID_LIMIT = 6;
 
-function CategoryBalanceTable({
-  cat,
-  dates,
+// Mirrors Overview's Balance-by-Category table (one shared header, dark category-total rows),
+// but the Accounts page keeps individual account rows — clickable to open the edit/history
+// panel — instead of aggregating them into account-type rows.
+function CombinedAccountsTable({
+  grid,
   onOpenAccount,
 }: {
-  cat: BalanceGridCategory;
-  dates: string[];
+  grid: BalanceGridResponse;
   onOpenAccount: (accountId: string) => void;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
-
-  function handleScroll() {
-    setScrolled((scrollRef.current?.scrollLeft ?? 0) > 2);
-  }
-
-  const stickyCellClass = STICKY_COL + " " + (scrolled ? SCROLL_SHADOW : "");
+  const dates = grid.dates;
+  const shadow = scrolled ? " " + SCROLL_SHADOW : "";
 
   return (
     <div className="rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
-      <div className="text-sm font-medium">{titleCase(cat.category)}</div>
-      <div ref={scrollRef} onScroll={handleScroll} className="overflow-x-auto">
+      <div className="text-sm font-medium">Account Balances</div>
+      <div onScroll={(e) => setScrolled(e.currentTarget.scrollLeft > 2)} className="overflow-x-auto">
         <table className="text-xs w-full min-w-max border-collapse">
           <thead>
             <tr className="text-nw-muted text-left">
-              <th className={stickyCellClass + " pr-4 py-2 font-normal whitespace-nowrap"}>Account Name (Institution)</th>
+              <th className={STICKY_COL + " bg-nw-surface pr-4 py-2 font-normal whitespace-nowrap" + shadow}>Category / Account</th>
               {dates.map((d) => (
                 <th key={d} className="px-3 py-2 font-normal text-right whitespace-nowrap">
                   {d}
                 </th>
               ))}
-              <th className="px-3 py-2 font-normal whitespace-nowrap">Balance Trend</th>
               <th className="px-3 py-2 font-normal text-right whitespace-nowrap">Last Change</th>
               <th className="px-3 py-2 font-normal text-right whitespace-nowrap">Change</th>
             </tr>
           </thead>
           <tbody>
-            {cat.rows.map((row) => {
-              const nums = row.values.map((v) => (v === null ? null : Number(v)));
-              const { last, overall } = computeChangePct(nums);
-              const sparkValues = nums.filter((n): n is number => n !== null);
-              return (
-                <tr
-                  key={row.account_id}
-                  className="border-t border-nw-border cursor-pointer hover:bg-nw-rail/40"
-                  onClick={() => onOpenAccount(row.account_id)}
-                >
-                  <td className={stickyCellClass + " pr-4 py-2.5 whitespace-nowrap underline decoration-dotted underline-offset-2"}>
-                    {row.account_name} ({row.institution_name})
-                  </td>
-                  {nums.map((n, i) => (
-                    <td
-                      key={i}
-                      className={"px-3 py-2.5 text-right whitespace-nowrap " + (row.balance_type === "liability" && n ? "text-nw-coral" : "")}
-                    >
-                      {n === null ? "—" : row.balance_type === "liability" ? `−${money(String(n))}` : money(String(n))}
+            {grid.categories.flatMap((cat) => {
+              const categoryTotals = cat.totals.map(Number);
+              const catChange = computeChangePct(categoryTotals);
+              return [
+                <tr key={cat.category} className="border-t border-nw-border font-medium bg-nw-rail">
+                  <td className={STICKY_COL + " bg-nw-rail pr-4 py-2 whitespace-nowrap" + shadow}>{titleCase(cat.category)}</td>
+                  {categoryTotals.map((t, i) => (
+                    <td key={i} className={"px-3 py-2 text-right whitespace-nowrap " + (t < 0 ? "text-nw-coral" : "")}>
+                      {money(String(t))}
                     </td>
                   ))}
-                  <td className="px-3 py-2.5">
-                    {sparkValues.length > 1 && (
-                      <Sparkline
-                        values={sparkValues}
-                        color={row.balance_type === "liability" ? "var(--nw-coral)" : "var(--nw-green)"}
-                      />
-                    )}
+                  <td className="px-3 py-2 text-right">
+                    <ChangeCell pct={catChange.last} />
                   </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <ChangeCell pct={last} />
+                  <td className="px-3 py-2 text-right">
+                    <ChangeCell pct={catChange.overall} />
                   </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <ChangeCell pct={overall} />
+                </tr>,
+                ...cat.rows.map((row) => {
+                  const nums = row.values.map((v) => (v === null ? null : Number(v)));
+                  const { last, overall } = computeChangePct(nums);
+                  return (
+                    <tr
+                      key={row.account_id}
+                      className="border-t border-nw-border text-nw-muted text-[10px] cursor-pointer hover:bg-nw-rail/40"
+                      onClick={() => onOpenAccount(row.account_id)}
+                    >
+                      <td
+                        className={
+                          STICKY_COL +
+                          " bg-nw-surface pr-4 py-1.5 pl-4 whitespace-nowrap underline decoration-dotted underline-offset-2" +
+                          shadow
+                        }
+                      >
+                        {row.account_name} ({row.account_type})
+                      </td>
+                      {nums.map((n, i) => (
+                        <td
+                          key={i}
+                          className={"px-3 py-1.5 text-right whitespace-nowrap " + (row.balance_type === "liability" && n ? "text-nw-coral" : "")}
+                        >
+                          {n === null ? "—" : row.balance_type === "liability" ? `−${money(String(n))}` : money(String(n))}
+                        </td>
+                      ))}
+                      <td className="px-3 py-1.5 text-right">
+                        <ChangeCell pct={last} />
+                      </td>
+                      <td className="px-3 py-1.5 text-right">
+                        <ChangeCell pct={overall} />
+                      </td>
+                    </tr>
+                  );
+                }),
+              ];
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// All-time balance history across every account, grouped by institution — a spreadsheet-style
+// view distinct from the "current" combined table above. Date + Net Worth are pinned while the
+// per-institution/account columns scroll horizontally underneath.
+function BalanceHistoryTable({ data }: { data: BalanceHistoryResponse }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [dateColWidth, setDateColWidth] = useState(96);
+  const dateColRef = useRef<HTMLTableCellElement>(null);
+
+  // Tracks the Date column's actual rendered width live (not just once on data load) — its
+  // width can shift with viewport size (the table's w-full stretches columns when there's no
+  // overflow), and a stale width here would misalign the Net Worth column's sticky offset.
+  useEffect(() => {
+    const el = dateColRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      const width = entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+      setDateColWidth(width);
+    });
+    observer.observe(el, { box: "border-box" });
+    return () => observer.disconnect();
+  }, [data]);
+
+  const shadow = scrolled ? " " + SCROLL_SHADOW : "";
+  const netWorthStyle = { left: dateColWidth };
+
+  return (
+    <div className="rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
+      <div className="text-sm font-medium">All Balances Over Time</div>
+      <div onScroll={(e) => setScrolled(e.currentTarget.scrollLeft > 2)} className="overflow-x-auto">
+        <table className="text-xs w-full min-w-max border-collapse">
+          <thead>
+            <tr className="text-nw-muted text-left">
+              <th
+                ref={dateColRef}
+                rowSpan={2}
+                className={STICKY_COL + " z-20 bg-nw-surface px-3 py-2 font-normal whitespace-nowrap align-bottom"}
+              >
+                Date
+              </th>
+              <th
+                rowSpan={2}
+                style={netWorthStyle}
+                className={"sticky z-20 bg-nw-surface px-3 py-2 font-normal text-right whitespace-nowrap align-bottom" + shadow}
+              >
+                Net Worth
+              </th>
+              {data.institutions.map((inst) => (
+                <th
+                  key={inst.institution_name}
+                  colSpan={inst.accounts.length}
+                  className="px-3 py-2 font-normal text-center whitespace-nowrap border-l border-nw-border"
+                >
+                  {inst.institution_name}
+                </th>
+              ))}
+            </tr>
+            <tr className="text-nw-muted text-left">
+              {data.institutions.flatMap((inst) =>
+                inst.accounts.map((a, i) => (
+                  <th
+                    key={a.account_id}
+                    className={"px-3 py-2 font-normal text-right whitespace-nowrap" + (i === 0 ? " border-l border-nw-border" : "")}
+                  >
+                    {a.account_name}
+                  </th>
+                ))
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {data.dates.map((d, i) => {
+              const nw = Number(data.net_worth[i]);
+              return (
+                <tr key={d} className="border-t border-nw-border">
+                  <td className={STICKY_COL + " bg-nw-surface px-3 py-2 whitespace-nowrap"}>{d}</td>
+                  <td
+                    style={netWorthStyle}
+                    className={
+                      "sticky bg-nw-surface px-3 py-2 text-right whitespace-nowrap font-medium" + (nw < 0 ? " text-nw-coral" : "") + shadow
+                    }
+                  >
+                    {money(String(nw))}
                   </td>
+                  {data.institutions.flatMap((inst) =>
+                    inst.accounts.map((a, j) => {
+                      const raw = a.values[i];
+                      const v = raw === null ? 0 : Number(raw);
+                      return (
+                        <td
+                          key={a.account_id}
+                          className={
+                            "px-3 py-2 text-right whitespace-nowrap" +
+                            (j === 0 ? " border-l border-nw-border" : "") +
+                            (a.balance_type === "liability" && v ? " text-nw-coral" : "")
+                          }
+                        >
+                          {a.balance_type === "liability" && v ? `−${money(String(v))}` : money(String(v))}
+                        </td>
+                      );
+                    })
+                  )}
                 </tr>
               );
             })}
-            <tr className="border-t border-nw-border font-medium">
-              <td className={stickyCellClass + " pr-4 py-2.5 whitespace-nowrap"}>Total</td>
-              {cat.totals.map((t, i) => (
-                <td key={i} className={"px-3 py-2.5 text-right whitespace-nowrap " + (Number(t) < 0 ? "text-nw-coral" : "")}>
-                  {money(t)}
-                </td>
-              ))}
-              <td className="px-3 py-2.5">
-                {cat.totals.length > 1 && <Sparkline values={cat.totals.map(Number)} color="var(--nw-mint)" />}
-              </td>
-              {(() => {
-                const { last, overall } = computeChangePct(cat.totals.map(Number));
-                return (
-                  <>
-                    <td className="px-3 py-2.5 text-right">
-                      <ChangeCell pct={last} />
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <ChangeCell pct={overall} />
-                    </td>
-                  </>
-                );
-              })()}
-            </tr>
           </tbody>
         </table>
       </div>
@@ -130,11 +237,12 @@ function CategoryBalanceTable({
 }
 
 export default function AccountsPage() {
+  const [view, setView] = useState<"balances" | "history">("balances");
   const [filter, setFilter] = useState<Filter>("active");
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
-  const [gridLimit, setGridLimit] = useState(8);
   const [grid, setGrid] = useState<BalanceGridResponse | null>(null);
+  const [history, setHistory] = useState<BalanceHistoryResponse | null>(null);
   const [panel, setPanel] = useState<null | "create" | Account>(null);
   const [panelTab, setPanelTab] = useState<"edit" | "history">("edit");
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -152,9 +260,14 @@ export default function AccountsPage() {
     setSparklines(map);
   }
 
-  async function loadGrid(limit: number) {
-    const data = await api.get<BalanceGridResponse>(`/accounts/balance-grid?limit=${limit}`);
+  async function loadGrid() {
+    const data = await api.get<BalanceGridResponse>(`/accounts/balance-grid?limit=${GRID_LIMIT}`);
     setGrid(data);
+  }
+
+  async function loadHistory() {
+    const data = await api.get<BalanceHistoryResponse>("/accounts/balance-history");
+    setHistory(data);
   }
 
   useEffect(() => {
@@ -164,9 +277,16 @@ export default function AccountsPage() {
   }, [filter]);
 
   useEffect(() => {
-    if (filter === "active") loadGrid(gridLimit);
+    if (filter === "active") loadGrid();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, gridLimit]);
+  }, [filter]);
+
+  // Lazily fetched the first time the History tab is opened — it's an all-time query, no
+  // point paying for it on every Accounts page load.
+  useEffect(() => {
+    if (view === "history" && history === null) loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   useEffect(() => {
     setPanelTab("edit");
@@ -191,7 +311,7 @@ export default function AccountsPage() {
       });
       setPanel(null);
       await load();
-      if (filter === "active") await loadGrid(gridLimit);
+      if (filter === "active") await loadGrid();
     } catch (err) {
       throw new Error(err instanceof ApiError ? err.message : "Could not create account.");
     }
@@ -209,7 +329,7 @@ export default function AccountsPage() {
       });
       setPanel(null);
       await load();
-      if (filter === "active") await loadGrid(gridLimit);
+      if (filter === "active") await loadGrid();
     } catch (err) {
       throw new Error(err instanceof ApiError ? err.message : "Could not save revision.");
     }
@@ -221,7 +341,7 @@ export default function AccountsPage() {
     try {
       await api.post(`/accounts/${account.account_id}/close`, { effective_end_date: endDate });
       await load();
-      if (filter === "active") await loadGrid(gridLimit);
+      if (filter === "active") await loadGrid();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not close account.");
     }
@@ -239,52 +359,57 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {(["active", "closed", "all"] as Filter[]).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={
-              "px-3 py-1 rounded-full text-xs border capitalize " +
-              (filter === f
-                ? "border-nw-green-line text-nw-mint bg-nw-green-tint"
-                : "border-nw-border text-nw-muted")
-            }
-          >
-            {f}
-          </button>
-        ))}
+      <div className="flex border border-nw-border rounded-md overflow-hidden text-xs w-fit">
+        <button
+          onClick={() => setView("balances")}
+          className={"px-3 py-1.5 " + (view === "balances" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+        >
+          Balances
+        </button>
+        <button
+          onClick={() => setView("history")}
+          className={"px-3 py-1.5 " + (view === "history" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+        >
+          History
+        </button>
       </div>
+
+      {view === "balances" && (
+        <div className="flex gap-2">
+          {(["active", "closed", "all"] as Filter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={
+                "px-3 py-1 rounded-full text-xs border capitalize " +
+                (filter === f
+                  ? "border-nw-green-line text-nw-mint bg-nw-green-tint"
+                  : "border-nw-border text-nw-muted")
+              }
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && <p className="text-xs text-nw-coral">{error}</p>}
 
+      {view === "history" ? (
+        <div className="flex flex-col gap-4">
+          {history === null && <p className="text-sm text-nw-muted">Loading…</p>}
+          {history?.dates.length === 0 && (
+            <p className="text-sm text-nw-muted">
+              No balance history yet. Add your first account, or upload balance history once it exists.
+            </p>
+          )}
+          {history && history.dates.length > 0 && <BalanceHistoryTable data={history} />}
+        </div>
+      ) : (
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {filter === "active" ? (
             <>
-              <div className="flex items-center justify-between gap-4 flex-wrap rounded-lg border border-nw-border bg-nw-surface p-3">
-                <div>
-                  <div className="text-sm font-medium">Recent Balance Changes</div>
-                  <p className="text-xs text-nw-muted">
-                    Balance trends by category. Use the slider to adjust how many recent entries are included.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-none">
-                  <span className="text-[10px] uppercase tracking-wide text-nw-muted whitespace-nowrap">
-                    Entries to Show
-                  </span>
-                  <input
-                    type="range"
-                    min={3}
-                    max={10}
-                    value={gridLimit}
-                    onChange={(e) => setGridLimit(Number(e.target.value))}
-                    className="w-40 accent-[var(--nw-green)]"
-                  />
-                  <span className="text-sm w-6 text-right">{gridLimit}</span>
-                </div>
-              </div>
-
               {grid === null && <p className="text-sm text-nw-muted">Loading…</p>}
               {grid?.categories.length === 0 && (
                 <p className="text-sm text-nw-muted">
@@ -292,17 +417,15 @@ export default function AccountsPage() {
                 </p>
               )}
 
-              {grid?.categories.map((cat) => (
-                <CategoryBalanceTable
-                  key={cat.category}
-                  cat={cat}
-                  dates={grid.dates}
+              {grid && grid.categories.length > 0 && (
+                <CombinedAccountsTable
+                  grid={grid}
                   onOpenAccount={(accountId) => {
                     const acct = accountsById.get(accountId);
                     if (acct) setPanel(acct);
                   }}
                 />
-              ))}
+              )}
             </>
           ) : (
             <>
@@ -403,6 +526,7 @@ export default function AccountsPage() {
           </div>
         )}
       </div>
+      )}
 
       {bulkUploadOpen && (
         <BulkUploadModal
@@ -412,7 +536,7 @@ export default function AccountsPage() {
             setBulkUploadOpen(false);
             load();
             loadSparklines();
-            if (filter === "active") loadGrid(gridLimit);
+            if (filter === "active") loadGrid();
           }}
         />
       )}
