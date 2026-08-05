@@ -8,6 +8,7 @@ import type { Account, HouseholdSettings, IncomeRecord, TransactionListResponse 
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 const SECURITY_QUESTIONS = [
   "What was your first pet's name?",
@@ -268,6 +269,13 @@ export default function SettingsPage() {
           <span>1 hour inactivity · fixed</span>
         </div>
       </Card>
+
+      {settings === null && (
+        <Card>
+          <div className="text-sm font-medium">Preferences</div>
+          <LoadingBlock className="py-4" />
+        </Card>
+      )}
 
       {settings && (
         <Card>

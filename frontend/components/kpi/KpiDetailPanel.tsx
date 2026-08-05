@@ -8,6 +8,7 @@ import { KPI_CONTENT } from "@/lib/kpiContent";
 import { THRESHOLD_CONFIG } from "@/lib/kpiThresholds";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 // Top-level settings fields (not kpi_thresholds) that back a metric's own formula — edited
 // alongside thresholds since both live in the same household_settings PATCH. Age is
@@ -116,7 +117,11 @@ export function KpiDetailPanel({
           </div>
         )}
 
-        {assumptionConfig && (
+        {(thresholdConfig || assumptionConfig) && settings === null && (
+          <LoadingBlock className="py-4" />
+        )}
+
+        {assumptionConfig && settings !== null && (
           <div className="flex flex-col gap-2">
             <div className="text-[10px] uppercase tracking-wide text-nw-muted">Assumptions</div>
             {assumptionConfig.map((field) => (
@@ -132,7 +137,7 @@ export function KpiDetailPanel({
           </div>
         )}
 
-        {thresholdConfig && (
+        {thresholdConfig && settings !== null && (
           <div className="flex flex-col gap-2">
             <div className="text-[10px] uppercase tracking-wide text-nw-muted">Thresholds</div>
             {thresholdConfig.keys.map((key, i) => (
@@ -147,7 +152,7 @@ export function KpiDetailPanel({
           </div>
         )}
 
-        {(thresholdConfig || assumptionConfig) && (
+        {(thresholdConfig || assumptionConfig) && settings !== null && (
           <Button variant="primary" onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>

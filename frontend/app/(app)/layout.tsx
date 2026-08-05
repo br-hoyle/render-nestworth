@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Sidebar } from "@/components/nav/Sidebar";
 import { BottomNav } from "@/components/nav/BottomNav";
 import { SessionExpiredModal } from "@/components/nav/SessionExpiredModal";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { status, session, secondsRemaining } = useAuth();
@@ -20,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (status === "loading") {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <span className="text-sm text-nw-muted">Loading…</span>
+        <Spinner />
       </div>
     );
   }

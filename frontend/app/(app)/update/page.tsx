@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Account, StaleAccountInfo } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 function money(v: string | number) {
   return Number(v).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -114,7 +115,7 @@ export default function UpdatePage() {
   }
 
   if (queue === null) {
-    return <div className="p-6 text-sm text-nw-muted">Loading…</div>;
+    return <LoadingBlock />;
   }
 
   if (queue.length === 0) {

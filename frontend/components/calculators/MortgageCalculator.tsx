@@ -78,7 +78,7 @@ export function MortgageCalculator() {
           <ResultTile label="Total interest" value={fmtMoney(result?.total_interest)} />
           <ResultTile label="Interest saved" value={fmtMoney(result?.interest_saved)} />
         </div>
-        {result && result.yearly_schedule.length > 0 && (
+        {result && result.yearly_schedule.length > 1 && (
           <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={result.yearly_schedule.map((s) => ({ year: s.year, balance: Number(s.balance) }))}>
@@ -90,6 +90,9 @@ export function MortgageCalculator() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        )}
+        {result && result.yearly_schedule.length <= 1 && (
+          <p className="text-xs text-nw-muted">Not enough data yet — try a longer term.</p>
         )}
       </div>
     </div>

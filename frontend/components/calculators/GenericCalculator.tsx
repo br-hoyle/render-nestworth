@@ -150,17 +150,21 @@ export function GenericCalculator({ config }: { config: CalculatorConfig }) {
         {result?.error != null && typeof result.error === "string" && (
           <p className="text-xs text-nw-coral">{result.error}</p>
         )}
-        {scheduleData.length > 1 && config.scheduleXKey && config.scheduleYKey && (
-          <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
-            <ResponsiveContainer width="100%" height={180}>
-              <LineChart data={scheduleData}>
-                <XAxis dataKey={config.scheduleXKey} tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
-                <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={60} tickFormatter={(v) => money(v)} />
-                <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
-                <Line type="monotone" dataKey={config.scheduleYKey} stroke="var(--nw-green)" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+        {config.scheduleXKey && config.scheduleYKey && result && (
+          scheduleData.length > 1 ? (
+            <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={scheduleData}>
+                  <XAxis dataKey={config.scheduleXKey} tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={60} tickFormatter={(v) => money(v)} />
+                  <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
+                  <Line type="monotone" dataKey={config.scheduleYKey} stroke="var(--nw-green)" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-xs text-nw-muted">Not enough data yet.</p>
+          )
         )}
         {config.note && <p className="text-[10px] text-nw-muted">{config.note}</p>}
       </div>

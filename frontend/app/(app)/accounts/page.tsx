@@ -15,6 +15,7 @@ import { Sparkline } from "@/components/charts/Sparkline";
 import { ChangeCell } from "@/components/ui/ChangeCell";
 import { AccountForm, AccountFormValues } from "@/components/forms/AccountForm";
 import { AccountBalanceHistory } from "@/components/forms/AccountBalanceHistory";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 type Filter = "active" | "closed" | "all";
 
@@ -243,6 +244,7 @@ export default function AccountsPage() {
   const [filter, setFilter] = useState<Filter>("active");
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
+  const [sparklinesLoaded, setSparklinesLoaded] = useState(false);
   const [grid, setGrid] = useState<BalanceGridResponse | null>(null);
   const [history, setHistory] = useState<BalanceHistoryResponse | null>(null);
   const [historyPage, setHistoryPage] = useState(1);
@@ -262,6 +264,7 @@ export default function AccountsPage() {
     const map: Record<string, number[]> = {};
     for (const s of data) map[s.account_id] = s.points.map((p) => Number(p.balance));
     setSparklines(map);
+    setSparklinesLoaded(true);
   }
 
   async function loadGrid() {
@@ -408,7 +411,7 @@ export default function AccountsPage() {
 
       {view === "history" ? (
         <div className="flex flex-col gap-4">
-          {history === null && <p className="text-sm text-nw-muted">Loading…</p>}
+          {history === null && <LoadingBlock />}
           {history?.total_dates === 0 && (
             <p className="text-sm text-nw-muted">
               No balance history yet. Add your first account, or upload balance history once it exists.
@@ -462,7 +465,7 @@ export default function AccountsPage() {
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {filter === "active" ? (
             <>
-              {grid === null && <p className="text-sm text-nw-muted">Loading…</p>}
+              {grid === null && <LoadingBlock />}
               {grid?.categories.length === 0 && (
                 <p className="text-sm text-nw-muted">
                   No balance history yet. Add your first account, or upload balance history once it exists.
@@ -481,7 +484,7 @@ export default function AccountsPage() {
             </>
           ) : (
             <>
-              {accounts === null && <p className="text-sm text-nw-muted">Loading…</p>}
+              {accounts === null && <LoadingBlock />}
               {accounts?.length === 0 && (
                 <p className="text-sm text-nw-muted">
                   No accounts yet. Add your first account, or upload balance history once it exists.
@@ -503,9 +506,9 @@ export default function AccountsPage() {
                           {a.institution_name} · {a.account_type}
                         </div>
                       </button>
-                      {a.is_open && sparklines[a.account_id]?.length > 1 && (
+                      {a.is_open && sparklinesLoaded && (
                         <Sparkline
-                          values={sparklines[a.account_id]}
+                          values={sparklines[a.account_id] ?? []}
                           color={a.balance_type === "liability" ? "var(--nw-coral)" : "var(--nw-green)"}
                         />
                       )}

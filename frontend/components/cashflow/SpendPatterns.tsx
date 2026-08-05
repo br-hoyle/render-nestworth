@@ -91,17 +91,21 @@ export function SpendPatterns({ transactions, title }: { transactions: Transacti
           </select>
         </label>
       </div>
-      <div className="flex flex-col gap-2">
-        {buckets.map((b) => (
-          <div key={b.label} className="flex items-center gap-2 text-xs">
-            <span className="w-9 text-nw-muted flex-none">{b.label}</span>
-            <div className="flex-1 h-2 rounded-full bg-nw-track overflow-hidden">
-              <div className="h-full bg-nw-green-line" style={{ width: `${(b.average / maxAvg) * 100}%` }} />
+      {filtered.length === 0 ? (
+        <p className="text-xs text-nw-muted">Not enough data yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {buckets.map((b) => (
+            <div key={b.label} className="flex items-center gap-2 text-xs">
+              <span className="w-9 text-nw-muted flex-none">{b.label}</span>
+              <div className="flex-1 h-2 rounded-full bg-nw-track overflow-hidden">
+                <div className="h-full bg-nw-green-line" style={{ width: `${(b.average / maxAvg) * 100}%` }} />
+              </div>
+              <span className="w-16 text-right flex-none">{money(b.average)}</span>
             </div>
-            <span className="w-16 text-right flex-none">{money(b.average)}</span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

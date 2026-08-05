@@ -22,6 +22,7 @@ import { KpiTile } from "@/components/kpi/KpiTile";
 import { KpiDetailPanel } from "@/components/kpi/KpiDetailPanel";
 import { ChangeCell } from "@/components/ui/ChangeCell";
 import { Button } from "@/components/ui/Button";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 const STICKY_COL = "sticky left-0 z-10";
 const SCROLL_SHADOW = "shadow-[6px_0_8px_-6px_rgba(0,0,0,0.6)]";
@@ -204,7 +205,20 @@ export default function OverviewPage() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([month, v]) => ({ month, ...v }));
   }, [transactions]);
 
-  if (points.length < 2 && series !== null) {
+  // One gate covering every fetch this page needs before its first real paint — without
+  // it, sections like the Sunburst/Cash Flow chart render `?? []`/`null` mid-flight and
+  // show their real "no data yet" copy for a beat even for households with real data.
+  const isLoading = stale === null || series === null || accounts === null || scorecard === null || transactions === null;
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 flex flex-col gap-3">
+        <h1 className="text-lg font-medium">Overview</h1>
+        <LoadingBlock />
+      </div>
+    );
+  }
+
+  if (points.length < 2) {
     return (
       <div className="p-4 md:p-6 flex flex-col gap-3">
         <h1 className="text-lg font-medium">Overview</h1>
@@ -310,7 +324,6 @@ export default function OverviewPage() {
             {keyMetrics.map((m) => (
               <KpiTile key={m.slug} metric={m} onClick={() => setSelectedMetric(m)} />
             ))}
-            {scorecard === null && <p className="text-xs text-nw-muted col-span-full">Loading…</p>}
           </div>
 
           {typeGrid && typeGrid.categories.length > 0 && <CombinedCategoryTypeTable grid={typeGrid} />}

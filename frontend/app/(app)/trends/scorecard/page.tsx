@@ -6,6 +6,7 @@ import type { AllKpiHistoryResponse, HouseholdSettings, KpiMetric, ScorecardResp
 import { KpiTile } from "@/components/kpi/KpiTile";
 import { KpiDetailPanel } from "@/components/kpi/KpiDetailPanel";
 import { targetInfoFor } from "@/lib/kpiThresholds";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 const GROUPS = [
   "Liquidity & Emergency Reserves",
@@ -69,7 +70,7 @@ const BASIS: Record<2 | 3 | 4, string> = {
 export default function ScorecardPage() {
   const [scorecard, setScorecard] = useState<ScorecardResponse | null>(null);
   const [history, setHistory] = useState<AllKpiHistoryResponse | null>(null);
-  const [kpiThresholds, setKpiThresholds] = useState<Record<string, Record<string, number>>>({});
+  const [kpiThresholds, setKpiThresholds] = useState<Record<string, Record<string, number>> | null>(null);
   const [selected, setSelected] = useState<KpiMetric | null>(null);
 
   function load() {
@@ -86,11 +87,15 @@ export default function ScorecardPage() {
     });
   }, []);
 
+  // Gates the whole page so tiles don't first render with a "Not enough history yet"
+  // chart placeholder and target-less bars, then flash to their real content once
+  // /scorecard/history and /settings resolve a beat after /scorecard itself.
+  const isLoading = scorecard === null || history === null || kpiThresholds === null;
   const metrics = scorecard?.metrics ?? [];
 
   function renderTile(m: KpiMetric, compact: boolean) {
     const metricHistory = history?.series[m.slug];
-    const info = targetInfoFor(m, metrics, kpiThresholds, metricHistory);
+    const info = targetInfoFor(m, metrics, kpiThresholds ?? {}, metricHistory);
     return (
       <KpiTile
         key={m.slug}
@@ -101,6 +106,15 @@ export default function ScorecardPage() {
         compactChart={compact}
         onClick={() => setSelected(m)}
       />
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-6 flex flex-col gap-4 max-w-5xl mx-auto w-full">
+        <h1 className="text-lg font-medium">Scorecard</h1>
+        <LoadingBlock />
+      </div>
     );
   }
 
@@ -170,7 +184,7 @@ export default function ScorecardPage() {
               <div className="text-[10px] uppercase tracking-wide text-nw-muted">{group}</div>
               <div className="flex flex-wrap gap-2 items-start">
                 {groupMetrics.map((m) => {
-                  const info = targetInfoFor(m, metrics, kpiThresholds, history?.series[m.slug]);
+                  const info = targetInfoFor(m, metrics, kpiThresholds ?? {}, history?.series[m.slug]);
                   // No-target metrics (Future Balance projections) show only the name and
                   // number — a narrower, auto-width tile rather than stretching to the
                   // row's shared basis, since there's no bar/chart to fill that width with.
@@ -184,8 +198,6 @@ export default function ScorecardPage() {
             </div>
           );
         })}
-
-        {scorecard === null && <p className="text-sm text-nw-muted">Loading…</p>}
       </div>
 
       {selected && (

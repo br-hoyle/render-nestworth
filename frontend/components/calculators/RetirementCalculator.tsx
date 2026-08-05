@@ -77,7 +77,7 @@ export function RetirementCalculator() {
             value={result ? (result.depletion_age ? `age ${result.depletion_age}` : `past ${inputs.life_expectancy}`) : "—"}
           />
         </div>
-        {result && result.schedule.length > 0 && (
+        {result && result.schedule.length > 1 && (
           <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={result.schedule}>
@@ -89,6 +89,9 @@ export function RetirementCalculator() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        )}
+        {result && result.schedule.length <= 1 && (
+          <p className="text-xs text-nw-muted">Not enough data yet — retirement age must be before life expectancy.</p>
         )}
       </div>
     </div>
