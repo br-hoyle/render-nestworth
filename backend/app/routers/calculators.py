@@ -133,7 +133,7 @@ def calculator_defaults(
 
     if name == "emergency-fund":
         settings = get_household_settings(conn, household_id)
-        _, _, _, balance_by_type = balances_totals_at(conn, household_id, today)
+        _, _, _, _, balance_by_type = balances_totals_at(conn, household_id, today)
         liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
         liquid_balance = sum(
             (v for k, v in balance_by_type.items() if k.lower() in liquid_types), Decimal(0)
@@ -148,7 +148,7 @@ def calculator_defaults(
         return {"gross_monthly_income": str(income / 12)} if income else {}
 
     if name == "retirement":
-        _, _, assets_by_category, _ = balances_totals_at(conn, household_id, today)
+        _, _, assets_by_category, _, _ = balances_totals_at(conn, household_id, today)
         retirement_balance = assets_by_category.get("Retirement", 0)
         return {"current_balance": str(retirement_balance)}
 
@@ -168,7 +168,7 @@ def calculator_defaults(
 
     if name == "target-emergency-fund":
         settings = get_household_settings(conn, household_id)
-        _, _, _, balance_by_type = balances_totals_at(conn, household_id, today)
+        _, _, _, _, balance_by_type = balances_totals_at(conn, household_id, today)
         liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
         liquid_balance = sum(
             (v for k, v in balance_by_type.items() if k.lower() in liquid_types), Decimal(0)
@@ -179,7 +179,7 @@ def calculator_defaults(
         return {"current_liquid_balance": str(liquid_balance), "monthly_expense": str(monthly_expense)}
 
     if name == "financial-independence":
-        total_assets, total_liabilities, _, _ = balances_totals_at(conn, household_id, today)
+        total_assets, total_liabilities, _, _, _ = balances_totals_at(conn, household_id, today)
         window_start = today - relativedelta(months=3)
         txn = transaction_sums(conn, household_id, window_start, today)
         annual_expenses = (txn["expense"] / 3 * 12) if txn["expense"] else Decimal(0)

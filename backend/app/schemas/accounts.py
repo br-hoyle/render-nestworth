@@ -94,3 +94,4 @@ class BalanceHistoryResponse(BaseModel):
     dates: list[date]
     net_worth: list[Decimal]
     institutions: list[BalanceHistoryInstitution]
+    total_dates: int = 0  # count of ALL distinct snapshot dates, for pagination (independent of limit/offset)

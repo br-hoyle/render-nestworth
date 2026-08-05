@@ -46,5 +46,10 @@ export function GroupLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function colorClass(color: string) {
-  return clsx(color === "green" && "text-nw-green", (color === "red" || color === "coral") && "text-nw-coral", color === "yellow" && "text-nw-amber");
+  return clsx(
+    color === "green" && "text-nw-green",
+    (color === "red" || color === "coral") && "text-nw-coral",
+    color === "yellow" && "text-nw-amber",
+    color === "neutral" && "text-nw-muted"
+  );
 }

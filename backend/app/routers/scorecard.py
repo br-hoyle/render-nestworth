@@ -14,35 +14,54 @@ from app.services.kpi import KpiInputs
 
 router = APIRouter(tags=["scorecard"])
 
+# Group names match the Scorecard page's 5 sections exactly (the frontend renders one grid
+# per group, in this order). needs_ratio/wants_ratio keep their own "Budget rule" group,
+# which the Scorecard page no longer renders as tiles — they stay defined here purely so
+# GET /scorecard/{slug}/history keeps serving Cash Flow's needs/wants trend charts.
 METRICS = [
-    ("emergency_fund", "Emergency fund", "Safety", "months", kpi_service.emergency_fund_months),
-    ("liquidity_ratio", "Liquidity ratio", "Safety", "ratio", kpi_service.liquidity_ratio),
-    ("housing_cost_ratio", "Housing cost ratio", "Safety", "percent", kpi_service.housing_cost_ratio),
-    ("savings_rate", "Savings rate", "Growth", "percent", kpi_service.savings_rate),
-    ("net_worth_growth_yoy", "Net worth growth (YoY)", "Growth", "percent", kpi_service.net_worth_growth_yoy),
-    # Labels are intentionally swapped relative to slug/function names: the household wants
-    # the expense-based number (fi_progress fn) displayed as "Target net worth" and the
-    # age-based savings-annuity number (target_net_worth fn) displayed as "Financial
-    # Independence" — slugs stay put so thresholds/assumptions/content keyed by slug
-    # elsewhere don't need to move.
-    ("fi_progress", "Target net worth", "Growth", "dollars", kpi_service.fi_progress),
-    ("target_net_worth", "Financial Independence", "Growth", "dollars", kpi_service.target_net_worth),
-    ("debt_to_income", "Debt-to-income", "Debt & mix", "percent", kpi_service.debt_to_income),
-    ("debt_payoff_runway", "Debt payoff runway", "Debt & mix", "months", kpi_service.debt_payoff_runway_months),
-    ("net_worth", "Net worth", "Debt & mix", "dollars", kpi_service.net_worth_value),
-    # Backlog pass 2 additions:
-    ("debt_to_assets_ratio", "Debt-to-assets", "Efficiency", "percent", kpi_service.debt_to_assets_ratio),
-    ("liquid_runway", "Liquid runway", "Efficiency", "months", kpi_service.liquid_runway_months),
-    ("savings_efficiency", "Savings efficiency", "Efficiency", "percent", kpi_service.savings_efficiency),
-    ("net_worth_velocity", "Net worth velocity", "Efficiency", "percent", kpi_service.net_worth_velocity),
+    # Liquidity & Emergency Reserves
+    ("emergency_fund", "Emergency Fund", "Liquidity & Emergency Reserves", "months", kpi_service.emergency_fund_months),
+    ("liquid_runway", "Liquid Runway", "Liquidity & Emergency Reserves", "months", kpi_service.liquid_runway_months),
+    ("liquidity_ratio", "Liquidity Ratio", "Liquidity & Emergency Reserves", "ratio", kpi_service.liquidity_ratio),
+    # Debt & Leverage Management
+    ("total_debt", "Total Debt", "Debt & Leverage Management", "dollars", kpi_service.total_debt_value),
+    ("debt_to_income", "Debt to Income (DTI)", "Debt & Leverage Management", "percent", kpi_service.debt_to_income),
+    ("debt_to_assets_ratio", "Debt to Assets", "Debt & Leverage Management", "percent", kpi_service.debt_to_assets_ratio),
+    ("housing_debt_to_equity", "Housing Debt to Equity", "Debt & Leverage Management", "percent", kpi_service.housing_debt_to_equity),
+    ("debt_payoff_runway", "Debt Payoff Runway", "Debt & Leverage Management", "months", kpi_service.debt_payoff_runway_months),
+    # Cash Flow & Budgeting Efficiency
+    ("savings_rate", "Savings Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.savings_rate),
+    ("net_cash_flow", "Net Cash Flow", "Cash Flow & Budgeting Efficiency", "dollars", kpi_service.net_cash_flow),
+    ("discretionary_spending_rate", "Discretionary Spending Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.discretionary_spending_rate),
+    ("housing_cost_ratio", "Housing Cost Ratio", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.housing_cost_ratio),
+    ("net_income_rate", "Net Income Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.net_income_rate),
+    ("income_growth_rate", "Income Growth Rate", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.income_growth_rate),
+    ("savings_efficiency", "Savings Efficiency", "Cash Flow & Budgeting Efficiency", "percent", kpi_service.savings_efficiency),
+    # Wealth Accumulation & Balance Sheet Health
+    ("net_worth", "Net Worth", "Wealth Accumulation & Balance Sheet Health", "dollars", kpi_service.net_worth_value),
+    ("net_worth_velocity", "Net Worth Velocity", "Wealth Accumulation & Balance Sheet Health", "percent", kpi_service.net_worth_velocity),
+    # fi_progress (expense-based "25x expenses" FI number) — kept on Overview as "Target Net
+    # Worth" and additionally surfaced here per the household's explicit request; slug stays
+    # put so existing thresholds/assumptions/content keyed by slug don't need to move.
+    ("fi_progress", "Target Net Worth", "Wealth Accumulation & Balance Sheet Health", "dollars", kpi_service.fi_progress),
+    # Retirement & Financial Independence
+    # target_net_worth (age-based savings-annuity projection) is the household's existing
+    # "Financial Independence" metric — not a new Millionaire-Next-Door formula, per their
+    # explicit call that the two are the same thing conceptually.
+    ("target_net_worth", "Financial Independence", "Retirement & Financial Independence", "dollars", kpi_service.target_net_worth),
+    ("future_investment_balance", "Future Investment Balance", "Retirement & Financial Independence", "dollars", kpi_service.future_investment_balance),
+    ("future_retirement_balance", "Future Retirement Balance", "Retirement & Financial Independence", "dollars", kpi_service.future_retirement_balance),
+    # Budget rule — not rendered on the Scorecard page; kept alive for Cash Flow's history charts.
     ("needs_ratio", "Needs", "Budget rule", "percent", kpi_service.needs_ratio),
     ("wants_ratio", "Wants", "Budget rule", "percent", kpi_service.wants_ratio),
-    ("savings_ratio", "Savings", "Budget rule", "percent", kpi_service.savings_ratio),
 ]
 
 
-def balances_totals_at(conn: Connection, household_id: str, as_of: date) -> tuple[Decimal, Decimal, dict[str, Decimal], dict[str, Decimal]]:
-    """Returns (total_assets, total_liabilities, assets_by_category, balance_by_account_type)."""
+def balances_totals_at(
+    conn: Connection, household_id: str, as_of: date
+) -> tuple[Decimal, Decimal, dict[str, Decimal], dict[str, Decimal], dict[str, Decimal]]:
+    """Returns (total_assets, total_liabilities, assets_by_category, liabilities_by_category,
+    balance_by_account_type)."""
     rows = conn.execute(
         text(
             """
@@ -61,6 +80,7 @@ def balances_totals_at(conn: Connection, household_id: str, as_of: date) -> tupl
     total_assets = Decimal(0)
     total_liabilities = Decimal(0)
     assets_by_category: dict[str, Decimal] = {}
+    liabilities_by_category: dict[str, Decimal] = {}
     balance_by_type: dict[str, Decimal] = {}
 
     for row in rows:
@@ -71,8 +91,9 @@ def balances_totals_at(conn: Connection, household_id: str, as_of: date) -> tupl
             assets_by_category[row["category"]] = assets_by_category.get(row["category"], Decimal(0)) + balance
         else:
             total_liabilities += balance
+            liabilities_by_category[row["category"]] = liabilities_by_category.get(row["category"], Decimal(0)) + balance
 
-    return total_assets, total_liabilities, assets_by_category, balance_by_type
+    return total_assets, total_liabilities, assets_by_category, liabilities_by_category, balance_by_type
 
 
 def gross_annual_income_at(conn: Connection, household_id: str, as_of: date) -> Decimal:
@@ -140,8 +161,39 @@ def classified_expense_sums(conn: Connection, household_id: str, start: date, en
     return row
 
 
+def _category_total(by_category: dict[str, Decimal], *names: str) -> Decimal:
+    """Case-insensitive lookup across one or more category spellings — `category` is free
+    text (no DB enum), and real households' data can drift from the current dropdown's
+    vocabulary (e.g. older seed data using "Investments" where the form now writes
+    "Investment"). Matching case-insensitively and across a couple of accepted spellings
+    avoids silently zeroing out a household's data over a naming mismatch."""
+    lowered = {k.lower(): v for k, v in by_category.items()}
+    matched_keys = {name.lower() for name in names} & lowered.keys()
+    return sum((lowered[key] for key in matched_keys), Decimal(0))
+
+
+def monthly_income_transaction_sums(conn: Connection, household_id: str, start: date, end: date) -> dict[str, Decimal]:
+    """Actual income-type transactions summed per calendar month — the real "banked income"
+    series Income Growth Rate compares month to month (distinct from the effective-dated,
+    on-paper gross_annual_income_at)."""
+    rows = conn.execute(
+        text(
+            """
+            select to_char(date_trunc('month', date), 'YYYY-MM') as month, sum(amount) as total
+            from transactions
+            where household_id = :household_id and type = 'income' and date >= :start and date <= :end
+            group by date_trunc('month', date)
+            """
+        ),
+        {"household_id": household_id, "start": start, "end": end},
+    ).mappings().all()
+    return {r["month"]: r["total"] for r in rows}
+
+
 def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings: dict) -> KpiInputs:
-    total_assets, total_liabilities, _, balance_by_type = balances_totals_at(conn, household_id, as_of)
+    total_assets, total_liabilities, assets_by_category, liabilities_by_category, balance_by_type = balances_totals_at(
+        conn, household_id, as_of
+    )
 
     liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
     cash_types = {t.lower() for t in settings.get("cash_account_types", [])}
@@ -151,12 +203,37 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
     net_worth = total_assets - total_liabilities
 
     one_year_ago = as_of - relativedelta(years=1)
-    assets_1y, liabilities_1y, _, _ = balances_totals_at(conn, household_id, one_year_ago)
+    assets_1y, liabilities_1y, _, _, _ = balances_totals_at(conn, household_id, one_year_ago)
     net_worth_1y = assets_1y - liabilities_1y
 
     six_months_ago = as_of - relativedelta(months=6)
-    _, liabilities_6mo, _, _ = balances_totals_at(conn, household_id, six_months_ago)
+    _, liabilities_6mo, _, _, _ = balances_totals_at(conn, household_id, six_months_ago)
     liability_reduction_6mo = liabilities_6mo - total_liabilities
+
+    three_months_ago = as_of - relativedelta(months=3)
+    _, liabilities_3mo, _, _, _ = balances_totals_at(conn, household_id, three_months_ago)
+    liability_reduction_3mo = liabilities_3mo - total_liabilities
+
+    property_asset_value = _category_total(assets_by_category, "Property")
+    property_liability_value = _category_total(liabilities_by_category, "Property")
+    investment_asset_value = _category_total(assets_by_category, "Investment", "Investments")
+    retirement_asset_value = _category_total(assets_by_category, "Retirement")
+
+    # Income Growth Rate: this month's actual income transactions vs. the average of the 12
+    # full calendar months before it.
+    income_window_start = as_of - relativedelta(months=13)
+    monthly_income = monthly_income_transaction_sums(conn, household_id, income_window_start, as_of)
+    current_month_income = monthly_income.get(as_of.strftime("%Y-%m"), Decimal(0))
+    prior_month_values = [
+        monthly_income[key]
+        for key in (
+            (as_of - relativedelta(months=k)).strftime("%Y-%m") for k in range(1, 13)
+        )
+        if key in monthly_income
+    ]
+    trailing_12mo_avg_income = (
+        sum(prior_month_values, Decimal(0)) / len(prior_month_values) if prior_month_values else None
+    )
 
     gross_annual_income = gross_annual_income_at(conn, household_id, as_of)
 
@@ -202,6 +279,13 @@ def build_kpi_inputs(conn: Connection, household_id: str, as_of: date, settings:
         savings_flow_trailing=savings_trailing,
         gross_income_trailing_12mo=gross_income_12mo,
         net_income_trailing_12mo=net_income_12mo,
+        liability_reduction_trailing_3mo=liability_reduction_3mo,
+        property_asset_value=property_asset_value,
+        property_liability_value=property_liability_value,
+        investment_asset_value=investment_asset_value,
+        retirement_asset_value=retirement_asset_value,
+        current_month_income=current_month_income,
+        trailing_12mo_avg_income=trailing_12mo_avg_income,
     )
 
 

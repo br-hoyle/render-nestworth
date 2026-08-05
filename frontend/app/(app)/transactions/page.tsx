@@ -10,7 +10,7 @@ import { ImportWizard } from "@/components/transactions/ImportWizard";
 import { ClassifyModal } from "@/components/transactions/ClassifyModal";
 import { EditTransactionModal } from "@/components/transactions/EditTransactionModal";
 
-const PAGE_SIZES = [25, 50, 100];
+const PAGE_SIZES = [15, 25, 50, 100];
 
 const NEED_WANT_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "Need/Want: all" },

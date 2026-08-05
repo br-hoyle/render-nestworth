@@ -70,6 +70,7 @@ export interface BalanceHistoryResponse {
   dates: string[];
   net_worth: string[];
   institutions: BalanceHistoryInstitution[];
+  total_dates: number;
 }
 
 export interface BalanceImportResult {
@@ -162,6 +163,10 @@ export interface HouseholdSettings {
   target_net_worth_savings_rate: number;
   target_net_worth_roi: number;
   household_age: number | null;
+  target_retirement_age: number | null;
+  expected_return_rate: number;
+  monthly_investment_contribution: number;
+  monthly_retirement_contribution: number;
   [key: string]: unknown;
 }
 

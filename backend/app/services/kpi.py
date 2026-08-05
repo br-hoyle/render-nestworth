@@ -1,14 +1,26 @@
 """
-The 11 KPI formulas from CLAUDE.md, as pure functions over already-fetched primitives (no
+KPI formulas backing the Scorecard, as pure functions over already-fetched primitives (no
 DB access here — see routers/scorecard.py for the data-fetching glue). Each returns a
-(value, color) pair; color is computed from the household's configured thresholds via
-`color_for`. Two documented, transparent simplifications given the schema as provided
+(value, color) pair (or a 3-tuple with progress_pct for dollar-target metrics); color is
+computed from the household's configured thresholds via `color_for`. A "neutral" color is
+used for purely informational dollar figures with no natural good/bad direction (Total
+Debt, the two forward-looking balance projections) — it renders as a grey dot rather than
+implying a judgment. Documented, transparent simplifications given the schema as provided
 (spelled out again in docs/KPI_FORMULAS.md):
 
-- Debt-to-income uses total liability balance ÷ annual income (a stock/flow ratio), not a
-  monthly required-payment ratio — the schema has no loan-payment field to compute the
-  latter. The classic 36/43 thresholds are kept as directional guidance, not underwriting
-  rules.
+- Debt-to-income estimates the "recurring monthly debt payment" as the trailing 3-month
+  average pace of total liability paydown (total liabilities 3 months ago − now, ÷ 3) —
+  the schema has no loan-payment/APR/term field to compute a real payment amount. This
+  only reads as a payment when liabilities are actually shrinking; if they're flat or
+  growing there's no pace to infer a payment from, and the metric reports unavailable
+  rather than guessing.
+- Housing Debt-to-Equity and the two Future Balance projections aggregate accounts by
+  `category` (Property / Investment / Retirement) household-wide — multiple properties or
+  investment accounts are summed together rather than tracked per-property.
+- The two Future Balance projections (Future Investment Balance, Future Retirement
+  Balance) require `household_age` and `target_retirement_age` to both be set; there is no
+  persisted "years to retirement" anywhere else in the schema (Scenarios, which would have
+  held this, were removed).
 """
 
 from dataclasses import dataclass
@@ -42,6 +54,14 @@ class KpiInputs:
     # Net Worth Velocity.
     gross_income_trailing_12mo: Decimal = Decimal(0)
     net_income_trailing_12mo: Decimal = Decimal(0)
+    # Scorecard overhaul additions:
+    liability_reduction_trailing_3mo: Decimal = Decimal(0)  # positive = paid down; feeds DTI
+    property_asset_value: Decimal = Decimal(0)  # sum of Property-category asset accounts
+    property_liability_value: Decimal = Decimal(0)  # sum of Property-category liability accounts
+    investment_asset_value: Decimal = Decimal(0)  # sum of Investment-category asset accounts
+    retirement_asset_value: Decimal = Decimal(0)  # sum of Retirement-category asset accounts
+    current_month_income: Decimal = Decimal(0)  # actual income transactions, this calendar month
+    trailing_12mo_avg_income: Decimal | None = None  # avg of the 12 full months before this one
 
 
 def _threshold(settings: dict, slug: str, key: str, default: float) -> float:
@@ -82,33 +102,47 @@ def color_for_target(value: float | None, target: float, green_tolerance: float,
 
 
 def emergency_fund_months(i: KpiInputs) -> tuple[float | None, str]:
-    if i.trailing_expense <= 0:
+    """Cash reserves ÷ average monthly "needs" expense — the narrowest, most conservative
+    reading of "could I cover essentials with cash on hand." Falls back to overall trailing
+    expense until the household classifies transactions as needs/wants (documented fallback,
+    same convention as liquid_runway used previously)."""
+    needs_expense = i.needs_expense_trailing if i.needs_expense_trailing is not None else i.trailing_expense
+    if needs_expense <= 0:
         return None, "yellow"
-    monthly_expense = i.trailing_expense / i.trailing_months
-    if monthly_expense <= 0:
+    monthly_needs = needs_expense / i.trailing_months
+    if monthly_needs <= 0:
         return None, "yellow"
-    months = float(i.liquid_balance / monthly_expense)
+    months = float(i.cash_balance / monthly_needs)
     red = _threshold(i.settings, "emergency_fund", "red_below", 3)
     green = _threshold(i.settings, "emergency_fund", "green_at_or_above", 6)
     return months, color_for_higher_is_better(months, red, green)
 
 
 def liquidity_ratio(i: KpiInputs) -> tuple[float | None, str]:
+    """Liquid assets ÷ average monthly cash outflow (total trailing expense). Deliberately
+    the same numerator/denominator as liquid_runway_months below — this shows the identical
+    underlying figure as a unitless ratio rather than a month count, for a more analytical
+    reading of the same signal."""
     if i.trailing_expense <= 0:
         return None, "yellow"
     monthly_expense = i.trailing_expense / i.trailing_months
     if monthly_expense <= 0:
         return None, "yellow"
-    ratio = float(i.cash_balance / monthly_expense)
+    ratio = float(i.liquid_balance / monthly_expense)
     red = _threshold(i.settings, "liquidity_ratio", "red_below", 0.5)
     green = _threshold(i.settings, "liquidity_ratio", "green_at_or_above", 1.0)
     return ratio, color_for_higher_is_better(ratio, red, green)
 
 
 def housing_cost_ratio(i: KpiInputs) -> tuple[float | None, str]:
-    if i.gross_annual_income <= 0:
+    """Monthly housing expense ÷ monthly NET income (actual banked income transactions over
+    the trailing window, not the on-paper gross annual figure) — reads higher than a
+    gross-income version of the same housing cost, since net < gross; the default 28/36
+    thresholds are carried over unchanged and are household-configurable if that calibration
+    doesn't fit."""
+    if i.trailing_income <= 0:
         return None, "red"
-    monthly_income = i.gross_annual_income / 12
+    monthly_income = i.trailing_income / i.trailing_months
     monthly_housing = i.housing_expense_trailing / i.trailing_months
     ratio_pct = float(monthly_housing / monthly_income * 100)
     green = _threshold(i.settings, "housing_cost_ratio", "green_below", 28)
@@ -143,14 +177,15 @@ def debt_to_assets_ratio(i: KpiInputs) -> tuple[float | None, str]:
 
 
 def liquid_runway_months(i: KpiInputs) -> tuple[float | None, str]:
-    if i.needs_expense_trailing is not None and i.needs_expense_trailing > 0:
-        monthly_needs = i.needs_expense_trailing / i.trailing_months
-    elif i.trailing_expense > 0:
-        # Fallback: household hasn't classified transactions yet — use overall expense.
-        monthly_needs = i.trailing_expense / i.trailing_months
-    else:
+    """Liquid assets ÷ average monthly TOTAL expense (not needs-only) — broader than
+    Emergency Fund's cash-and-needs-only reading, since it counts every liquid account and
+    every expense dollar."""
+    if i.trailing_expense <= 0:
         return None, "yellow"
-    months = float(i.liquid_balance / monthly_needs)
+    monthly_expense = i.trailing_expense / i.trailing_months
+    if monthly_expense <= 0:
+        return None, "yellow"
+    months = float(i.liquid_balance / monthly_expense)
     red = _threshold(i.settings, "liquid_runway", "red_below", 3)
     green = _threshold(i.settings, "liquid_runway", "green_at_or_above", 6)
     return months, color_for_higher_is_better(months, red, green)
@@ -191,10 +226,6 @@ def needs_ratio(i: KpiInputs) -> tuple[float | None, str]:
 
 def wants_ratio(i: KpiInputs) -> tuple[float | None, str]:
     return _budget_rule_ratio(i, i.wants_expense_trailing, "wants_ratio", 30)
-
-
-def savings_ratio(i: KpiInputs) -> tuple[float | None, str]:
-    return _budget_rule_ratio(i, i.savings_flow_trailing, "savings_ratio", 20)
 
 
 def fi_number(i: KpiInputs) -> Decimal:
@@ -249,9 +280,21 @@ def target_net_worth(i: KpiInputs) -> tuple[float | None, str, float | None]:
 
 
 def debt_to_income(i: KpiInputs) -> tuple[float | None, str]:
+    """Estimated recurring monthly debt payment ÷ monthly gross income. The "payment" is
+    estimated as the trailing 3-month average pace of total-liability paydown — the schema
+    has no loan-payment field, so this proxies "payment" with "principal actually going
+    away." Only meaningful when debt is shrinking: flat or growing balances mean there's no
+    paydown pace to infer a payment from, so the metric reports unavailable rather than a
+    misleading 0% or negative figure."""
+    if i.total_liabilities <= 0:
+        return 0.0, "green"
     if i.gross_annual_income <= 0:
         return None, "red"
-    ratio_pct = float(i.total_liabilities / i.gross_annual_income * 100)
+    monthly_payment_estimate = i.liability_reduction_trailing_3mo / 3
+    if monthly_payment_estimate <= 0:
+        return None, "red"
+    monthly_income = i.gross_annual_income / 12
+    ratio_pct = float(monthly_payment_estimate / monthly_income * 100)
     green = _threshold(i.settings, "debt_to_income", "green_below", 36)
     red = _threshold(i.settings, "debt_to_income", "red_at_or_above", 43)
     return ratio_pct, color_for_lower_is_better(ratio_pct, green, red)
@@ -271,3 +314,100 @@ def debt_payoff_runway_months(i: KpiInputs) -> tuple[float | None, str]:
 
 def net_worth_value(i: KpiInputs) -> tuple[float, str]:
     return float(i.net_worth), ("green" if i.net_worth >= 0 else "coral")
+
+
+def total_debt_value(i: KpiInputs) -> tuple[float, str]:
+    """Raw dollar total of every liability — informational, not graded: there's no
+    household-size-independent threshold for what a "good" absolute debt total is."""
+    return float(i.total_liabilities), "neutral"
+
+
+def net_cash_flow(i: KpiInputs) -> tuple[float, str]:
+    """Trailing income − trailing expense, in dollars — the same trailing window as
+    Savings Rate, just expressed as a dollar amount instead of a percent."""
+    value = float(i.trailing_income - i.trailing_expense)
+    return value, ("green" if value >= 0 else "coral")
+
+
+def discretionary_spending_rate(i: KpiInputs) -> tuple[float | None, str]:
+    """Trailing "wants"-classified expense ÷ trailing income × 100. None until the
+    household classifies transactions (same fallback convention as the other
+    needs/wants-dependent metrics)."""
+    if i.wants_expense_trailing is None or i.trailing_income <= 0:
+        return None, "yellow"
+    rate_pct = float(i.wants_expense_trailing / i.trailing_income * 100)
+    green = _threshold(i.settings, "discretionary_spending_rate", "green_below", 30)
+    red = _threshold(i.settings, "discretionary_spending_rate", "red_at_or_above", 45)
+    return rate_pct, color_for_lower_is_better(rate_pct, green, red)
+
+
+def net_income_rate(i: KpiInputs) -> tuple[float | None, str]:
+    """Trailing NET income (actual banked income transactions) ÷ trailing GROSS income
+    (the on-paper annualized figure, held flat over the trailing window as an
+    approximation) × 100 — the share of gross pay that actually shows up as income."""
+    gross_over_window = i.gross_annual_income / 12 * i.trailing_months
+    if gross_over_window <= 0:
+        return None, "red"
+    rate_pct = float(i.trailing_income / gross_over_window * 100)
+    red = _threshold(i.settings, "net_income_rate", "red_below", 50)
+    green = _threshold(i.settings, "net_income_rate", "green_at_or_above", 70)
+    return rate_pct, color_for_higher_is_better(rate_pct, red, green)
+
+
+def income_growth_rate(i: KpiInputs) -> tuple[float | None, str]:
+    """This calendar month's actual income transactions ÷ the average of the 12 full
+    calendar months before it × 100 — a "pace vs. trailing average" reading (100% = right
+    on pace), the same convention Cash Flow's Category Drift chart uses for expenses, just
+    on income with a 12-month window. None until 12 full prior months of transaction
+    history exist."""
+    if i.trailing_12mo_avg_income is None or i.trailing_12mo_avg_income <= 0:
+        return None, "yellow"
+    ratio_pct = float(i.current_month_income / i.trailing_12mo_avg_income * 100)
+    red = _threshold(i.settings, "income_growth_rate", "red_below", 90)
+    green = _threshold(i.settings, "income_growth_rate", "green_at_or_above", 105)
+    return ratio_pct, color_for_higher_is_better(ratio_pct, red, green)
+
+
+def housing_debt_to_equity(i: KpiInputs) -> tuple[float | None, str]:
+    """Property-category liabilities (mortgages, HELOCs, etc.) ÷ property-category home
+    equity (property assets − property liabilities), household-wide. None (neutral) when
+    no property is tracked at all — renders as "not applicable" rather than a red flag."""
+    if i.property_asset_value <= 0:
+        return (None, "red") if i.property_liability_value > 0 else (None, "neutral")
+    equity = i.property_asset_value - i.property_liability_value
+    if equity <= 0:
+        # Underwater (or exactly zero equity) — the ratio is undefined/unbounded rather
+        # than a finite percentage worth displaying.
+        return None, "red"
+    ratio_pct = float(i.property_liability_value / equity * 100)
+    green = _threshold(i.settings, "housing_debt_to_equity", "green_below", 100)
+    red = _threshold(i.settings, "housing_debt_to_equity", "red_at_or_above", 300)
+    return ratio_pct, color_for_lower_is_better(ratio_pct, green, red)
+
+
+def _future_balance(current_balance: Decimal, monthly_contribution_key: str, i: KpiInputs) -> tuple[float | None, str]:
+    """Shared compounding projection for Future Investment/Retirement Balance: the current
+    category balance, grown monthly at settings.expected_return_rate with a flat monthly
+    contribution added each month, from household_age to target_retirement_age. Both ages
+    must be configured (Settings) or this returns None — there's nowhere else in the schema
+    a "years to retirement" figure could come from."""
+    age = i.settings.get("household_age")
+    retirement_age = i.settings.get("target_retirement_age")
+    return_rate = i.settings.get("expected_return_rate", 0.10)
+    if age is None or retirement_age is None or retirement_age <= age or return_rate is None or return_rate <= 0:
+        return None, "neutral"
+    monthly_contribution = Decimal(str(i.settings.get(monthly_contribution_key, 0) or 0))
+    months = (retirement_age - age) * 12
+    monthly_rate = Decimal(str(return_rate)) / 12
+    balance = current_balance
+    for _ in range(months):
+        balance = balance * (1 + monthly_rate) + monthly_contribution
+    return float(balance), "neutral"
+
+
+def future_investment_balance(i: KpiInputs) -> tuple[float | None, str]:
+    return _future_balance(i.investment_asset_value, "monthly_investment_contribution", i)
+
+
+def future_retirement_balance(i: KpiInputs) -> tuple[float | None, str]:
+    return _future_balance(i.retirement_asset_value, "monthly_retirement_contribution", i)

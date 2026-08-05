@@ -4,28 +4,37 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import {
+  MdOutlineBarChart,
+  MdOutlineCalculate,
+  MdOutlineCreditCard,
+  MdOutlineHome,
+  MdOutlineLayers,
+  MdOutlineSavings,
+  MdOutlineTrendingUp,
+} from "react-icons/md";
 import { useAuth } from "@/lib/auth-context";
 
-const NAV_GROUPS: { heading: string; items: { href: string; label: string }[] }[] = [
+const NAV_GROUPS: { heading: string; items: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] }[] = [
   {
     heading: "Track",
     items: [
-      { href: "/overview", label: "Overview" },
-      { href: "/trends/cash-flow", label: "Cash Flow" },
-      { href: "/trends/scorecard", label: "Scorecard" },
+      { href: "/overview", label: "Overview", icon: MdOutlineHome },
+      { href: "/trends/cash-flow", label: "Cash Flow", icon: MdOutlineBarChart },
+      { href: "/trends/scorecard", label: "Scorecard", icon: MdOutlineTrendingUp },
     ],
   },
   {
     heading: "Manage",
     items: [
-      { href: "/accounts", label: "Accounts" },
-      { href: "/income", label: "Income" },
-      { href: "/transactions", label: "Transactions" },
+      { href: "/accounts", label: "Accounts", icon: MdOutlineLayers },
+      { href: "/income", label: "Income", icon: MdOutlineSavings },
+      { href: "/transactions", label: "Transactions", icon: MdOutlineCreditCard },
     ],
   },
   {
     heading: "Plan",
-    items: [{ href: "/plan/calculators", label: "Calculators" }],
+    items: [{ href: "/plan/calculators", label: "Calculators", icon: MdOutlineCalculate }],
   },
 ];
 
@@ -49,17 +58,19 @@ export function Sidebar() {
           </div>
           {group.items.map((item) => {
             const active = pathname.startsWith(item.href);
+            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={clsx(
-                  "rounded-md px-2 py-1.5 text-[11px]",
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px]",
                   active
                     ? "bg-nw-green-tint text-nw-mint shadow-[inset_2px_0_0_var(--nw-green)]"
                     : "text-nw-muted hover:text-nw-text"
                 )}
               >
+                <Icon className="w-4 h-4 flex-none" />
                 {item.label}
               </Link>
             );

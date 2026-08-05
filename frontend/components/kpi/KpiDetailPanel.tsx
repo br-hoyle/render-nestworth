@@ -25,6 +25,18 @@ const ASSUMPTION_FIELDS: Record<string, { key: string; label: string; step?: str
     { key: "target_net_worth_savings_rate", label: "Savings rate", step: "0.01" },
     { key: "target_net_worth_roi", label: "Expected return", step: "0.01" },
   ],
+  future_investment_balance: [
+    { key: "household_age", label: "Current age", step: "1" },
+    { key: "target_retirement_age", label: "Target retirement age", step: "1" },
+    { key: "expected_return_rate", label: "Expected return", step: "0.01" },
+    { key: "monthly_investment_contribution", label: "Monthly contribution", step: "1" },
+  ],
+  future_retirement_balance: [
+    { key: "household_age", label: "Current age", step: "1" },
+    { key: "target_retirement_age", label: "Target retirement age", step: "1" },
+    { key: "expected_return_rate", label: "Expected return", step: "0.01" },
+    { key: "monthly_retirement_contribution", label: "Monthly contribution", step: "1" },
+  ],
 };
 
 const THRESHOLD_KEYS: Record<string, { keys: string[]; labels: string[] }> = {
@@ -42,7 +54,10 @@ const THRESHOLD_KEYS: Record<string, { keys: string[]; labels: string[] }> = {
   net_worth_velocity: HIGHER_IS_BETTER,
   needs_ratio: BAND_AROUND_TARGET,
   wants_ratio: BAND_AROUND_TARGET,
-  savings_ratio: BAND_AROUND_TARGET,
+  discretionary_spending_rate: LOWER_IS_BETTER,
+  net_income_rate: HIGHER_IS_BETTER,
+  income_growth_rate: HIGHER_IS_BETTER,
+  housing_debt_to_equity: LOWER_IS_BETTER,
 };
 
 export function KpiDetailPanel({

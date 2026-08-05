@@ -19,10 +19,15 @@ DEFAULT_KPI_THRESHOLDS = {
     "target_net_worth": {"red_below": 50, "green_at_or_above": 100},
     "savings_efficiency": {"red_below": 0, "green_at_or_above": 20},
     "net_worth_velocity": {"red_below": 0, "green_at_or_above": 100},
-    # 50/30/20 rule — banded around a target rather than a simple higher/lower-is-better cut.
+    # 50/30/20 rule — still computed for Cash Flow's needs/wants trend charts even though
+    # the Scorecard's own "Budget rule" section was removed; not user-facing as tiles here.
     "needs_ratio": {"target": 50, "green_tolerance": 5, "yellow_tolerance": 15},
     "wants_ratio": {"target": 30, "green_tolerance": 5, "yellow_tolerance": 15},
-    "savings_ratio": {"target": 20, "green_tolerance": 5, "yellow_tolerance": 15},
+    # Scorecard overhaul additions:
+    "discretionary_spending_rate": {"green_below": 30, "red_at_or_above": 45},
+    "net_income_rate": {"red_below": 50, "green_at_or_above": 70},
+    "income_growth_rate": {"red_below": 90, "green_at_or_above": 105},
+    "housing_debt_to_equity": {"green_below": 100, "red_at_or_above": 300},
 }
 
 DEFAULT_SETTINGS = {
@@ -38,6 +43,12 @@ DEFAULT_SETTINGS = {
     "target_net_worth_savings_rate": 0.15,
     "target_net_worth_roi": 0.07,
     "household_age": None,
+    # Assumptions for the Future Investment/Retirement Balance projections — distinct from
+    # target_net_worth_roi above, which feeds the separate age-based annuity projection.
+    "target_retirement_age": 65,
+    "expected_return_rate": 0.10,
+    "monthly_investment_contribution": 0,
+    "monthly_retirement_contribution": 0,
     "kpi_thresholds": DEFAULT_KPI_THRESHOLDS,
 }
 
@@ -60,6 +71,10 @@ class HouseholdSettings(BaseModel):
     target_net_worth_savings_rate: float = 0.15
     target_net_worth_roi: float = 0.07
     household_age: int | None = None
+    target_retirement_age: int | None = 65
+    expected_return_rate: float = 0.10
+    monthly_investment_contribution: float = 0
+    monthly_retirement_contribution: float = 0
     kpi_thresholds: dict = DEFAULT_KPI_THRESHOLDS
 
 

@@ -256,14 +256,17 @@ def account_balance_grid(
 
 @router.get("/balance-history", response_model=BalanceHistoryResponse)
 def account_balance_history(
+    limit: int = 25,
+    offset: int = 0,
     session: Session = Depends(get_current_session),
     conn: Connection = Depends(get_tenant_db),
 ) -> BalanceHistoryResponse:
-    """All-time, all-account balance history for the Accounts page's spreadsheet tab: every
-    distinct snapshot date ever recorded for the household (not just the last N), one column
-    per account grouped by institution, plus a net-worth total column. Closed accounts are
-    included since their history still belongs in a full-history view — only /balance-grid
-    (the "current" view) restricts to open accounts."""
+    """Paginated, all-account balance history for the Accounts page's spreadsheet tab: one
+    column per account grouped by institution, plus a net-worth total column. Dates are
+    always most-recent-first — `offset`/`limit` page backward through progressively OLDER
+    dates, so page 1 (offset=0) always starts at today's most recent snapshot. Closed
+    accounts are included since their history still belongs in a full-history view — only
+    /balance-grid (the "current" view) restricts to open accounts."""
     accounts = conn.execute(
         text(
             """
@@ -285,14 +288,18 @@ def account_balance_history(
             from balances b
             join accounts a on a.account_id = b.account_id
             where a.household_id = :household_id
-            order by b.full_date
+            order by b.full_date desc
             """
         ),
         {"household_id": session.household_id},
     ).all()
-    dates_asc = [r.full_date for r in date_rows]
+    total_dates = len(date_rows)
+    # Slice the descending (most-recent-first) list for this page, then re-sort ascending —
+    # forward_fill_series requires ascending query dates — before reversing back for display.
+    page_dates_desc = [r.full_date for r in date_rows][offset : offset + limit]
+    dates_asc = sorted(page_dates_desc)
     if not dates_asc:
-        return BalanceHistoryResponse(dates=[], net_worth=[], institutions=[])
+        return BalanceHistoryResponse(dates=[], net_worth=[], institutions=[], total_dates=total_dates)
 
     net_worth_asc = [Decimal(0) for _ in dates_asc]
     institution_order: list[str] = []
@@ -335,6 +342,7 @@ def account_balance_history(
         dates=list(reversed(dates_asc)),
         net_worth=list(reversed(net_worth_asc)),
         institutions=institutions,
+        total_dates=total_dates,
     )
 
 

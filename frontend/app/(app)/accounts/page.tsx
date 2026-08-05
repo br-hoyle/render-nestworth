@@ -18,6 +18,8 @@ import { AccountBalanceHistory } from "@/components/forms/AccountBalanceHistory"
 
 type Filter = "active" | "closed" | "all";
 
+const HISTORY_PAGE_SIZES = [15, 25, 50, 100] as const;
+
 function money(v: string | null) {
   if (v === null) return "—";
   return fmtMoney(v);
@@ -243,6 +245,8 @@ export default function AccountsPage() {
   const [sparklines, setSparklines] = useState<Record<string, number[]>>({});
   const [grid, setGrid] = useState<BalanceGridResponse | null>(null);
   const [history, setHistory] = useState<BalanceHistoryResponse | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPageSize, setHistoryPageSize] = useState<15 | 25 | 50 | 100>(25);
   const [panel, setPanel] = useState<null | "create" | Account>(null);
   const [panelTab, setPanelTab] = useState<"edit" | "history">("edit");
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -265,8 +269,11 @@ export default function AccountsPage() {
     setGrid(data);
   }
 
-  async function loadHistory() {
-    const data = await api.get<BalanceHistoryResponse>("/accounts/balance-history");
+  async function loadHistory(page: number, pageSize: number) {
+    const offset = (page - 1) * pageSize;
+    const data = await api.get<BalanceHistoryResponse>(
+      `/accounts/balance-history?limit=${pageSize}&offset=${offset}`
+    );
     setHistory(data);
   }
 
@@ -281,12 +288,14 @@ export default function AccountsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
-  // Lazily fetched the first time the History tab is opened — it's an all-time query, no
-  // point paying for it on every Accounts page load.
+  // Fetched whenever the History tab is active and the page/page-size changes — cheap now
+  // that the query is bounded by pageSize rather than an all-time fetch. Changing the page
+  // size resets to page 1 in the same handler (see the <select> below) rather than a
+  // separate effect, so the two state changes land in one fetch instead of two.
   useEffect(() => {
-    if (view === "history" && history === null) loadHistory();
+    if (view === "history") loadHistory(historyPage, historyPageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, historyPage, historyPageSize]);
 
   useEffect(() => {
     setPanelTab("edit");
@@ -359,51 +368,94 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="flex border border-nw-border rounded-md overflow-hidden text-xs w-fit">
-        <button
-          onClick={() => setView("balances")}
-          className={"px-3 py-1.5 " + (view === "balances" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
-        >
-          Balances
-        </button>
-        <button
-          onClick={() => setView("history")}
-          className={"px-3 py-1.5 " + (view === "history" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
-        >
-          History
-        </button>
-      </div>
-
-      {view === "balances" && (
-        <div className="flex gap-2">
-          {(["active", "closed", "all"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={
-                "px-3 py-1 rounded-full text-xs border capitalize " +
-                (filter === f
-                  ? "border-nw-green-line text-nw-mint bg-nw-green-tint"
-                  : "border-nw-border text-nw-muted")
-              }
-            >
-              {f}
-            </button>
-          ))}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex border border-nw-border rounded-md overflow-hidden text-xs w-fit">
+          <button
+            onClick={() => setView("balances")}
+            className={"px-3 py-1.5 " + (view === "balances" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+          >
+            Balances
+          </button>
+          <button
+            onClick={() => setView("history")}
+            className={"px-3 py-1.5 " + (view === "history" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+          >
+            History
+          </button>
         </div>
-      )}
+
+        {view === "balances" && (
+          <div className="flex gap-2">
+            {(["active", "closed", "all"] as Filter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={
+                  "px-3 py-1 rounded-full text-xs border capitalize " +
+                  (filter === f
+                    ? "border-nw-green-line text-nw-mint bg-nw-green-tint"
+                    : "border-nw-border text-nw-muted")
+                }
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {error && <p className="text-xs text-nw-coral">{error}</p>}
 
       {view === "history" ? (
         <div className="flex flex-col gap-4">
           {history === null && <p className="text-sm text-nw-muted">Loading…</p>}
-          {history?.dates.length === 0 && (
+          {history?.total_dates === 0 && (
             <p className="text-sm text-nw-muted">
               No balance history yet. Add your first account, or upload balance history once it exists.
             </p>
           )}
-          {history && history.dates.length > 0 && <BalanceHistoryTable data={history} />}
+          {history && history.total_dates > 0 && (
+            <>
+              <BalanceHistoryTable data={history} />
+              <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-nw-muted">
+                <div className="flex items-center gap-2">
+                  <span>Rows per page</span>
+                  {HISTORY_PAGE_SIZES.map((size) => (
+                    <button
+                      key={size}
+                      onClick={() => {
+                        setHistoryPageSize(size);
+                        setHistoryPage(1);
+                      }}
+                      className={
+                        "px-2 py-1 rounded-full border " +
+                        (historyPageSize === size ? "border-nw-green-line text-nw-mint bg-nw-green-tint" : "border-nw-border")
+                      }
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span>
+                    {(historyPage - 1) * historyPageSize + 1}–
+                    {Math.min(history.total_dates, historyPage * historyPageSize)} of {history.total_dates}
+                  </span>
+                  <Button onClick={() => setHistoryPage((p) => Math.max(1, p - 1))} disabled={historyPage === 1}>
+                    ‹
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      setHistoryPage((p) => Math.min(Math.ceil(history.total_dates / historyPageSize), p + 1))
+                    }
+                    disabled={historyPage >= Math.ceil(history.total_dates / historyPageSize)}
+                  >
+                    ›
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       ) : (
       <div className="flex flex-col md:flex-row gap-4">

@@ -44,6 +44,9 @@ export const KPI_COLOR_HEX: Record<string, string> = {
   yellow: "var(--nw-amber)",
   red: "var(--nw-coral)",
   coral: "var(--nw-coral)",
+  // Purely informational metrics with no natural good/bad direction (Total Debt, the
+  // forward-looking balance projections) — a grey dot instead of implying a judgment.
+  neutral: "var(--nw-muted)",
 };
 
 // Shared by any balance-over-time table (Accounts, Overview) — % change from the

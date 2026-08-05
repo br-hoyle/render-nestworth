@@ -14,7 +14,7 @@ import {
 import type { NetWorthPoint } from "@/lib/types";
 import { money } from "@/lib/format";
 
-export function NetWorthChart({ points, height = 220 }: { points: NetWorthPoint[]; height?: number }) {
+export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[]; height?: number }) {
   const data = points.map((p) => ({
     date: p.full_date,
     netWorth: Number(p.net_worth),
