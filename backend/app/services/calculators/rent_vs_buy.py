@@ -1,46 +1,64 @@
 """Rent vs Buy Calculator — the most involved calculator in the Housing & Mortgage section:
-simulates home ownership and renting side-by-side over a chosen comparison horizon and reports
-which one leaves the household better off in future-value terms.
+simulates home ownership and renting side-by-side and, for every possible length of stay from
+1 year up to the comparison horizon, reports the **average monthly cost** of each option if you
+sold (or stopped renting) at that point — the same "average cost by staying length" framing
+calculator.net's version uses, which is what makes a clean break-even statement possible
+("buying is cheaper if you stay N years or longer") instead of only a single end-of-horizon
+number.
 
-Method ("invest the difference"): each year, whichever option costs less that year is assumed
-to have its savings invested at the given average investment return; the running, compounded
-gap between the two options' costs is the final answer — if positive, renting-and-investing
-the difference wins by that amount (in future dollars at the end of the horizon); if negative,
-buying wins by that amount. This is the standard economic framing for a rent-vs-buy comparison
-(not simply "which has the lower monthly payment"), since it accounts for the down payment's
-opportunity cost, the mortgage's amortization, home price appreciation, and every recurring
-cost on both sides. The schedule also tracks each side's plain cumulative (undiscounted) cost
-so far — `cumulative_buy_cost`/`cumulative_rent_cost` — for a "cost of renting vs. cost of
-owning over time" chart; the year those two lines cross is `breakeven_year`, computed
-separately (and not necessarily identical to the year the invest-the-difference sign flips,
-since that account also earns investment returns on top of the raw cost gap).
+Method, per staying length N (years):
 
-Buy-side costs: P&I (via _amortization.amortize, stopping once the loan is paid off — if that
-happens before the comparison horizon ends, only escrow costs continue for the remaining years),
+- `buy_net_cost(N)` = every dollar paid out on the buy side through year N (down payment,
+  closing costs, P&I, property tax, home insurance, PMI, HOA, other costs, minus the mortgage-
+  interest tax shield) **minus** what you'd get back by selling at that point — home value
+  (appreciated N years) net of selling closing costs, minus the remaining loan balance. This is
+  the piece that was previously missing: without netting out the sale proceeds, buying could
+  never look cheaper long-term even though paying down a mortgage builds equity a renter never
+  gets back. Early years are dominated by the down payment and closing costs (a big lump paid
+  once, averaged over very few years); later years are dominated by ordinary recurring costs
+  growing against a housing market that's (usually) appreciating faster than those costs, plus
+  loan-balance paydown — the combination is what produces the "cheap-then-rising" curve on the
+  buy side and mirrors the shape calculator.net's own chart shows.
+- `rent_net_cost(N)` = every dollar paid on the rent side through year N (rent, renters
+  insurance, upfront cost) **minus** the investment growth (not the principal — that's already
+  reflected in the two sides' raw cash outlay difference) earned on whichever side had more cash
+  free to invest upfront (typically the renter, since buying ties up a down payment renting
+  doesn't require) at the household's average investment return. This is the standard "invest
+  the difference" opportunity-cost treatment, just applied per staying-length instead of once at
+  the end of a fixed horizon.
+- `avg_monthly_cost(N) = net_cost(N) / (12 × N)` for both sides. The chart plots these two curves
+  across every N from 1 to `comparison_years`; the year they cross (linearly interpolated to one
+  decimal place, matching calculator.net's display) is `breakeven_year` — "buying is cheaper if
+  you stay this long or more."
+
 PMI (same <20%-down trigger as mortgage.py, held flat rather than auto-cancelling at 20% equity
-— same simplification), property tax (its own annual increase rate, independent of home
-appreciation — a mill-rate-style escalation), and home insurance/HOA/other costs (a shared
-"costs increase" rate). Property tax's and other costs' increase rates are fixed, undocumented-
-to-the-household assumptions (both default to 2%/yr, the same "documented simplified constant"
-convention as STANDARD_DEDUCTION below) rather than exposed inputs — the household already has
-Home Value Appreciation to tune for the one rate that matters most to the outcome.
+— same simplification) and property tax's own annual increase rate (independent of home
+appreciation — a mill-rate-style escalation) apply on the buy side; home insurance/PMI/HOA/other
+costs share a "costs increase" rate. Both escalation rates are fixed, undocumented-to-the-
+household assumptions (2%/yr each, the same "documented simplified constant" convention as
+STANDARD_DEDUCTION below) rather than exposed inputs — Home Value Appreciation is the one growth
+rate that matters most, and the one the household tunes directly.
 
 Closing costs (buy) and renters insurance (rent) may each be quoted as a flat dollar amount or
 as a percentage — of home price for closing costs, of annual rent for renters insurance.
-Selling closing costs are a one-time % of the home's appreciated value, charged only at the end
-of the horizon when computing sale proceeds.
+Selling closing costs are a one-time % of the home's appreciated value, applied whenever a sale
+is priced in (i.e. at every staying length N, not just the final one, since the whole point of
+this calculator is asking "what if I sold at year N" for every N).
 
 Tax treatment: assumes the household itemizes only when mortgage interest + property tax paid
 that year exceeds the standard deduction for their filing status (STANDARD_DEDUCTION below —
 approximate, single-tax-year constants) — only the excess over the standard deduction gets a
 tax benefit, at the combined federal+state marginal rate. Other itemizable items (state income
-tax paid, charitable giving, etc.) aren't modeled. Renters insurance and the rent-side
-upfront/security deposit costs are not tax-advantaged in any way, matching how renting is
-actually taxed.
+tax paid, charitable giving, etc.) aren't modeled. Renters insurance is not tax-advantaged in any
+way, matching how renting is actually taxed.
 
 Simplifications flagged for the record: no SALT deduction cap, no AMT, security deposit assumed
-fully refunded at the end of the horizon, renters insurance held flat (no separate increase
-rate — the household's "costs increase" input only drives buy-side costs)."""
+fully refunded whenever the household stops renting (so it's excluded from the running rent cost
+entirely rather than modeled as a temporary outflow), renters insurance held flat year over year
+(no separate increase rate — the household's "costs increase" input only drives buy-side costs),
+and the break-even year is the *first* point buying goes from more expensive to cheaper — if a
+later, unusual combination of inputs flips the ranking back, that second crossing isn't
+separately reported (matching calculator.net's single break-even statement)."""
 
 from decimal import Decimal
 
@@ -103,11 +121,15 @@ def compute(
     combined_tax_rate = marginal_federal_rate + marginal_state_rate
     standard_deduction = STANDARD_DEDUCTION.get(tax_filing_status, STANDARD_DEDUCTION["single"])
 
+    # Whoever needs less cash upfront has that difference free to invest — typically the renter,
+    # since buying ties up a down payment renting doesn't require. Only the investment *growth*
+    # (not the principal, which is already reflected in the two sides' raw outlay difference)
+    # is credited as a benefit below.
+    upfront_diff = (down_payment_amount + closing_costs_amount) - (security_deposit + rent_upfront_cost)
+
     schedule = []
-    loan_balance = loan_amount
-    investment_balance = (down_payment_amount + closing_costs_amount) - (security_deposit + rent_upfront_cost)
-    cumulative_buy_cost = down_payment_amount + closing_costs_amount
-    cumulative_rent_cost = security_deposit + rent_upfront_cost
+    cumulative_buy_outflow = down_payment_amount + closing_costs_amount
+    cumulative_rent_outflow = rent_upfront_cost
 
     for year in range(1, comparison_years + 1):
         start = (year - 1) * 12
@@ -126,20 +148,26 @@ def compute(
 
         itemized = year_interest + property_tax
         tax_shield = max(Decimal(0), itemized - standard_deduction) * combined_tax_rate
-        buy_cost = year_pi_payment + property_tax + home_insurance + pmi + hoa + other_costs - tax_shield
+        year_buy_outflow = year_pi_payment + property_tax + home_insurance + pmi + hoa + other_costs - tax_shield
+        cumulative_buy_outflow += year_buy_outflow
 
         annual_rent = monthly_rent * 12 * (1 + rental_increase_pct) ** (year - 1)
-        rent_cost = annual_rent + renters_insurance_year1
+        year_rent_outflow = annual_rent + renters_insurance_year1
+        cumulative_rent_outflow += year_rent_outflow
 
-        cumulative_buy_cost += buy_cost
-        cumulative_rent_cost += rent_cost
+        net_sale_proceeds = home_value * (1 - selling_closing_costs_pct) - loan_balance
+        buy_net_cost = cumulative_buy_outflow - net_sale_proceeds
+        rent_net_cost = cumulative_rent_outflow
 
-        if year == comparison_years:
-            sale_proceeds = home_value * (1 - selling_closing_costs_pct) - loan_balance
-            buy_cost -= sale_proceeds
-            rent_cost -= security_deposit  # assumed fully refunded at the end of the horizon
+        investment_growth = abs(upfront_diff) * ((1 + avg_investment_return) ** year - 1)
+        if upfront_diff >= 0:
+            rent_net_cost -= investment_growth
+        else:
+            buy_net_cost -= investment_growth
 
-        investment_balance = investment_balance * (1 + avg_investment_return) + (buy_cost - rent_cost)
+        months = year * 12
+        avg_buy_cost = buy_net_cost / months
+        avg_rent_cost = rent_net_cost / months
 
         schedule.append(
             {
@@ -147,25 +175,32 @@ def compute(
                 "home_value": round(home_value, 2),
                 "loan_balance": round(loan_balance, 2),
                 "home_equity": round(home_value - loan_balance, 2),
-                "advantage_of_renting": round(investment_balance, 2),
-                "cumulative_buy_cost": round(cumulative_buy_cost, 2),
-                "cumulative_rent_cost": round(cumulative_rent_cost, 2),
+                "avg_buy_cost": round(avg_buy_cost, 2),
+                "avg_rent_cost": round(avg_rent_cost, 2),
             }
         )
 
-    final = schedule[-1]
     breakeven_year = None
-    first_sign_positive = schedule[0]["advantage_of_renting"] >= 0
-    for point in schedule[1:]:
-        if (point["advantage_of_renting"] >= 0) != first_sign_positive:
-            breakeven_year = point["year"]
-            break
+    if schedule[0]["avg_buy_cost"] <= schedule[0]["avg_rent_cost"]:
+        breakeven_year = Decimal(1)
+    else:
+        for prev, curr in zip(schedule, schedule[1:]):
+            prev_diff = prev["avg_buy_cost"] - prev["avg_rent_cost"]
+            curr_diff = curr["avg_buy_cost"] - curr["avg_rent_cost"]
+            if prev_diff > 0 and curr_diff <= 0:
+                frac = prev_diff / (prev_diff - curr_diff) if prev_diff != curr_diff else Decimal(0)
+                breakeven_year = round(Decimal(prev["year"]) + frac, 1)
+                break
+
+    final = schedule[-1]
+    recommendation = "Buying" if final["avg_buy_cost"] <= final["avg_rent_cost"] else "Renting"
 
     return {
-        "advantage_of_renting": final["advantage_of_renting"],
-        "recommendation": "Renting" if final["advantage_of_renting"] > 0 else "Buying",
+        "recommendation": recommendation,
+        "breakeven_year": breakeven_year,
         "home_equity_at_horizon": final["home_equity"],
         "home_value_at_horizon": final["home_value"],
-        "breakeven_year": breakeven_year,
+        "avg_buy_cost_at_horizon": final["avg_buy_cost"],
+        "avg_rent_cost_at_horizon": final["avg_rent_cost"],
         "schedule": schedule,
     }

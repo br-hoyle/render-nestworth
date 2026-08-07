@@ -299,31 +299,45 @@ cost, since receiving cash offsets what refinancing costs.
 
 ### Rent vs. Buy Calculator
 
-`rent_vs_buy.py` — the most involved calculator in the app: simulates home ownership and renting
-side by side over a chosen comparison horizon (default 5 years) and reports which one leaves the
-household better off, using the standard "invest the difference" framing rather than simply
-comparing monthly payments:
+`rent_vs_buy.py` — the most involved calculator in the app. For **every staying length N from 1
+year up to the chosen comparison horizon** (default 5 years — raise it to see more of the curve,
+the same way a longer loan term reveals more of the shape on calculator.net's version), it
+reports the **average monthly cost** of each option if you sold the home (or stopped renting)
+after N years — matching calculator.net's own "average cost by staying length" framing, which is
+what makes a clean "buying is cheaper if you stay N years or longer" statement possible instead
+of only a single end-of-horizon number.
 
-- Each year, whichever option costs less is assumed to have its savings invested at the given
-  average investment return; the running, compounded gap between the two options' costs is the
-  final answer. Positive means renting-and-investing-the-difference wins by that amount (in
-  future dollars at the end of the horizon); negative means buying wins by that amount.
-- **Buy side**: P&I via `_amortization.amortize()` (stopping once the loan is paid off — if that
-  happens before the horizon ends, only escrow costs continue for the remaining years); PMI under
-  the same 20%-down trigger as `mortgage.py`; property tax escalates at its own annual rate,
-  independent of home appreciation (a mill-rate-style increase rather than tied to the home's
-  assessed value); home insurance/PMI/HOA/other costs share a "costs increase" rate. Both
-  escalation rates are fixed, undocumented-to-the-household assumptions (2%/yr each, the same
+- **Buy side, `avg_buy_cost(N)`**: every dollar paid out through year N (down payment, closing
+  costs, P&I via `_amortization.amortize()` — stopping once the loan is paid off, if that happens
+  before N — property tax, home insurance, PMI under the same 20%-down trigger as `mortgage.py`,
+  HOA, other costs, minus the mortgage-interest tax shield) **minus the net sale proceeds if sold
+  at year N** (home value appreciated N years, net of selling closing costs, minus the remaining
+  loan balance) — divided by `12 × N`. Netting out the sale proceeds is the fix for the case this
+  calculator used to get wrong: without it, buying could never look cheaper long-term even though
+  paying down a mortgage builds equity a renter never gets back. Property tax escalates at its own
+  annual rate, independent of home appreciation (a mill-rate-style increase rather than tied to
+  the home's assessed value); home insurance/PMI/HOA/other costs share a "costs increase" rate.
+  Both escalation rates are fixed, undocumented-to-the-household assumptions (2%/yr each, the same
   "documented simplified constant" convention as `STANDARD_DEDUCTION` below) rather than exposed
-  inputs — Home Value Appreciation is the one growth rate the household tunes directly. Closing
-  costs (percent-of-price or flat) are a one-time upfront cost; selling closing costs are a
-  one-time % of the home's appreciated value, charged only when computing sale proceeds at the
-  end of the horizon.
-- **Chart**: the schedule also tracks each side's plain cumulative (undiscounted) cost so far —
-  `cumulative_buy_cost`/`cumulative_rent_cost` — rendered as two lines ("cost of owning" vs. "cost
-  of renting" over time) with the payoff point (where owning starts costing less overall) marked
-  directly on the chart, distinct from `breakeven_year` (the invest-the-difference sign flip),
-  which also gets its own callout in the plain-English answer.
+  inputs — Home Value Appreciation is the one growth rate that matters most, and the one the
+  household tunes directly. Closing costs (percent-of-price or flat) are a one-time upfront cost;
+  selling closing costs are a one-time % of the home's appreciated value, applied at every N (since
+  the whole point of this calculator is asking "what if I sold at year N," for every N — not just
+  the final year).
+- **Rent side, `avg_rent_cost(N)`**: every dollar paid through year N (rent, renters insurance,
+  upfront cost) **minus the investment growth** — not the principal, which is already reflected in
+  the two sides' raw cash-outlay difference — earned on whichever side had more cash free to
+  invest upfront (typically the renter, since buying ties up a down payment renting doesn't
+  require) at the household's average investment return. This is the standard "invest the
+  difference" opportunity-cost treatment, applied per staying length instead of once at a fixed
+  horizon.
+- **Break-even**: the two average-cost curves are compared year by year; the first year buying's
+  average drops from more expensive to cheaper (linearly interpolated to one decimal place, e.g.
+  "4.9 years," matching calculator.net's display) is `breakeven_year`. If a later, unusual
+  combination of inputs flips the ranking back, that second crossing isn't separately reported —
+  the answer is always framed as a single break-even statement.
+- **Chart**: two lines, `avg_buy_cost` ("Buy") and `avg_rent_cost` ("Rent"), plotted for every year
+  from 1 to the comparison horizon, with the break-even year marked directly on the chart.
 - **Tax treatment**: assumes the household itemizes only when mortgage interest + property tax
   paid that year exceeds the standard deduction for their filing status (`STANDARD_DEDUCTION` —
   approximate, single-tax-year constants, the same "documented simplified constant" convention as
@@ -331,6 +345,10 @@ comparing monthly payments:
   standard deduction gets a tax benefit, at the combined federal + state marginal rate. Other
   itemizable items (state income tax paid, charitable giving, etc.) aren't modeled.
 - **Simplifications flagged for the record**: no SALT deduction cap, no AMT, security deposit
-  assumed fully refunded at the end of the horizon, renters insurance (percent-of-annual-rent or
-  flat) held flat year over year — the household's "costs increase" assumption only drives
-  buy-side costs.
+  assumed fully refunded whenever renting stops (so it's excluded from the running rent cost
+  entirely, rather than modeled as a temporary outflow), renters insurance (percent-of-annual-rent
+  or flat) held flat year over year — the household's "costs increase" assumption only drives
+  buy-side costs. calculator.net's own formula isn't published, so this methodology is a
+  from-first-principles model built to match its known conceptual shape (average cost by staying
+  length, netting home equity, investing the upfront difference) rather than a byte-for-byte
+  reproduction of its internals.

@@ -728,13 +728,14 @@ def test_rent_vs_buy_returns_a_recommendation_and_schedule():
 def test_rent_vs_buy_cheap_rent_favors_renting():
     result = rent_vs_buy.compute(**_rent_vs_buy_inputs(monthly_rent=Decimal("500")))
     assert result["recommendation"] == "Renting"
-    assert result["advantage_of_renting"] > 0
+    assert result["avg_rent_cost_at_horizon"] < result["avg_buy_cost_at_horizon"]
 
 
 def test_rent_vs_buy_expensive_rent_favors_buying():
     result = rent_vs_buy.compute(**_rent_vs_buy_inputs(monthly_rent=Decimal("6000")))
     assert result["recommendation"] == "Buying"
-    assert result["advantage_of_renting"] < 0
+    assert result["avg_buy_cost_at_horizon"] < result["avg_rent_cost_at_horizon"]
+    assert result["breakeven_year"] is not None
 
 
 def test_rent_vs_buy_down_payment_cant_exceed_price():
@@ -745,11 +746,24 @@ def test_rent_vs_buy_down_payment_cant_exceed_price():
 def test_rent_vs_buy_low_down_payment_costs_more_via_pmi():
     with_pmi = rent_vs_buy.compute(**_rent_vs_buy_inputs(down_payment_value=Decimal("0.10")))
     without_pmi = rent_vs_buy.compute(**_rent_vs_buy_inputs(down_payment_value=Decimal("0.10"), pmi_pct=Decimal(0)))
-    assert with_pmi["advantage_of_renting"] > without_pmi["advantage_of_renting"]
+    assert with_pmi["avg_buy_cost_at_horizon"] > without_pmi["avg_buy_cost_at_horizon"]
 
 
-def test_rent_vs_buy_schedule_tracks_cumulative_costs():
+def test_rent_vs_buy_schedule_tracks_average_costs_and_equity():
     result = rent_vs_buy.compute(**_rent_vs_buy_inputs())
     first, last = result["schedule"][0], result["schedule"][-1]
-    assert last["cumulative_buy_cost"] > first["cumulative_buy_cost"]
-    assert last["cumulative_rent_cost"] > first["cumulative_rent_cost"]
+    assert last["home_equity"] > first["home_equity"]
+    assert last["avg_rent_cost"] > first["avg_rent_cost"]  # rent has no equity offset, so its average only climbs
+
+
+def test_rent_vs_buy_home_equity_makes_buying_cheaper_over_a_long_horizon():
+    # The core fix this test guards: without netting sale proceeds against buy-side cost, buying
+    # could never look cheaper long-term even though paying down a mortgage builds equity a
+    # renter never gets back. Over a long-enough horizon with reasonable appreciation, buying's
+    # average monthly cost should end up cheaper than renting's, and a breakeven year should exist
+    # well inside the horizon.
+    result = rent_vs_buy.compute(**_rent_vs_buy_inputs(comparison_years=30, loan_term_years=30))
+    assert result["recommendation"] == "Buying"
+    assert result["breakeven_year"] is not None
+    assert result["breakeven_year"] < 30
+    assert result["avg_buy_cost_at_horizon"] < result["avg_rent_cost_at_horizon"]

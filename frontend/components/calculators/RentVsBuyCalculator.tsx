@@ -31,19 +31,20 @@ const TAX_FILING_OPTIONS: { value: TaxFilingStatus; label: string }[] = [
 
 interface Result {
   error?: string;
-  advantage_of_renting: string;
   recommendation: "Renting" | "Buying";
   home_equity_at_horizon: string;
   home_value_at_horizon: string;
+  avg_buy_cost_at_horizon: string;
+  avg_rent_cost_at_horizon: string;
   breakeven_year: number | null;
-  schedule: { year: number; cumulative_buy_cost: number; cumulative_rent_cost: number }[];
+  schedule: { year: number; avg_buy_cost: number; avg_rent_cost: number }[];
 }
 
-function CostOverTimeChart({
+function AverageCostChart({
   data,
   breakevenYear,
 }: {
-  data: { year: number; cumulative_buy_cost: number; cumulative_rent_cost: number }[];
+  data: { year: number; avg_buy_cost: number; avg_rent_cost: number }[];
   breakevenYear: number | null;
 }) {
   if (data.length < 2) return <p className="text-xs text-nw-muted">Not enough data yet.</p>;
@@ -52,8 +53,21 @@ function CostOverTimeChart({
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data}>
           <CartesianGrid stroke="var(--nw-border)" vertical={false} />
-          <XAxis dataKey="year" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
-          <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={70} tickFormatter={(v) => money(v)} />
+          <XAxis
+            dataKey="year"
+            tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+            tickLine={false}
+            axisLine={{ stroke: "var(--nw-border)" }}
+            label={{ value: "Year", position: "insideBottom", offset: -5, fontSize: 10, fill: "var(--nw-muted)" }}
+          />
+          <YAxis
+            tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+            tickLine={false}
+            axisLine={false}
+            width={70}
+            tickFormatter={(v) => money(v)}
+            label={{ value: "Average Monthly Cost", angle: -90, position: "insideLeft", fontSize: 10, fill: "var(--nw-muted)" }}
+          />
           <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           {breakevenYear != null && (
@@ -62,15 +76,16 @@ function CostOverTimeChart({
               stroke="var(--nw-mint)"
               strokeDasharray="4 4"
               ifOverflow="extendDomain"
-              label={{ value: "Payoff point", position: "insideTopLeft", fill: "var(--nw-mint)", fontSize: 10 }}
+              label={{ value: `Buy cheaper at ${breakevenYear} yr`, position: "insideTopLeft", fill: "var(--nw-mint)", fontSize: 10 }}
             />
           )}
-          <Line type="monotone" dataKey="cumulative_buy_cost" name="Cost of owning" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
-          <Line type="monotone" dataKey="cumulative_rent_cost" name="Cost of renting" stroke="var(--nw-muted)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="avg_buy_cost" name="Buy" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="avg_rent_cost" name="Rent" stroke="var(--nw-muted)" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
       <p className="text-[10px] text-nw-muted pt-1">
-        Cumulative money spent under each path. Where the lines cross is the payoff point — the year buying starts costing less overall.
+        Average monthly cost if you stayed exactly that many years, netting out what you'd get back selling the home (equity) on the buy
+        side. Where the lines cross is the point buying starts averaging cheaper than renting.
       </p>
     </div>
   );
@@ -142,7 +157,6 @@ export function RentVsBuyCalculator() {
   }
 
   const schedule = result?.schedule ?? [];
-  const advantage = result ? Number(result.advantage_of_renting) : 0;
 
   const inputsPanel = (
     <>
@@ -236,14 +250,19 @@ export function RentVsBuyCalculator() {
     ) : (
       <div className="flex flex-col gap-3">
         <CalcAnswer>
-          {result.recommendation} wins by {fmtMoney(Math.abs(advantage))} over {comparisonYears} years
-          {result.breakeven_year != null && ` — the cost-of-owning line crosses below cost-of-renting in year ${result.breakeven_year}`}.
+          {result.recommendation === "Buying" && result.breakeven_year != null
+            ? `Buying is cheaper if you stay ${result.breakeven_year} years or longer. Otherwise, renting is cheaper.`
+            : result.recommendation === "Renting" && result.breakeven_year == null
+              ? `Renting is cheaper for the entire ${comparisonYears}-year period you're comparing.`
+              : `${result.recommendation} averages cheaper over ${comparisonYears} years — ${fmtMoney(result.avg_buy_cost_at_horizon)}/mo buying vs. ${fmtMoney(result.avg_rent_cost_at_horizon)}/mo renting.`}
         </CalcAnswer>
         <div className="flex flex-wrap gap-2">
+          <ResultTile label="Avg. Monthly Cost to Buy" value={fmtMoney(result.avg_buy_cost_at_horizon)} />
+          <ResultTile label="Avg. Monthly Cost to Rent" value={fmtMoney(result.avg_rent_cost_at_horizon)} />
           <ResultTile label="Home Equity at Horizon" value={fmtMoney(result.home_equity_at_horizon)} />
           <ResultTile label="Home Value at Horizon" value={fmtMoney(result.home_value_at_horizon)} />
         </div>
-        <CostOverTimeChart data={schedule} breakevenYear={result.breakeven_year} />
+        <AverageCostChart data={schedule} breakevenYear={result.breakeven_year} />
       </div>
     );
 
