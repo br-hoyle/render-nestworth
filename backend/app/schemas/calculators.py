@@ -211,27 +211,31 @@ class AmortizationInput(BaseModel):
     principal: Decimal
     annual_rate: Decimal = Decimal("0.065")
     term_years: int = 30
+    start_date: date
     extra_monthly: Decimal = Decimal(0)
-    extra_monthly_start_month: int = 1
+    extra_monthly_start_date: date | None = None
     extra_yearly: Decimal = Decimal(0)
-    extra_yearly_start_month: int = 12
+    extra_yearly_start_date: date | None = None
     extra_one_time: Decimal = Decimal(0)
-    extra_one_time_month: int | None = None
+    extra_one_time_date: date | None = None
 
 
 class MortgagePayoffInput(BaseModel):
     original_principal: Decimal
     original_term_years: int = 30
     annual_rate: Decimal = Decimal("0.065")
+    start_date: date
     remaining_term_years: int = 25
     remaining_term_months: int = 0
-    repayment_option: Literal["lump_sum", "extra_payments", "biweekly", "normal"] = "normal"
+    repayment_option: Literal["extra_payments", "biweekly"] = "extra_payments"
     extra_monthly: Decimal = Decimal(0)
-    extra_monthly_start_month: int = 1
+    extra_monthly_start_date: date | None = None
     extra_yearly: Decimal = Decimal(0)
-    extra_yearly_start_month: int = 12
+    extra_yearly_start_date: date | None = None
     extra_one_time: Decimal = Decimal(0)
-    extra_one_time_month: int | None = None
+    extra_one_time_date: date | None = None
+    extra_biweekly: Decimal = Decimal(0)
+    extra_biweekly_start_date: date | None = None
 
 
 class HouseAffordabilityInput(BaseModel):
@@ -245,13 +249,16 @@ class HouseAffordabilityInput(BaseModel):
     down_payment_is_percent: bool = True
     property_tax_value: Decimal = Decimal(0)
     property_tax_is_percent: bool = True
-    hoa_value: Decimal = Decimal(0)
-    hoa_is_percent: bool = False
-    insurance_value: Decimal = Decimal(0)
-    insurance_is_percent: bool = True
+    home_insurance_value: Decimal = Decimal(0)
+    home_insurance_is_percent: bool = True
+    pmi_value: Decimal = Decimal(0)
+    pmi_is_percent: bool = True
+    hoa_fees_value: Decimal = Decimal(0)
+    hoa_fees_is_percent: bool = False
+    other_costs_value: Decimal = Decimal(0)
+    other_costs_is_percent: bool = False
     dti_preset: Literal["conventional", "fha", "va", "custom"] = "conventional"
     custom_back_end_ratio: Decimal = Decimal("0.36")
-    maintenance_monthly: Decimal = Decimal(0)
 
 
 class RefinanceInput(BaseModel):
@@ -260,32 +267,33 @@ class RefinanceInput(BaseModel):
     current_rate: Decimal
     new_rate: Decimal
     new_term_years: int = 30
-    new_loan_points: Decimal = Decimal(0)
     new_loan_costs_fees: Decimal = Decimal(0)
+    new_loan_points: Decimal = Decimal(0)
     cash_out_amount: Decimal = Decimal(0)
 
 
 class RentVsBuyInput(BaseModel):
-    comparison_years: int = 10
+    comparison_years: int = 5
     home_price: Decimal
     down_payment_value: Decimal = Decimal("0.20")
     down_payment_is_percent: bool = True
+    closing_costs_value: Decimal = Decimal("0.03")
+    closing_costs_is_percent: bool = True
     annual_rate: Decimal = Decimal("0.065")
     loan_term_years: int = 30
-    closing_costs_pct: Decimal = Decimal("0.03")
     property_tax_pct: Decimal = Decimal("0.012")
-    property_tax_increase_pct: Decimal = Decimal("0.02")
     home_insurance_pct: Decimal = Decimal("0.005")
+    pmi_pct: Decimal = Decimal("0.006")
     hoa_fees_pct: Decimal = Decimal(0)
-    maintenance_pct: Decimal = Decimal("0.01")
+    other_costs_pct: Decimal = Decimal("0.01")
     home_appreciation_pct: Decimal = Decimal("0.03")
-    costs_increase_pct: Decimal = Decimal("0.02")
     selling_closing_costs_pct: Decimal = Decimal("0.06")
     monthly_rent: Decimal
-    rental_increase_pct: Decimal = Decimal("0.03")
-    renters_insurance_annual: Decimal = Decimal(180)
     security_deposit: Decimal = Decimal(0)
     rent_upfront_cost: Decimal = Decimal(0)
+    rental_increase_pct: Decimal = Decimal("0.03")
+    renters_insurance_value: Decimal = Decimal("0.01")
+    renters_insurance_is_percent: bool = True
     avg_investment_return: Decimal = Decimal("0.07")
     marginal_federal_rate: Decimal = Decimal("0.22")
     marginal_state_rate: Decimal = Decimal("0.05")

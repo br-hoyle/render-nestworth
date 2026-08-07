@@ -1,9 +1,15 @@
 """General periodic amortization engine — a fixed payment against a balance, at any payment
-frequency, with three independent optional extra-payment types layered on top (recurring
-monthly-cadence, recurring yearly-cadence, and a single one-time extra). Backs the Mortgage,
-Amortization, and Mortgage Payoff calculators, which each need a different subset of this
-generality (Mortgage: no extras; Amortization: all three extras, monthly cadence only;
-Mortgage Payoff: either the extras or a plain accelerated-frequency payoff, never combined).
+frequency, with four independent optional extra-payment types layered on top: a recurring
+extra every single period (`extra_recurring` — e.g. an additional biweekly payment on top of a
+biweekly payoff schedule), a recurring extra roughly once a calendar month
+(`extra_monthly` — fires every `max(1, round(payments_per_year / 12))` periods, which
+collapses to "every period" at monthly cadence, matching this parameter's original monthly-only
+behavior), a recurring extra once a calendar year (`extra_yearly` — every `payments_per_year`
+periods), and a single one-time extra (`extra_one_time`). Backs the Mortgage, Amortization, and
+Mortgage Payoff calculators, which each need a different subset of this generality (Mortgage:
+no extras; Amortization: monthly cadence, `extra_monthly`/`extra_yearly`/`extra_one_time`;
+Mortgage Payoff: either those three on a monthly-cadence payoff, or all four — including
+`extra_recurring` — on a biweekly-cadence one).
 
 Kept separate from mortgage.py's original monthly_payment/_amortize (still used by Refinance
 and the House Affordability sizing math, neither of which needs extra payments or a
@@ -19,6 +25,8 @@ def amortize(
     annual_rate: Decimal,
     payment: Decimal,
     payments_per_year: int = 12,
+    extra_recurring: Decimal = Decimal(0),
+    extra_recurring_start_period: int = 1,
     extra_monthly: Decimal = Decimal(0),
     extra_monthly_start_period: int = 1,
     extra_yearly: Decimal = Decimal(0),
@@ -27,10 +35,9 @@ def amortize(
     extra_one_time_period: int | None = None,
 ) -> dict:
     """Simulates period-by-period until the balance reaches zero (or MAX_PERIODS is hit, in
-    which case the payment doesn't cover interest and payoff never completes). "Yearly" cadence
-    for extra_yearly means every `payments_per_year` periods, i.e. once per calendar year
-    regardless of how often regular payments are made."""
+    which case the payment doesn't cover interest and payoff never completes)."""
     r = annual_rate / payments_per_year
+    monthly_cadence_periods = max(1, round(payments_per_year / 12))
     period_balance = balance
     total_interest = Decimal(0)
     periods = []
@@ -42,7 +49,13 @@ def amortize(
         principal_payment = payment - interest
 
         extra = Decimal(0)
-        if extra_monthly > 0 and period >= extra_monthly_start_period:
+        if extra_recurring > 0 and period >= extra_recurring_start_period:
+            extra += extra_recurring
+        if (
+            extra_monthly > 0
+            and period >= extra_monthly_start_period
+            and (period - extra_monthly_start_period) % monthly_cadence_periods == 0
+        ):
             extra += extra_monthly
         if (
             extra_yearly > 0

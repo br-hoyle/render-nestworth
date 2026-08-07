@@ -81,91 +81,92 @@ def test_mortgage_down_payment_as_flat_amount():
 def test_amortization_matches_mortgage_payment_formula():
     # Same $200k/6%/30yr reference point as the mortgage-payment test above; the Amortization
     # Calculator's plain (no extras) case should reduce to the same amortization math.
-    result = amortization.compute(Decimal("200000"), Decimal("0.06"), 30)
+    result = amortization.compute(Decimal("200000"), Decimal("0.06"), 30, start_date=date(2024, 1, 1))
     assert abs(result["monthly_payment"] - Decimal("1199.10")) < Decimal("0.05")
     assert result["total_paid"] > Decimal("200000")
     assert result["yearly_schedule"][-1]["balance"] == Decimal("0.00")
+    assert result["payoff_date"] is not None
 
 
 def test_amortization_extra_payments_reduce_interest_and_term():
-    baseline = amortization.compute(Decimal("200000"), Decimal("0.06"), 30)
-    with_extra = amortization.compute(Decimal("200000"), Decimal("0.06"), 30, extra_monthly=Decimal("200"))
+    baseline = amortization.compute(Decimal("200000"), Decimal("0.06"), 30, start_date=date(2024, 1, 1))
+    with_extra = amortization.compute(
+        Decimal("200000"), Decimal("0.06"), 30, start_date=date(2024, 1, 1), extra_monthly=Decimal("200")
+    )
     assert with_extra["total_interest"] < baseline["total_interest"]
     assert with_extra["interest_saved"] > 0
     assert with_extra["months_saved"] > 0
 
 
 def test_amortization_combines_all_three_extra_payment_types():
-    only_monthly = amortization.compute(Decimal("200000"), Decimal("0.06"), 30, extra_monthly=Decimal("100"))
+    only_monthly = amortization.compute(
+        Decimal("200000"), Decimal("0.06"), 30, start_date=date(2024, 1, 1), extra_monthly=Decimal("100")
+    )
     all_three = amortization.compute(
         Decimal("200000"),
         Decimal("0.06"),
         30,
+        start_date=date(2024, 1, 1),
         extra_monthly=Decimal("100"),
         extra_yearly=Decimal("1000"),
-        extra_yearly_start_month=12,
+        extra_yearly_start_date=date(2025, 1, 1),
         extra_one_time=Decimal("5000"),
-        extra_one_time_month=6,
+        extra_one_time_date=date(2024, 7, 1),
     )
     assert all_three["total_interest"] < only_monthly["total_interest"]
 
 
-def test_mortgage_payoff_lump_sum_reports_remaining_interest_as_savings():
-    result = mortgage_payoff.compute(
-        original_principal=Decimal("300000"),
-        original_term_years=30,
-        annual_rate=Decimal("0.06"),
-        remaining_term_years=20,
-        remaining_term_months=0,
-        repayment_option="lump_sum",
-    )
-    assert result["payoff_amount_today"] > 0
-    assert result["interest_saved"] > 0
-    # A level payment rounded to the cent rarely zeroes the balance at exactly the nominal
-    # term (same rounding-straggler behavior as mortgage.py/amortization.py) — allow slack.
-    assert abs(result["months_saved"] - 20 * 12) <= 2
-
-
-def test_mortgage_payoff_biweekly_beats_normal():
-    normal = mortgage_payoff.compute(
-        original_principal=Decimal("300000"),
-        original_term_years=30,
-        annual_rate=Decimal("0.06"),
-        remaining_term_years=25,
-        remaining_term_months=0,
-        repayment_option="normal",
-    )
+def test_mortgage_payoff_biweekly_beats_extra_payments_baseline():
     biweekly = mortgage_payoff.compute(
         original_principal=Decimal("300000"),
         original_term_years=30,
         annual_rate=Decimal("0.06"),
+        start_date=date(2019, 1, 1),
         remaining_term_years=25,
         remaining_term_months=0,
         repayment_option="biweekly",
     )
-    assert biweekly["total_interest"] < normal["total_interest"]
-    assert biweekly["months_to_payoff"] < normal["months_to_payoff"]
+    assert biweekly["interest_saved"] > 0
+    assert biweekly["months_saved"] > 0
+    assert biweekly["payoff_date"] is not None
 
 
-def test_mortgage_payoff_extra_payments_beats_normal():
-    normal = mortgage_payoff.compute(
-        original_principal=Decimal("300000"),
-        original_term_years=30,
-        annual_rate=Decimal("0.06"),
-        remaining_term_years=25,
-        remaining_term_months=0,
-        repayment_option="normal",
-    )
+def test_mortgage_payoff_extra_payments_beats_baseline():
     with_extra = mortgage_payoff.compute(
         original_principal=Decimal("300000"),
         original_term_years=30,
         annual_rate=Decimal("0.06"),
+        start_date=date(2019, 1, 1),
         remaining_term_years=25,
         remaining_term_months=0,
         repayment_option="extra_payments",
         extra_monthly=Decimal("300"),
     )
-    assert with_extra["total_interest"] < normal["total_interest"]
+    assert with_extra["interest_saved"] > 0
+    assert with_extra["months_saved"] > 0
+
+
+def test_mortgage_payoff_biweekly_extra_biweekly_beats_plain_biweekly():
+    plain = mortgage_payoff.compute(
+        original_principal=Decimal("300000"),
+        original_term_years=30,
+        annual_rate=Decimal("0.06"),
+        start_date=date(2019, 1, 1),
+        remaining_term_years=25,
+        remaining_term_months=0,
+        repayment_option="biweekly",
+    )
+    with_extra = mortgage_payoff.compute(
+        original_principal=Decimal("300000"),
+        original_term_years=30,
+        annual_rate=Decimal("0.06"),
+        start_date=date(2019, 1, 1),
+        remaining_term_years=25,
+        remaining_term_months=0,
+        repayment_option="biweekly",
+        extra_biweekly=Decimal("50"),
+    )
+    assert with_extra["total_interest"] < plain["total_interest"]
 
 
 def test_amortize_engine_no_payoff_within_cap_returns_none():
@@ -183,12 +184,27 @@ def test_house_affordability_income_to_debt_back_end_binding():
         down_payment_is_percent=True,
         annual_rate=Decimal("0.065"),
         term_years=30,
-        hoa_value=Decimal("400"),
-        hoa_is_percent=False,
+        hoa_fees_value=Decimal("400"),
+        hoa_fees_is_percent=False,
         dti_preset="conventional",
     )
     assert result["max_price"] > 0
     assert result["back_end_dti"] <= Decimal("36.1")
+    assert result["monthly_escrow"]["pmi"] == Decimal("0.00")  # 20% down clears the PMI threshold
+
+
+def test_house_affordability_income_to_debt_applies_pmi_under_20pct_down():
+    result = house_affordability.compute(
+        mode="income-to-debt",
+        annual_income=Decimal("120000"),
+        monthly_debts=Decimal("500"),
+        down_payment_value=Decimal("0.10"),
+        down_payment_is_percent=True,
+        pmi_value=Decimal("0.006"),
+        pmi_is_percent=True,
+        dti_preset="conventional",
+    )
+    assert result["monthly_escrow"]["pmi"] > Decimal("0.00")
 
 
 def test_house_affordability_dti_presets_change_max_price():
@@ -210,7 +226,8 @@ def test_house_affordability_fixed_budget_mode():
         annual_rate=Decimal("0.065"),
         down_payment_value=Decimal("0.20"),
         down_payment_is_percent=True,
-        maintenance_monthly=Decimal("100"),
+        other_costs_value=Decimal("100"),
+        other_costs_is_percent=False,
     )
     assert result["max_price"] > 0
     assert result["monthly_piti"] <= Decimal("2500.01")
@@ -674,22 +691,23 @@ def _rent_vs_buy_inputs(**overrides):
         home_price=Decimal("400000"),
         down_payment_value=Decimal("0.20"),
         down_payment_is_percent=True,
+        closing_costs_value=Decimal("0.03"),
+        closing_costs_is_percent=True,
         annual_rate=Decimal("0.065"),
         loan_term_years=30,
-        closing_costs_pct=Decimal("0.03"),
         property_tax_pct=Decimal("0.012"),
-        property_tax_increase_pct=Decimal("0.02"),
         home_insurance_pct=Decimal("0.005"),
+        pmi_pct=Decimal("0.006"),
         hoa_fees_pct=Decimal(0),
-        maintenance_pct=Decimal("0.01"),
+        other_costs_pct=Decimal("0.01"),
         home_appreciation_pct=Decimal("0.03"),
-        costs_increase_pct=Decimal("0.02"),
         selling_closing_costs_pct=Decimal("0.06"),
         monthly_rent=Decimal("2000"),
-        rental_increase_pct=Decimal("0.03"),
-        renters_insurance_annual=Decimal("180"),
         security_deposit=Decimal("2000"),
         rent_upfront_cost=Decimal(0),
+        rental_increase_pct=Decimal("0.03"),
+        renters_insurance_value=Decimal("0.01"),
+        renters_insurance_is_percent=True,
         avg_investment_return=Decimal("0.07"),
         marginal_federal_rate=Decimal("0.22"),
         marginal_state_rate=Decimal("0.05"),
@@ -722,3 +740,16 @@ def test_rent_vs_buy_expensive_rent_favors_buying():
 def test_rent_vs_buy_down_payment_cant_exceed_price():
     result = rent_vs_buy.compute(**_rent_vs_buy_inputs(down_payment_value=Decimal("1.5")))
     assert "error" in result
+
+
+def test_rent_vs_buy_low_down_payment_costs_more_via_pmi():
+    with_pmi = rent_vs_buy.compute(**_rent_vs_buy_inputs(down_payment_value=Decimal("0.10")))
+    without_pmi = rent_vs_buy.compute(**_rent_vs_buy_inputs(down_payment_value=Decimal("0.10"), pmi_pct=Decimal(0)))
+    assert with_pmi["advantage_of_renting"] > without_pmi["advantage_of_renting"]
+
+
+def test_rent_vs_buy_schedule_tracks_cumulative_costs():
+    result = rent_vs_buy.compute(**_rent_vs_buy_inputs())
+    first, last = result["schedule"][0], result["schedule"][-1]
+    assert last["cumulative_buy_cost"] > first["cumulative_buy_cost"]
+    assert last["cumulative_rent_cost"] > first["cumulative_rent_cost"]

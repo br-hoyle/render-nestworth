@@ -13,7 +13,12 @@ import {
   CalcButton,
   CalcCopy,
   CalcLayout,
-  CalcFieldGrid,
+  CalcRow,
+  CalcCol,
+  CalcOptionalSection,
+  CalcAnswer,
+  CalcViewToggle,
+  ScheduleTable,
   CalcEmptyState,
 } from "@/components/calculators/shared";
 import { TextField } from "@/components/ui/TextField";
@@ -33,7 +38,7 @@ interface Result {
   payoff_date: string;
   total_interest: string;
   total_paid: string;
-  yearly_schedule: { year: number; balance: number }[];
+  yearly_schedule: { year: number; principal: number; interest: number; balance: number }[];
   error?: string;
 }
 
@@ -47,7 +52,7 @@ function YearlyBalanceChart({ data }: { data: { year: number; balance: number }[
           <XAxis dataKey="year" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
           <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={70} tickFormatter={(v) => money(v)} />
           <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
-          <Line type="monotone" dataKey="balance" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="balance" name="Balance" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -67,6 +72,7 @@ export function MortgageCalculator() {
   const [otherCosts, setOtherCosts] = useState<AmountOrPercent>({ value: 0, isPercent: false });
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"chart" | "table">("chart");
 
   function calculate() {
     setLoading(true);
@@ -94,44 +100,63 @@ export function MortgageCalculator() {
       .finally(() => setLoading(false));
   }
 
-  const schedule = (result?.yearly_schedule ?? []).map((s) => ({ year: s.year, balance: Number(s.balance) }));
+  const schedule = result?.yearly_schedule ?? [];
+  const chartData = schedule.map((s) => ({ year: s.year, balance: Number(s.balance) }));
 
-  const inputs = (
+  const inputsPanel = (
     <>
-      <CalcFieldGrid>
-        <NumField label="Home Price" prefix="$" value={homePrice} onChange={setHomePrice} />
-        <NumField label="Loan Term (Years)" value={termYears} onChange={setTermYears} />
-        <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
-        <div className="sm:col-span-2 xl:col-span-3">
+      <CalcRow>
+        <CalcCol>
+          <NumField label="Home Price" prefix="$" value={homePrice} onChange={setHomePrice} />
+        </CalcCol>
+        <CalcCol>
+          <AmountOrPercentField label="Down Payment" value={downPayment} onChange={setDownPayment} />
+        </CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol>
+          <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
+        </CalcCol>
+        <CalcCol>
           <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        </CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol>
+          <NumField label="Loan Term (Years)" value={termYears} onChange={setTermYears} />
+        </CalcCol>
+      </CalcRow>
+      <CalcOptionalSection>
+        <div className="flex flex-col gap-3 max-w-xs">
+          <AmountOrPercentField label="Property Tax (per year)" value={propertyTax} onChange={setPropertyTax} />
+          <AmountOrPercentField label="Home Insurance (per year)" value={homeInsurance} onChange={setHomeInsurance} />
+          <AmountOrPercentField
+            label="PMI Insurance (per year)"
+            value={pmi}
+            onChange={setPmi}
+            helper="Only applied if the down payment is under 20% of the home price."
+          />
+          <AmountOrPercentField label="HOA Fees (per year)" value={hoaFees} onChange={setHoaFees} />
+          <AmountOrPercentField label="Other Costs (per year)" value={otherCosts} onChange={setOtherCosts} />
         </div>
-      </CalcFieldGrid>
-      <CalcFieldGrid>
-        <AmountOrPercentField label="Down Payment" value={downPayment} onChange={setDownPayment} />
-        <AmountOrPercentField label="Property Tax (per year)" value={propertyTax} onChange={setPropertyTax} />
-        <AmountOrPercentField label="Home Insurance (per year)" value={homeInsurance} onChange={setHomeInsurance} />
-        <AmountOrPercentField
-          label="PMI Insurance (per year)"
-          value={pmi}
-          onChange={setPmi}
-          helper="Only applied if the down payment is under 20% of the home price."
-        />
-        <AmountOrPercentField label="HOA Fees (per year)" value={hoaFees} onChange={setHoaFees} />
-        <AmountOrPercentField label="Other Costs (per year)" value={otherCosts} onChange={setOtherCosts} />
-      </CalcFieldGrid>
+      </CalcOptionalSection>
       <div className="pt-1">
         <CalcButton onClick={calculate} loading={loading} />
       </div>
     </>
   );
 
-  const results =
+  const resultsPanel =
     result === null ? (
       <CalcEmptyState />
     ) : result.error ? (
       <p className="text-xs text-nw-coral">{result.error}</p>
     ) : (
       <div className="flex flex-col gap-3">
+        <CalcAnswer>
+          This home costs {fmtMoney(result.total_monthly_payment)}/mo all-in — {fmtMoney(result.monthly_pi)} principal &amp; interest, plus
+          taxes/insurance/fees — and pays off {result.payoff_date}.
+        </CalcAnswer>
         <div className="flex flex-wrap gap-2">
           <ResultTile label="Total Monthly Payment" value={fmtMoney(result.total_monthly_payment)} />
           <ResultTile label="Principal & Interest" value={fmtMoney(result.monthly_pi)} />
@@ -149,7 +174,20 @@ export function MortgageCalculator() {
             <span>Other: {fmtMoney(result.monthly_escrow.other_costs)}</span>
           </div>
         </div>
-        <YearlyBalanceChart data={schedule} />
+        <CalcViewToggle view={view} onChange={setView} />
+        {view === "chart" ? (
+          <YearlyBalanceChart data={chartData} />
+        ) : (
+          <ScheduleTable
+            rows={schedule}
+            columns={[
+              { key: "year", label: "Year" },
+              { key: "principal", label: "Principal Paid", format: "money" },
+              { key: "interest", label: "Interest Paid", format: "money" },
+              { key: "balance", label: "Balance", format: "money" },
+            ]}
+          />
+        )}
       </div>
     );
 
@@ -159,7 +197,7 @@ export function MortgageCalculator() {
         title="Mortgage Calculator"
         description="The full monthly cost of owning this home — principal & interest, plus property tax, insurance, PMI, HOA, and any other recurring costs. Each cost can be entered as a flat yearly dollar amount or as a percentage of the home price."
       />
-      <CalcLayout inputs={inputs} results={results} />
+      <CalcLayout inputs={inputsPanel} results={resultsPanel} />
     </div>
   );
 }

@@ -13,7 +13,10 @@ import {
   CalcCopy,
   CalcTabs,
   CalcLayout,
-  CalcFieldGrid,
+  CalcRow,
+  CalcCol,
+  CalcOptionalSection,
+  CalcAnswer,
   CalcEmptyState,
 } from "@/components/calculators/shared";
 import { Button } from "@/components/ui/Button";
@@ -27,8 +30,9 @@ const TABS: { key: Mode; label: string }[] = [
 ];
 
 const MODE_COPY: Record<Mode, string> = {
-  "income-to-debt": "Estimate an affordable home price from your income, other debts, and a debt-to-income ratio.",
-  "fixed-budget": "Estimate an affordable home price from a fixed total monthly housing budget instead — no income needed.",
+  "income-to-debt":
+    "Estimate an affordable home price from your income, other debts, and a debt-to-income ratio — the front-end/back-end ratio approach lenders actually use to qualify a mortgage.",
+  "fixed-budget": "Estimate an affordable home price from a fixed total monthly housing budget instead — no income or debt-to-income ratio needed.",
 };
 
 const DTI_OPTIONS: { value: DtiPreset; label: string }[] = [
@@ -43,9 +47,14 @@ interface Result {
   loan_amount: string;
   down_payment_amount: string;
   monthly_pi: string;
-  monthly_escrow: string;
+  monthly_escrow: {
+    property_tax: string;
+    home_insurance: string;
+    pmi: string;
+    hoa_fees: string;
+    other_costs: string;
+  };
   monthly_piti: string;
-  monthly_maintenance?: string;
   front_end_dti?: string | null;
   back_end_dti?: string | null;
 }
@@ -59,14 +68,15 @@ export function HouseAffordabilityCalculator() {
   const [customBackEndRatio, setCustomBackEndRatio] = useState(0.36);
 
   const [monthlyBudget, setMonthlyBudget] = useState(2500);
-  const [maintenanceMonthly, setMaintenanceMonthly] = useState(100);
 
   const [termYears, setTermYears] = useState(30);
   const [annualRate, setAnnualRate] = useState(0.065);
   const [downPayment, setDownPayment] = useState<AmountOrPercent>({ value: 0.2, isPercent: true });
   const [propertyTax, setPropertyTax] = useState<AmountOrPercent>({ value: 0.012, isPercent: true });
-  const [hoa, setHoa] = useState<AmountOrPercent>({ value: 0, isPercent: false });
-  const [insurance, setInsurance] = useState<AmountOrPercent>({ value: 0.005, isPercent: true });
+  const [homeInsurance, setHomeInsurance] = useState<AmountOrPercent>({ value: 0.005, isPercent: true });
+  const [pmi, setPmi] = useState<AmountOrPercent>({ value: 0.006, isPercent: true });
+  const [hoaFees, setHoaFees] = useState<AmountOrPercent>({ value: 0, isPercent: false });
+  const [otherCosts, setOtherCosts] = useState<AmountOrPercent>({ value: 0, isPercent: false });
 
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
@@ -85,13 +95,16 @@ export function HouseAffordabilityCalculator() {
         down_payment_is_percent: downPayment.isPercent,
         property_tax_value: propertyTax.value,
         property_tax_is_percent: propertyTax.isPercent,
-        hoa_value: hoa.value,
-        hoa_is_percent: hoa.isPercent,
-        insurance_value: insurance.value,
-        insurance_is_percent: insurance.isPercent,
+        home_insurance_value: homeInsurance.value,
+        home_insurance_is_percent: homeInsurance.isPercent,
+        pmi_value: pmi.value,
+        pmi_is_percent: pmi.isPercent,
+        hoa_fees_value: hoaFees.value,
+        hoa_fees_is_percent: hoaFees.isPercent,
+        other_costs_value: otherCosts.value,
+        other_costs_is_percent: otherCosts.isPercent,
         dti_preset: dtiPreset,
         custom_back_end_ratio: customBackEndRatio,
-        maintenance_monthly: maintenanceMonthly,
       })
       .then(setResult)
       .catch(() => setResult(null))
@@ -112,35 +125,65 @@ export function HouseAffordabilityCalculator() {
     setResult(null);
   }
 
-  const sharedFields = (
-    <CalcFieldGrid>
-      <NumField label="Loan Term (Years)" value={termYears} onChange={setTermYears} />
-      <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
-      <AmountOrPercentField label="Down Payment" value={downPayment} onChange={setDownPayment} />
-      <AmountOrPercentField label="Property Tax (per year)" value={propertyTax} onChange={setPropertyTax} />
-      <AmountOrPercentField label="HOA (per year)" value={hoa} onChange={setHoa} />
-      <AmountOrPercentField label="Insurance (per year)" value={insurance} onChange={setInsurance} />
-    </CalcFieldGrid>
+  const optionalCostFields = (
+    <CalcOptionalSection>
+      <div className="flex flex-col gap-3 max-w-xs">
+        <AmountOrPercentField label="Property Tax (per year)" value={propertyTax} onChange={setPropertyTax} />
+        <AmountOrPercentField label="Home Insurance (per year)" value={homeInsurance} onChange={setHomeInsurance} />
+        <AmountOrPercentField
+          label="PMI Insurance (per year)"
+          value={pmi}
+          onChange={setPmi}
+          helper="Only applied if the down payment is under 20% of the max price."
+        />
+        <AmountOrPercentField label="HOA Fees (per year)" value={hoaFees} onChange={setHoaFees} />
+        <AmountOrPercentField label="Other Costs (per year)" value={otherCosts} onChange={setOtherCosts} />
+      </div>
+    </CalcOptionalSection>
   );
 
-  const inputs = (
+  const inputsPanel = (
     <>
       {mode === "income-to-debt" ? (
-        <CalcFieldGrid>
-          <NumField label="Annual Income" prefix="$" value={annualIncome} onChange={setAnnualIncome} />
-          <NumField label="Monthly Debt Payback" prefix="$" value={monthlyDebts} onChange={setMonthlyDebts} />
-          <SelectField label="Debt-to-Income Ratio" value={dtiPreset} onChange={setDtiPreset} options={DTI_OPTIONS} />
-          {dtiPreset === "custom" && (
-            <NumField label="Custom Back-End Ratio" percent value={customBackEndRatio} onChange={setCustomBackEndRatio} />
-          )}
-        </CalcFieldGrid>
+        <>
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Annual Income" prefix="$" value={annualIncome} onChange={setAnnualIncome} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label="Monthly Debt Obligations" prefix="$" value={monthlyDebts} onChange={setMonthlyDebts} />
+            </CalcCol>
+          </CalcRow>
+          <CalcRow>
+            <CalcCol>
+              <SelectField label="Debt-to-Income Ratio" value={dtiPreset} onChange={setDtiPreset} options={DTI_OPTIONS} />
+            </CalcCol>
+            {dtiPreset === "custom" && (
+              <CalcCol>
+                <NumField label="Custom Back-End Ratio" percent value={customBackEndRatio} onChange={setCustomBackEndRatio} />
+              </CalcCol>
+            )}
+          </CalcRow>
+        </>
       ) : (
-        <CalcFieldGrid>
-          <NumField label="Monthly Budget for House" prefix="$" value={monthlyBudget} onChange={setMonthlyBudget} />
-          <NumField label="Maintenance ($/month)" prefix="$" value={maintenanceMonthly} onChange={setMaintenanceMonthly} />
-        </CalcFieldGrid>
+        <CalcRow>
+          <CalcCol>
+            <NumField label="Mortgage Budget" prefix="$" value={monthlyBudget} onChange={setMonthlyBudget} />
+          </CalcCol>
+        </CalcRow>
       )}
-      {sharedFields}
+      <CalcRow>
+        <CalcCol>
+          <AmountOrPercentField label="Down Payment" value={downPayment} onChange={setDownPayment} />
+        </CalcCol>
+        <CalcCol>
+          <NumField label="Loan Term (Years)" value={termYears} onChange={setTermYears} />
+        </CalcCol>
+        <CalcCol>
+          <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
+        </CalcCol>
+      </CalcRow>
+      {optionalCostFields}
       <div className="flex flex-col gap-2 pt-1">
         <CalcButton onClick={() => calculate()} loading={loading} />
         {mode === "income-to-debt" && <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>}
@@ -148,20 +191,34 @@ export function HouseAffordabilityCalculator() {
     </>
   );
 
-  const results =
+  const resultsPanel =
     result === null ? (
       <CalcEmptyState />
     ) : (
-      <div className="flex flex-wrap gap-2">
-        <ResultTile label="Max Home Price" value={fmtMoney(result.max_price)} />
-        <ResultTile label="Loan Amount" value={fmtMoney(result.loan_amount)} />
-        <ResultTile label="Down Payment" value={fmtMoney(result.down_payment_amount)} />
-        <ResultTile label="Monthly P&I" value={fmtMoney(result.monthly_pi)} />
-        <ResultTile label="Monthly Escrow" value={fmtMoney(result.monthly_escrow)} />
-        {result.monthly_maintenance != null && <ResultTile label="Monthly Maintenance" value={fmtMoney(result.monthly_maintenance)} />}
-        <ResultTile label="Total Monthly (PITI)" value={fmtMoney(result.monthly_piti)} />
-        {result.front_end_dti != null && <ResultTile label="Front-End DTI" value={`${result.front_end_dti}%`} />}
-        {result.back_end_dti != null && <ResultTile label="Back-End DTI" value={`${result.back_end_dti}%`} />}
+      <div className="flex flex-col gap-3">
+        <CalcAnswer>
+          Based on these numbers, you can afford a home around {fmtMoney(result.max_price)} — a {fmtMoney(result.loan_amount)} loan at{" "}
+          {fmtMoney(result.monthly_piti)}/mo (principal, interest, taxes &amp; insurance).
+        </CalcAnswer>
+        <div className="flex flex-wrap gap-2">
+          <ResultTile label="Max Home Price" value={fmtMoney(result.max_price)} />
+          <ResultTile label="Loan Amount" value={fmtMoney(result.loan_amount)} />
+          <ResultTile label="Down Payment" value={fmtMoney(result.down_payment_amount)} />
+          <ResultTile label="Monthly P&I" value={fmtMoney(result.monthly_pi)} />
+          <ResultTile label="Total Monthly (PITI)" value={fmtMoney(result.monthly_piti)} />
+          {result.front_end_dti != null && <ResultTile label="Front-End DTI" value={`${result.front_end_dti}%`} />}
+          {result.back_end_dti != null && <ResultTile label="Back-End DTI" value={`${result.back_end_dti}%`} />}
+        </div>
+        <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
+          <div className="text-[10px] uppercase tracking-wide text-nw-muted mb-1.5">Monthly Escrow Breakdown</div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+            <span>Property tax: {fmtMoney(result.monthly_escrow.property_tax)}</span>
+            <span>Home insurance: {fmtMoney(result.monthly_escrow.home_insurance)}</span>
+            <span>PMI: {fmtMoney(result.monthly_escrow.pmi)}</span>
+            <span>HOA: {fmtMoney(result.monthly_escrow.hoa_fees)}</span>
+            <span>Other: {fmtMoney(result.monthly_escrow.other_costs)}</span>
+          </div>
+        </div>
       </div>
     );
 
@@ -169,7 +226,7 @@ export function HouseAffordabilityCalculator() {
     <div className="flex flex-col gap-4">
       <CalcCopy title="House Affordability Calculator" description={MODE_COPY[mode]} />
       <CalcTabs tabs={TABS} active={mode} onChange={switchMode} />
-      <CalcLayout inputs={inputs} results={results} />
+      <CalcLayout inputs={inputsPanel} results={resultsPanel} />
     </div>
   );
 }

@@ -4,35 +4,47 @@ import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
-import { NumField, ResultTile, fmtMoney, CalcButton, CalcCopy, CalcTabs, CalcLayout, CalcFieldGrid, CalcEmptyState } from "@/components/calculators/shared";
+import {
+  NumField,
+  ResultTile,
+  fmtMoney,
+  CalcButton,
+  CalcCopy,
+  CalcTabs,
+  CalcLayout,
+  CalcRow,
+  CalcCol,
+  CalcAnswer,
+  CalcViewToggle,
+  ScheduleTable,
+  CalcEmptyState,
+} from "@/components/calculators/shared";
+import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
 
-type RepaymentOption = "lump_sum" | "extra_payments" | "biweekly" | "normal";
+type RepaymentOption = "extra_payments" | "biweekly";
 
 const TABS: { key: RepaymentOption; label: string }[] = [
-  { key: "normal", label: "Normal Repayment" },
   { key: "extra_payments", label: "Extra Payments" },
-  { key: "biweekly", label: "Biweekly Repayment" },
-  { key: "lump_sum", label: "Pay Off Altogether" },
+  { key: "biweekly", label: "Bi-Weekly Payment" },
 ];
 
 const MODE_COPY: Record<RepaymentOption, string> = {
-  normal: "Continue paying this loan exactly on its original schedule — the baseline every other option is compared against.",
   extra_payments: "Continue at the original payment, plus an extra monthly, yearly, and/or one-time payment.",
-  biweekly: "Pay half the monthly payment every two weeks instead — 26 payments a year, the equivalent of 13 monthly payments.",
-  lump_sum: "Pay off the remaining balance today — no more interest accrues from this point on.",
+  biweekly:
+    "Pay half the monthly payment every two weeks instead — 26 payments a year, the equivalent of 13 monthly payments — optionally with its own extra payments layered on top.",
 };
 
 interface Result {
   error?: string;
   current_balance: string;
-  payoff_amount_today?: string;
-  months_to_payoff?: number | null;
-  years_to_payoff?: string | null;
-  total_interest?: string;
+  months_to_payoff: number | null;
+  years_to_payoff: string | null;
+  payoff_date: string | null;
+  total_interest: string;
   interest_saved: string;
   months_saved: number | null;
-  yearly_schedule: { year: number; balance: number }[];
+  yearly_schedule: { year: number; principal: number; interest: number; balance: number }[];
 }
 
 function YearlyBalanceChart({ data }: { data: { year: number; balance: number }[] }) {
@@ -45,26 +57,33 @@ function YearlyBalanceChart({ data }: { data: { year: number; balance: number }[
           <XAxis dataKey="year" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
           <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={70} tickFormatter={(v) => money(v)} />
           <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
-          <Line type="monotone" dataKey="balance" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="balance" name="Balance" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
+const TODAY = new Date().toISOString().slice(0, 10);
+
 export function MortgagePayoffCalculator() {
-  const [option, setOption] = useState<RepaymentOption>("normal");
+  const [option, setOption] = useState<RepaymentOption>("extra_payments");
   const [originalPrincipal, setOriginalPrincipal] = useState(300000);
+  const [startDate, setStartDate] = useState(TODAY);
   const [originalTermYears, setOriginalTermYears] = useState(30);
   const [annualRate, setAnnualRate] = useState(0.065);
   const [remainingTermYears, setRemainingTermYears] = useState(25);
-  const [remainingTermMonths, setRemainingTermMonths] = useState(0);
   const [extraMonthly, setExtraMonthly] = useState(0);
+  const [extraMonthlyStartDate, setExtraMonthlyStartDate] = useState(TODAY);
   const [extraYearly, setExtraYearly] = useState(0);
+  const [extraYearlyStartDate, setExtraYearlyStartDate] = useState(TODAY);
   const [extraOneTime, setExtraOneTime] = useState(0);
-  const [extraOneTimeMonth, setExtraOneTimeMonth] = useState(12);
+  const [extraOneTimeDate, setExtraOneTimeDate] = useState(TODAY);
+  const [extraBiweekly, setExtraBiweekly] = useState(0);
+  const [extraBiweeklyStartDate, setExtraBiweeklyStartDate] = useState(TODAY);
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"chart" | "table">("chart");
 
   function calculate(overridePrincipal = originalPrincipal) {
     setLoading(true);
@@ -73,13 +92,17 @@ export function MortgagePayoffCalculator() {
         original_principal: overridePrincipal,
         original_term_years: originalTermYears,
         annual_rate: annualRate,
+        start_date: startDate,
         remaining_term_years: remainingTermYears,
-        remaining_term_months: remainingTermMonths,
         repayment_option: option,
         extra_monthly: extraMonthly,
+        extra_monthly_start_date: extraMonthlyStartDate,
         extra_yearly: extraYearly,
+        extra_yearly_start_date: extraYearlyStartDate,
         extra_one_time: extraOneTime,
-        extra_one_time_month: extraOneTimeMonth,
+        extra_one_time_date: extraOneTimeDate,
+        extra_biweekly: extraBiweekly,
+        extra_biweekly_start_date: extraBiweeklyStartDate,
       })
       .then(setResult)
       .catch(() => setResult(null))
@@ -100,25 +123,88 @@ export function MortgagePayoffCalculator() {
     setResult(null);
   }
 
-  const schedule = (result?.yearly_schedule ?? []).map((s) => ({ year: s.year, balance: Number(s.balance) }));
+  const schedule = result?.yearly_schedule ?? [];
+  const chartData = schedule.map((s) => ({ year: s.year, balance: Number(s.balance) }));
 
-  const inputs = (
+  const inputsPanel = (
     <>
-      <CalcFieldGrid>
-        <NumField label="Original Loan Amount" prefix="$" value={originalPrincipal} onChange={setOriginalPrincipal} />
-        <NumField label="Original Term (Years)" value={originalTermYears} onChange={setOriginalTermYears} />
-        <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
-        <NumField label="Remaining Term (Years)" value={remainingTermYears} onChange={setRemainingTermYears} />
-        <NumField label="Remaining Term (Extra Months)" value={remainingTermMonths} onChange={setRemainingTermMonths} />
-      </CalcFieldGrid>
-      {option === "extra_payments" && (
-        <CalcFieldGrid>
-          <NumField label="Extra Monthly" prefix="$" value={extraMonthly} onChange={setExtraMonthly} />
-          <NumField label="Extra Yearly" prefix="$" value={extraYearly} onChange={setExtraYearly} />
-          <NumField label="Extra One-Time" prefix="$" value={extraOneTime} onChange={setExtraOneTime} />
-          <NumField label="Extra One-Time Month #" value={extraOneTimeMonth} onChange={setExtraOneTimeMonth} />
-        </CalcFieldGrid>
+      {option === "extra_payments" ? (
+        <>
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Loan Amount" prefix="$" value={originalPrincipal} onChange={setOriginalPrincipal} />
+            </CalcCol>
+            <CalcCol>
+              <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
+            </CalcCol>
+          </CalcRow>
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Original Loan Term" value={originalTermYears} onChange={setOriginalTermYears} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label="Remaining Term (Years)" value={remainingTermYears} onChange={setRemainingTermYears} />
+            </CalcCol>
+          </CalcRow>
+        </>
+      ) : (
+        <>
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Loan Amount" prefix="$" value={originalPrincipal} onChange={setOriginalPrincipal} />
+            </CalcCol>
+            <CalcCol>
+              <TextField label="Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </CalcCol>
+          </CalcRow>
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Original Loan Term" value={originalTermYears} onChange={setOriginalTermYears} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label="Remaining Term (Years)" value={remainingTermYears} onChange={setRemainingTermYears} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label="Interest Rate" percent value={annualRate} onChange={setAnnualRate} />
+            </CalcCol>
+          </CalcRow>
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Extra Bi-Weekly" prefix="$" value={extraBiweekly} onChange={setExtraBiweekly} />
+            </CalcCol>
+            <CalcCol>
+              <TextField label="Start At" type="date" value={extraBiweeklyStartDate} onChange={(e) => setExtraBiweeklyStartDate(e.target.value)} />
+            </CalcCol>
+          </CalcRow>
+        </>
       )}
+      <CalcRow>
+        <CalcCol>
+          <NumField label="Extra Monthly" prefix="$" value={extraMonthly} onChange={setExtraMonthly} />
+        </CalcCol>
+        <CalcCol>
+          <TextField label="Start At" type="date" value={extraMonthlyStartDate} onChange={(e) => setExtraMonthlyStartDate(e.target.value)} />
+        </CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol>
+          <NumField label="Extra Yearly" prefix="$" value={extraYearly} onChange={setExtraYearly} />
+        </CalcCol>
+        <CalcCol>
+          <TextField label="Start At" type="date" value={extraYearlyStartDate} onChange={(e) => setExtraYearlyStartDate(e.target.value)} />
+        </CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol>
+          <NumField label="Extra One-Time" prefix="$" value={extraOneTime} onChange={setExtraOneTime} />
+        </CalcCol>
+        <CalcCol>
+          <TextField label="Payment Date" type="date" value={extraOneTimeDate} onChange={(e) => setExtraOneTimeDate(e.target.value)} />
+        </CalcCol>
+      </CalcRow>
       <div className="flex flex-col gap-2 pt-1">
         <CalcButton onClick={() => calculate()} loading={loading} />
         <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
@@ -127,30 +213,43 @@ export function MortgagePayoffCalculator() {
     </>
   );
 
-  const results =
+  const resultsPanel =
     result === null ? (
       <CalcEmptyState />
     ) : result.error ? (
       <p className="text-xs text-nw-coral">{result.error}</p>
     ) : (
       <div className="flex flex-col gap-3">
+        <CalcAnswer>
+          {result.months_saved && result.months_saved > 0
+            ? `This pays off ${result.months_saved} months earlier than your original schedule, saving ${fmtMoney(result.interest_saved)} in interest.`
+            : `Payoff in ${result.months_to_payoff} months (${result.years_to_payoff} years), on ${result.payoff_date}.`}
+        </CalcAnswer>
         <div className="flex flex-wrap gap-2">
           <ResultTile label="Current Balance" value={fmtMoney(result.current_balance)} />
-          {option === "lump_sum" ? (
-            <ResultTile label="Payoff Amount Today" value={fmtMoney(result.payoff_amount_today)} />
-          ) : (
-            <>
-              <ResultTile
-                label="Payoff Time"
-                value={result.months_to_payoff != null ? `${result.months_to_payoff} mo (${result.years_to_payoff} yr)` : "—"}
-              />
-              <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
-            </>
-          )}
-          <ResultTile label="Interest Saved vs. Normal" value={fmtMoney(result.interest_saved)} />
-          <ResultTile label="Time Saved vs. Normal" value={result.months_saved != null ? `${result.months_saved} mo` : "—"} />
+          <ResultTile
+            label="Payoff Time"
+            value={result.months_to_payoff != null ? `${result.months_to_payoff} mo (${result.years_to_payoff} yr)` : "—"}
+          />
+          <ResultTile label="Payoff Date" value={result.payoff_date ?? "—"} />
+          <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
+          <ResultTile label="Interest Saved vs. Original" value={fmtMoney(result.interest_saved)} />
+          <ResultTile label="Time Saved vs. Original" value={result.months_saved != null ? `${result.months_saved} mo` : "—"} />
         </div>
-        <YearlyBalanceChart data={schedule} />
+        <CalcViewToggle view={view} onChange={setView} />
+        {view === "chart" ? (
+          <YearlyBalanceChart data={chartData} />
+        ) : (
+          <ScheduleTable
+            rows={schedule}
+            columns={[
+              { key: "year", label: "Year" },
+              { key: "principal", label: "Principal Paid", format: "money" },
+              { key: "interest", label: "Interest Paid", format: "money" },
+              { key: "balance", label: "Balance", format: "money" },
+            ]}
+          />
+        )}
       </div>
     );
 
@@ -158,7 +257,7 @@ export function MortgagePayoffCalculator() {
     <div className="flex flex-col gap-4">
       <CalcCopy title="Mortgage Payoff Calculator" description={MODE_COPY[option]} />
       <CalcTabs tabs={TABS} active={option} onChange={switchOption} />
-      <CalcLayout inputs={inputs} results={results} />
+      <CalcLayout inputs={inputsPanel} results={resultsPanel} />
     </div>
   );
 }

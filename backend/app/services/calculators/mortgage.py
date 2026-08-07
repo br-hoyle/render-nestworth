@@ -10,14 +10,15 @@ auto-cancelling once paydown reaches 20% equity: the spec's PMI input is a flat 
 no cancellation rule specified, so this keeps the assumption simple and explicit rather than
 adding unrequested behavior.
 
-`monthly_payment` and `_add_months` are also imported directly by refinance.py and
-debt_consolidation.py — kept at their original names/signatures for that reason."""
+`monthly_payment` is also imported directly by refinance.py and debt_consolidation.py — kept
+at its original name/signature for that reason."""
 
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 from app.services.calculators._amortization import amortize
 from app.services.calculators._costs import resolve_annual
+from app.services.calculators._dates import add_months
 
 PMI_REQUIRED_BELOW_DOWN_PAYMENT_PCT = Decimal("0.20")
 
@@ -29,13 +30,6 @@ def monthly_payment(principal: Decimal, annual_rate: Decimal, term_years: int) -
     r = annual_rate / 12
     payment = principal * r * (1 + r) ** n / ((1 + r) ** n - 1)
     return payment.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
-def _add_months(d: date, months: int) -> date:
-    month_index = d.month - 1 + months
-    year = d.year + month_index // 12
-    month = month_index % 12 + 1
-    return date(year, month, min(d.day, 28))
 
 
 def compute(
@@ -67,7 +61,7 @@ def compute(
     payment = monthly_payment(loan_amount, annual_rate, term_years)
     result = amortize(loan_amount, annual_rate, payment, payments_per_year=12)
     months = result["periods_to_payoff"] or term_years * 12
-    payoff_date = _add_months(start_date, months)
+    payoff_date = add_months(start_date, months)
 
     annual_property_tax = resolve_annual(property_tax_value, property_tax_is_percent, home_price)
     annual_home_insurance = resolve_annual(home_insurance_value, home_insurance_is_percent, home_price)

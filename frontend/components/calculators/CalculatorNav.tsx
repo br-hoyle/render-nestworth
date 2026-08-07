@@ -134,9 +134,14 @@ function GroupPanel({
   active: string;
   onSelect: (key: string) => void;
 }) {
-  const hasSections = entries.some((e) => e.section);
+  // A group renders as a columned grid whenever any entry sets `section` or `column` — named
+  // sections (Retirement Calculators / Investment Calculators) get header rows; a group that
+  // only sets `column` (no section names at all, e.g. Housing & Mortgage's plain 3-column
+  // down-then-over layout) renders the same flattened column grid with no header row, instead
+  // of the alphabetical-order flat grid below.
+  const hasColumns = entries.some((e) => e.section || e.column);
 
-  if (!hasSections) {
+  if (!hasColumns) {
     return (
       <>
         <div className="text-[10px] uppercase tracking-wider text-nw-muted mb-3">{groupLabel}</div>
@@ -178,15 +183,18 @@ function GroupPanel({
 
   return (
     <div className="grid gap-x-8 gap-y-2" style={{ gridTemplateColumns: `repeat(${totalColumns}, minmax(220px, 1fr))` }}>
-      {sectionBlocks.map((block) => (
-        <div
-          key={block.section}
-          className="text-[10px] uppercase tracking-wider text-nw-muted"
-          style={{ gridColumn: `span ${block.columns.length}` }}
-        >
-          {block.section}
-        </div>
-      ))}
+      {sectionBlocks.map(
+        (block) =>
+          block.section && (
+            <div
+              key={block.section}
+              className="text-[10px] uppercase tracking-wider text-nw-muted"
+              style={{ gridColumn: `span ${block.columns.length}` }}
+            >
+              {block.section}
+            </div>
+          )
+      )}
       {sectionBlocks.flatMap((block, bi) =>
         block.columns.map((columnEntries, ci) => (
           <div key={`${block.section}-${bi}-${ci}`} className="flex flex-col gap-0.5">

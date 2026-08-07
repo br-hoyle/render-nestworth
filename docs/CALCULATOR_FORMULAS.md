@@ -209,14 +209,23 @@ rolled into the balance rather than spread across payments.
 
 ## Housing & Mortgage
 
-Six calculators. `_amortization.py`'s `amortize()` is the shared engine behind four of them
+Six calculators, laid out in the nav dropdown as a fixed 3-column, 2-row grid (Mortgage /
+Mortgage Payoff, House Affordability / Rent vs. Buy, Refinance / Amortization) rather than
+alphabetical order. `_amortization.py`'s `amortize()` is the shared engine behind four of them
 (Mortgage, Amortization, Mortgage Payoff, Rent vs. Buy): a periodic amortization loop at any
-payments-per-year frequency, with three independent optional extra-payment types (a recurring
-monthly-cadence extra, a recurring yearly-cadence extra, and a single one-time extra) that can
-combine freely. `_costs.resolve_annual()` resolves an "amount or percent" cost field (down
-payment, property tax, home insurance, PMI, HOA, other costs) into a concrete annual dollar
-figure given a base (home price) — used by Mortgage, House Affordability, and Rent vs. Buy
-wherever the spec allows a cost to be quoted either way.
+payments-per-year frequency, with four independent, combinable optional extra-payment types — a
+recurring extra every single period (`extra_recurring`), a recurring extra roughly once a
+calendar month regardless of the underlying payment cadence (`extra_monthly` — fires every
+`max(1, round(payments_per_year / 12))` periods, which collapses to "every period" at monthly
+cadence, its original behavior), a recurring extra once a calendar year (`extra_yearly` — every
+`payments_per_year` periods), and a single one-time extra (`extra_one_time`). `_dates.py`
+converts a household-picked calendar date for each extra's "start at" into the period offset
+this engine actually consumes — `months_elapsed()` for monthly-cadence calls (exact calendar
+months), `periods_elapsed()` more generally (a fixed days-per-period approximation for other
+cadences, e.g. biweekly). `_costs.resolve_annual()` resolves an "amount or percent" cost field
+(down payment, property tax, home insurance, PMI, HOA, other costs, closing costs, renters
+insurance) into a concrete annual dollar figure given a base — used wherever the spec allows a
+cost to be quoted either way.
 
 ### Mortgage Calculator
 
@@ -227,67 +236,72 @@ is under 20% of the home price (the standard trigger for requiring it) but, once
 modeled as a flat recurring cost for the life of the loan rather than auto-cancelling once
 paydown reaches 20% equity — real mortgages typically do cancel it at that point, but the
 spec's PMI input has no cancellation rule specified, so this keeps the assumption simple and
-explicit rather than adding unrequested behavior. `monthly_payment()` and `_add_months()` are
-also imported directly by `refinance.py` and `debt_consolidation.py`.
+explicit rather than adding unrequested behavior. `monthly_payment()` is also imported directly
+by `refinance.py` and `debt_consolidation.py`.
 
 ### Amortization Calculator
 
 `amortization.py` — a full amortization schedule with three optional, independent, and
-combinable extra-payment types: a recurring extra every month (from a chosen start month), a
-recurring extra once a year (from a chosen start month), and a single one-time extra (in a
-chosen month). Compares the result against the same loan with no extras to report interest and
-time saved. Replaces the previous registry-only relabel of the generic amortized-loan math
-(`loan.py`, now retired) — this calculator's whole point is the extra-payment scenarios that
-math never modeled.
+combinable extra-payment types: a recurring extra every month (from a chosen start date), a
+recurring extra once a year (from a chosen start date), and a single one-time extra (on a chosen
+date). Compares the result against the same loan with no extras to report interest and time
+saved, and reports a projected payoff date alongside the raw months/years figure.
 
 ### Mortgage Payoff Calculator
 
 `mortgage_payoff.py` — for a loan already in progress: replays the original loan's amortization
 schedule up to today (elapsed time = original term − remaining term) to find the current
-balance, then compares four ways to finish paying it off — pay off the balance today (no more
-interest), continue at the original payment plus optional extra payments (reusing the
-Amortization Calculator's engine), switch to biweekly payments (half the monthly payment every
-two weeks — 26 payments/year, the equivalent of 13 monthly payments/year, modeled by re-running
-the engine at `payments_per_year=26` with interest accruing at `annual_rate/26` per period — an
-approximation, since real biweekly billing cycles don't line up with exact 1/26-year periods,
-but the same simplification calculator.net's version uses), or continue exactly on the original
-schedule (the baseline every other option is compared against).
+balance, then compares two ways to finish paying it off faster than the original schedule —
+continue at the original payment plus optional extra payments (reusing the Amortization
+Calculator's engine), or switch to biweekly payments (half the monthly payment every two weeks —
+26 payments/year, the equivalent of 13 monthly payments/year, modeled by re-running the engine at
+`payments_per_year=26` — an approximation, since real biweekly billing cycles don't line up with
+exact 1/26-year periods, but the same simplification calculator.net's version uses), optionally
+with its own extra-biweekly/monthly/yearly/one-time payments layered on top of the biweekly
+cadence. Both modes report interest and time saved against the original, unmodified schedule —
+that comparison is always computed internally rather than exposed as its own selectable mode
+(the previous "Normal Repayment" and "Pay Off Altogether" tabs were dropped as separate options
+since they duplicated, respectively, the always-visible baseline comparison and a one-line payoff
+figure that didn't need its own tab).
 
 ### House Affordability Calculator
 
-`house_affordability.py` — two modes, both solved in closed form (no bisection needed) because
-the unknown being solved for — home price — cancels out algebraically whether costs are
-percent-of-price or flat dollar amounts:
+`house_affordability.py` — two modes, both solved in closed form for the base case (no bisection
+needed, since the unknown being solved for — home price — cancels out algebraically whether
+costs are percent-of-price or flat dollar amounts) plus a second solve pass when PMI applies
+(PMI depends on the down-payment-to-price ratio, which is only fully known once a price is
+solved — both modes solve once without PMI, check the resulting ratio against the 20% threshold,
+and re-solve with PMI folded in if it's under):
 
 - **Income to Debt** — sizes price from gross income and a debt-to-income ratio preset:
   Conventional (28% front-end / 36% back-end), FHA (31%/43%), VA (approximated here as
   "unconstrained front-end, 41% back-end" — VA underwriting has no standalone front-end ratio in
   practice, instead evaluating residual income, so this is a simplification), or a custom
   back-end-only ratio.
-  Total monthly debt is not covered by the down payment; the maximum PITI, minus the tax/
-  insurance/HOA escrow figured on the price being solved for, is what leaves the top of the
-  price equation.
 - **Fixed Monthly Budget** — solves for the price a chosen total monthly housing budget affords
-  instead, with no income or DTI involved; maintenance is always a flat dollar amount per the
-  spec, while property tax/HOA/insurance may each independently be percent or flat.
+  instead, with no income or DTI involved.
+
+Both modes share the same five optional cost inputs as the Mortgage Calculator (property tax,
+home insurance, PMI, HOA fees, other costs, each percent-or-flat) and return the same
+`monthly_escrow` breakdown shape for display parity.
 
 ### Refinance Calculator
 
 `refinance.py` — unlike the original version, the current loan's remaining term isn't asked for
 directly (households rarely know that number precisely); instead it's derived from the balance,
 rate, and current monthly payment already on a statement, via `_annuity.periods_for_payment` (the
-same closed-form inversion the Debt & Payment section's Repayment Calculator uses). **New Loan
-Points** (a percentage of the new loan amount, paid upfront to secure the quoted rate) and **New
-Loan Costs & Fees** (a flat dollar amount) are folded into a single upfront-cost figure for the
-breakeven calculation. A **Cash Out Amount** is added directly to the new loan's principal and
-nets against the upfront cost, since receiving cash offsets what refinancing costs.
+same closed-form inversion the Debt & Payment section's Repayment Calculator uses). **Loan
+Fees** (a flat dollar amount) sits in the main required "New" row; **Loan Points** (a percentage
+of the new loan amount, paid upfront to secure the quoted rate) and **Cash Out Amount** are
+optional. Both loan-fee types are folded into a single upfront-cost figure for the breakeven
+calculation; cash out is added directly to the new loan's principal and nets against the upfront
+cost, since receiving cash offsets what refinancing costs.
 
 ### Rent vs. Buy Calculator
 
 `rent_vs_buy.py` — the most involved calculator in the app: simulates home ownership and renting
-side by side over a chosen comparison horizon (a "years to compare" input the spec implies but
-doesn't name outright — without it the comparison has no endpoint) and reports which one leaves
-the household better off, using the standard "invest the difference" framing rather than simply
+side by side over a chosen comparison horizon (default 5 years) and reports which one leaves the
+household better off, using the standard "invest the difference" framing rather than simply
 comparing monthly payments:
 
 - Each year, whichever option costs less is assumed to have its savings invested at the given
@@ -295,12 +309,21 @@ comparing monthly payments:
   final answer. Positive means renting-and-investing-the-difference wins by that amount (in
   future dollars at the end of the horizon); negative means buying wins by that amount.
 - **Buy side**: P&I via `_amortization.amortize()` (stopping once the loan is paid off — if that
-  happens before the horizon ends, only escrow costs continue for the remaining years); property
-  tax escalates at its own annual rate, independent of home appreciation (a mill-rate-style
-  increase rather than tied to the home's assessed value); home insurance/HOA/maintenance share
-  the spec's single "costs increase" rate. Closing costs are a one-time upfront % of home price;
-  selling closing costs are a one-time % of the home's appreciated value, charged only when
-  computing sale proceeds at the end of the horizon.
+  happens before the horizon ends, only escrow costs continue for the remaining years); PMI under
+  the same 20%-down trigger as `mortgage.py`; property tax escalates at its own annual rate,
+  independent of home appreciation (a mill-rate-style increase rather than tied to the home's
+  assessed value); home insurance/PMI/HOA/other costs share a "costs increase" rate. Both
+  escalation rates are fixed, undocumented-to-the-household assumptions (2%/yr each, the same
+  "documented simplified constant" convention as `STANDARD_DEDUCTION` below) rather than exposed
+  inputs — Home Value Appreciation is the one growth rate the household tunes directly. Closing
+  costs (percent-of-price or flat) are a one-time upfront cost; selling closing costs are a
+  one-time % of the home's appreciated value, charged only when computing sale proceeds at the
+  end of the horizon.
+- **Chart**: the schedule also tracks each side's plain cumulative (undiscounted) cost so far —
+  `cumulative_buy_cost`/`cumulative_rent_cost` — rendered as two lines ("cost of owning" vs. "cost
+  of renting" over time) with the payoff point (where owning starts costing less overall) marked
+  directly on the chart, distinct from `breakeven_year` (the invest-the-difference sign flip),
+  which also gets its own callout in the plain-English answer.
 - **Tax treatment**: assumes the household itemizes only when mortgage interest + property tax
   paid that year exceeds the standard deduction for their filing status (`STANDARD_DEDUCTION` —
   approximate, single-tax-year constants, the same "documented simplified constant" convention as
@@ -308,5 +331,6 @@ comparing monthly payments:
   standard deduction gets a tax benefit, at the combined federal + state marginal rate. Other
   itemizable items (state income tax paid, charitable giving, etc.) aren't modeled.
 - **Simplifications flagged for the record**: no SALT deduction cap, no AMT, security deposit
-  assumed fully refunded at the end of the horizon, renters insurance held flat (the spec gives
-  an increase rate for buy-side insurance but not rent-side).
+  assumed fully refunded at the end of the horizon, renters insurance (percent-of-annual-rent or
+  flat) held flat year over year — the household's "costs increase" assumption only drives
+  buy-side costs.

@@ -66,15 +66,15 @@ const CALCULATORS: Entry[] = [
   { key: "debt-payoff", label: "Debt Payoff Calculator", group: "Debt & Payment", render: () => <DebtPayoffCalculator />, hasOwnCopy: true, section: "Debt Calculators", column: 1 },
   { key: "debt-consolidation", label: "Debt Consolidation Calculator", group: "Debt & Payment", render: () => <DebtConsolidationCalculator />, hasOwnCopy: true, section: "Debt Calculators", column: 1 },
 
-  { key: "repayment", label: "Repayment Calculator", group: "Debt & Payment", render: () => <RepaymentCalculator />, hasOwnCopy: true, section: "Investment Calculators", column: 1 },
-  { key: "simple-interest", label: "Simple Interest Calculator", group: "Debt & Payment", render: () => <SimpleInterestCalculator />, hasOwnCopy: true, section: "Investment Calculators", column: 1 },
+  { key: "repayment", label: "Repayment Calculator", group: "Debt & Payment", render: () => <RepaymentCalculator />, hasOwnCopy: true, section: "Payment Calculators", column: 1 },
+  { key: "simple-interest", label: "Simple Interest Calculator", group: "Debt & Payment", render: () => <SimpleInterestCalculator />, hasOwnCopy: true, section: "Payment Calculators", column: 1 },
 
-  { key: "mortgage", label: "Mortgage Calculator", group: "Housing & Mortgage", render: () => <MortgageCalculator />, hasOwnCopy: true },
-  { key: "amortization", label: "Amortization Calculator", group: "Housing & Mortgage", render: () => <AmortizationCalculator />, hasOwnCopy: true },
-  { key: "mortgage-payoff", label: "Mortgage Payoff Calculator", group: "Housing & Mortgage", render: () => <MortgagePayoffCalculator />, hasOwnCopy: true },
-  { key: "house-affordability", label: "House Affordability Calculator", group: "Housing & Mortgage", render: () => <HouseAffordabilityCalculator />, hasOwnCopy: true },
-  { key: "refinance", label: "Refinance Calculator", group: "Housing & Mortgage", render: () => <RefinanceCalculator />, hasOwnCopy: true },
-  { key: "rent-vs-buy", label: "Rent vs. Buy Calculator", group: "Housing & Mortgage", render: () => <RentVsBuyCalculator />, hasOwnCopy: true },
+  { key: "mortgage", label: "Mortgage Calculator", group: "Housing & Mortgage", render: () => <MortgageCalculator />, hasOwnCopy: true, column: 1 },
+  { key: "mortgage-payoff", label: "Mortgage Payoff Calculator", group: "Housing & Mortgage", render: () => <MortgagePayoffCalculator />, hasOwnCopy: true, column: 1 },
+  { key: "house-affordability", label: "House Affordability Calculator", group: "Housing & Mortgage", render: () => <HouseAffordabilityCalculator />, hasOwnCopy: true, column: 2 },
+  { key: "rent-vs-buy", label: "Rent vs. Buy Calculator", group: "Housing & Mortgage", render: () => <RentVsBuyCalculator />, hasOwnCopy: true, column: 2 },
+  { key: "refinance", label: "Refinance Calculator", group: "Housing & Mortgage", render: () => <RefinanceCalculator />, hasOwnCopy: true, column: 3 },
+  { key: "amortization", label: "Amortization Calculator", group: "Housing & Mortgage", render: () => <AmortizationCalculator />, hasOwnCopy: true, column: 3 },
 ];
 
 const GROUPS: Group[] = ["Retirement & Investment", "Debt & Payment", "Housing & Mortgage"];
@@ -92,7 +92,9 @@ export default function CalculatorsPage() {
           section opens a panel of that section's calculators below the bar, closing on
           click-away, Escape, or picking one. Retirement & Investment and Debt & Payment both
           split their panels further into named, columned subsections instead of one flat
-          alphabetical grid — Housing & Mortgage is small enough to stay flat. */}
+          alphabetical grid. Housing & Mortgage's 6 entries use the same column mechanism
+          without section names — a plain 3-column, 2-row grid in a fixed (not alphabetical)
+          order, filled down each column before moving to the next. */}
       <CalculatorNav groups={GROUPS} calculators={CALCULATORS} active={active} onSelect={setActive} />
       <div className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 md:p-6" key={active}>
         {!current.hasOwnCopy && <h1 className="text-lg font-medium mb-4">{current.label}</h1>}
