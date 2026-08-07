@@ -10,9 +10,9 @@ import {
   MdOutlineCreditCard,
   MdOutlineHome,
   MdOutlineLayers,
-  MdOutlineSavings,
   MdOutlineTrendingUp,
 } from "react-icons/md";
+import { TbMoneybagPlus } from "react-icons/tb";
 import { useAuth } from "@/lib/auth-context";
 
 const NAV_GROUPS: { heading: string; items: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] }[] = [
@@ -28,7 +28,7 @@ const NAV_GROUPS: { heading: string; items: { href: string; label: string; icon:
     heading: "Manage",
     items: [
       { href: "/accounts", label: "Accounts", icon: MdOutlineLayers },
-      { href: "/income", label: "Income", icon: MdOutlineSavings },
+      { href: "/income", label: "Income", icon: TbMoneybagPlus },
       { href: "/transactions", label: "Transactions", icon: MdOutlineCreditCard },
     ],
   },

@@ -9,73 +9,94 @@ from sqlalchemy.engine import Connection
 from app.deps import Session, get_current_session, get_tenant_db
 from app.routers.scorecard import balances_totals_at, gross_annual_income_at, get_household_settings, transaction_sums
 from app.schemas.calculators import (
-    CompoundGrowthInput,
-    DebtAccelerationInput,
+    AmortizationInput,
+    CompoundInterestConverterInput,
     DebtConsolidationInput,
-    DebtPayoffInput,
+    DebtPayoffAvalancheInput,
     EmergencyFundInput,
     FinancialIndependenceInput,
     HouseAffordabilityInput,
     InterestRateSolverInput,
-    LoanInput,
+    InvestmentInput,
+    K401Input,
+    K401MatchMaximizerInput,
+    LoanCalculatorInput,
     MortgageInput,
-    RebalancingInput,
+    MortgagePayoffInput,
+    PaymentCalculatorInput,
     RefinanceInput,
-    RetirementInput,
+    RentVsBuyInput,
+    RepaymentCalculatorInput,
+    RetirementLongevityInput,
+    RetirementNeedInput,
+    RetirementSavingsPlanInput,
+    RetirementWithdrawalInput,
     RothIraInput,
+    SavingsInput,
     SimpleInterestInput,
     TargetEmergencyFundInput,
-    TraditionalIraInput,
 )
 from app.services.calculators import (
-    compound_growth,
-    debt_acceleration,
+    amortization,
+    compound_interest_converter,
     debt_consolidation,
-    debt_payoff,
+    debt_payoff_avalanche,
     emergency_fund,
     financial_independence,
     house_affordability,
     interest_rate_solver,
-    loan,
+    investment,
+    k401,
+    k401_match_maximizer,
+    loan_calculator,
     mortgage,
-    rebalancing,
+    mortgage_payoff,
+    payment_calculator,
     refinance,
-    retirement,
+    rent_vs_buy,
+    repayment_calculator,
+    retirement_longevity,
+    retirement_need,
+    retirement_savings_plan,
+    retirement_withdrawal,
     roth_ira,
+    savings,
     simple_interest,
     target_emergency_fund,
-    traditional_ira,
 )
 
 router = APIRouter(prefix="/calculators", tags=["calculators"])
 
 CALCULATORS = {
-    "compound-growth": (CompoundGrowthInput, compound_growth.compute),
-    "mortgage": (MortgageInput, mortgage.compute),
-    "debt-payoff": (DebtPayoffInput, debt_payoff.compute),
     "emergency-fund": (EmergencyFundInput, emergency_fund.compute),
-    "house-affordability": (HouseAffordabilityInput, house_affordability.compute),
-    "retirement": (RetirementInput, retirement.compute),
-    "rebalancing": (RebalancingInput, rebalancing.compute),
-    # Backlog pass 2 — genuinely new math:
-    "loan": (LoanInput, loan.compute),
-    "refinance": (RefinanceInput, refinance.compute),
     "interest-rate": (InterestRateSolverInput, interest_rate_solver.compute),
-    "roth-ira": (RothIraInput, roth_ira.compute),
-    "ira": (TraditionalIraInput, traditional_ira.compute),
     "simple-interest": (SimpleInterestInput, simple_interest.compute),
-    "debt-consolidation": (DebtConsolidationInput, debt_consolidation.compute),
     "financial-independence": (FinancialIndependenceInput, financial_independence.compute),
-    "debt-acceleration": (DebtAccelerationInput, debt_acceleration.compute),
     "target-emergency-fund": (TargetEmergencyFundInput, target_emergency_fund.compute),
-    # Backlog pass 2 — registry-only relabels of existing math (same compute fn, different
-    # default inputs/labels/grouping in the frontend; avoids duplicating identical formulas):
-    "investment": (CompoundGrowthInput, compound_growth.compute),
-    "compound-interest": (CompoundGrowthInput, compound_growth.compute),
-    "savings": (CompoundGrowthInput, compound_growth.compute),
-    "amortization": (LoanInput, loan.compute),
-    "repayment": (LoanInput, loan.compute),
-    "student-loan": (LoanInput, loan.compute),
+    # Housing & Mortgage redesign:
+    "mortgage": (MortgageInput, mortgage.compute),
+    "amortization": (AmortizationInput, amortization.compute),
+    "mortgage-payoff": (MortgagePayoffInput, mortgage_payoff.compute),
+    "house-affordability": (HouseAffordabilityInput, house_affordability.compute),
+    "refinance": (RefinanceInput, refinance.compute),
+    "rent-vs-buy": (RentVsBuyInput, rent_vs_buy.compute),
+    # Retirement & Investment redesign:
+    "retirement-need": (RetirementNeedInput, retirement_need.compute),
+    "retirement-savings-plan": (RetirementSavingsPlanInput, retirement_savings_plan.compute),
+    "retirement-withdrawal": (RetirementWithdrawalInput, retirement_withdrawal.compute),
+    "retirement-longevity": (RetirementLongevityInput, retirement_longevity.compute),
+    "investment": (InvestmentInput, investment.compute),
+    "401k": (K401Input, k401.compute),
+    "401k-match-maximizer": (K401MatchMaximizerInput, k401_match_maximizer.compute),
+    "roth-ira": (RothIraInput, roth_ira.compute),
+    "compound-interest": (CompoundInterestConverterInput, compound_interest_converter.compute),
+    "savings": (SavingsInput, savings.compute),
+    # Debt & Payment redesign:
+    "loan": (LoanCalculatorInput, loan_calculator.compute),
+    "payment": (PaymentCalculatorInput, payment_calculator.compute),
+    "repayment": (RepaymentCalculatorInput, repayment_calculator.compute),
+    "debt-payoff": (DebtPayoffAvalancheInput, debt_payoff_avalanche.compute),
+    "debt-consolidation": (DebtConsolidationInput, debt_consolidation.compute),
 }
 
 
@@ -92,6 +113,37 @@ def run_calculator(
     return compute_fn(**validated.model_dump())
 
 
+def _retirement_category_balance(conn: Connection, household_id: str, today: date) -> Decimal:
+    _, _, assets_by_category, _, _ = balances_totals_at(conn, household_id, today)
+    return assets_by_category.get("Retirement", Decimal(0))
+
+
+def _trailing_3mo_monthly_expense(conn: Connection, household_id: str, today: date) -> Decimal:
+    window_start = today - relativedelta(months=3)
+    txn = transaction_sums(conn, household_id, window_start, today)
+    return (txn["expense"] / 3) if txn["expense"] else Decimal(0)
+
+
+def _open_non_mortgage_liability_accounts(conn: Connection, household_id: str) -> list[dict]:
+    """Every open, non-mortgage liability account's latest balance — used to prefill the Debt
+    Payoff / Debt Consolidation calculators' debt tables. Interest rate and minimum payment
+    aren't tracked on the accounts table, so those are left for the household to fill in."""
+    rows = conn.execute(
+        text(
+            "select a.account_name, "
+            "(select balance from balances b where b.account_id = a.account_id order by b.full_date desc limit 1) as latest_balance "
+            "from accounts a where a.household_id = :household_id and a.balance_type = 'liability' "
+            "and a.account_type not ilike '%mortgage%' and a.effective_end_date = '9999-12-31'"
+        ),
+        {"household_id": household_id},
+    ).mappings().all()
+    return [
+        {"name": row["account_name"], "balance": str(row["latest_balance"]), "annual_rate": "0", "minimum_payment": "0"}
+        for row in rows
+        if row["latest_balance"]
+    ]
+
+
 @router.get("/{name}/defaults")
 def calculator_defaults(
     name: str,
@@ -104,32 +156,9 @@ def calculator_defaults(
     today = date.today()
     household_id = session.household_id
 
-    if name == "mortgage":
-        row = conn.execute(
-            text(
-                "select account_id, effective_start_date, "
-                "(select balance from balances b where b.account_id = a.account_id order by b.full_date desc limit 1) as latest_balance "
-                "from accounts a where a.household_id = :household_id and a.balance_type = 'liability' "
-                "and a.account_type ilike '%mortgage%' and a.effective_end_date = '9999-12-31' limit 1"
-            ),
-            {"household_id": household_id},
-        ).mappings().first()
-        if row and row["latest_balance"]:
-            return {"principal": str(row["latest_balance"]), "start_date": row["effective_start_date"].isoformat()}
-        return {}
-
-    if name == "debt-payoff":
-        row = conn.execute(
-            text(
-                "select (select balance from balances b where b.account_id = a.account_id order by b.full_date desc limit 1) as latest_balance "
-                "from accounts a where a.household_id = :household_id and a.balance_type = 'liability' "
-                "and a.account_type not ilike '%mortgage%' and a.effective_end_date = '9999-12-31' limit 1"
-            ),
-            {"household_id": household_id},
-        ).mappings().first()
-        if row and row["latest_balance"]:
-            return {"balance": str(row["latest_balance"])}
-        return {}
+    if name in ("debt-payoff", "debt-consolidation"):
+        debts = _open_non_mortgage_liability_accounts(conn, household_id)
+        return {"debts": debts} if debts else {}
 
     if name == "emergency-fund":
         settings = get_household_settings(conn, household_id)
@@ -138,21 +167,20 @@ def calculator_defaults(
         liquid_balance = sum(
             (v for k, v in balance_by_type.items() if k.lower() in liquid_types), Decimal(0)
         )
-        window_start = today - relativedelta(months=3)
-        txn = transaction_sums(conn, household_id, window_start, today)
-        monthly_expense = (txn["expense"] / 3) if txn["expense"] else Decimal(0)
-        return {"liquid_balance": str(liquid_balance), "monthly_expense": str(monthly_expense)}
+        return {"liquid_balance": str(liquid_balance), "monthly_expense": str(_trailing_3mo_monthly_expense(conn, household_id, today))}
 
     if name == "house-affordability":
         income = gross_annual_income_at(conn, household_id, today)
-        return {"gross_monthly_income": str(income / 12)} if income else {}
+        return {"annual_income": str(income)} if income else {}
 
-    if name == "retirement":
-        _, _, assets_by_category, _, _ = balances_totals_at(conn, household_id, today)
-        retirement_balance = assets_by_category.get("Retirement", 0)
-        return {"current_balance": str(retirement_balance)}
-
-    if name == "amortization":
+    # "mortgage" (a prospective new-home shopping tool) has no household data to prefill from —
+    # home price and down payment aren't things the app tracks. "mortgage-payoff" is about an
+    # existing loan, so the real mortgage account's current balance is a reasonable starting
+    # point for original_principal, even though it's technically today's balance rather than
+    # the loan's true original principal — same "close enough, adjust as needed" precedent as
+    # the debt-payoff/debt-consolidation prefills above (rate/minimum payment aren't tracked
+    # either, and are left at 0 for the household to fill in).
+    if name == "mortgage-payoff":
         row = conn.execute(
             text(
                 "select account_id, "
@@ -163,7 +191,7 @@ def calculator_defaults(
             {"household_id": household_id},
         ).mappings().first()
         if row and row["latest_balance"]:
-            return {"principal": str(row["latest_balance"])}
+            return {"original_principal": str(row["latest_balance"])}
         return {}
 
     if name == "target-emergency-fund":
@@ -173,19 +201,43 @@ def calculator_defaults(
         liquid_balance = sum(
             (v for k, v in balance_by_type.items() if k.lower() in liquid_types), Decimal(0)
         )
-        window_start = today - relativedelta(months=3)
-        txn = transaction_sums(conn, household_id, window_start, today)
-        monthly_expense = (txn["expense"] / 3) if txn["expense"] else Decimal(0)
-        return {"current_liquid_balance": str(liquid_balance), "monthly_expense": str(monthly_expense)}
+        return {
+            "current_liquid_balance": str(liquid_balance),
+            "monthly_expense": str(_trailing_3mo_monthly_expense(conn, household_id, today)),
+        }
 
     if name == "financial-independence":
         total_assets, total_liabilities, _, _, _ = balances_totals_at(conn, household_id, today)
-        window_start = today - relativedelta(months=3)
-        txn = transaction_sums(conn, household_id, window_start, today)
-        annual_expenses = (txn["expense"] / 3 * 12) if txn["expense"] else Decimal(0)
+        annual_expenses = _trailing_3mo_monthly_expense(conn, household_id, today) * 12
         return {
             "current_net_worth": str(total_assets - total_liabilities),
             "annual_expenses": str(annual_expenses),
         }
+
+    if name in ("retirement-need", "retirement-savings-plan", "retirement-withdrawal", "401k", "roth-ira"):
+        settings = get_household_settings(conn, household_id)
+        result: dict = {}
+        age = settings.get("household_age")
+        if age is not None:
+            result["current_age"] = age
+        retirement_age = settings.get("target_retirement_age")
+        if retirement_age is not None:
+            result["retirement_age"] = retirement_age
+        retirement_balance = _retirement_category_balance(conn, household_id, today)
+        income = gross_annual_income_at(conn, household_id, today)
+
+        if name == "retirement-need":
+            result["current_savings"] = str(retirement_balance)
+            if income:
+                result["current_income"] = str(income)
+        elif name in ("retirement-savings-plan", "retirement-withdrawal"):
+            result["current_retirement_savings"] = str(retirement_balance)
+        elif name == "401k":
+            result["current_balance"] = str(retirement_balance)
+            if income:
+                result["annual_income"] = str(income)
+        elif name == "roth-ira":
+            result["current_balance"] = str(retirement_balance)
+        return result
 
     return {}

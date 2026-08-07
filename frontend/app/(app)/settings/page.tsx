@@ -205,13 +205,6 @@ export default function SettingsPage() {
           </Button>
         </form>
         {birthdateMsg && <p className="text-xs text-nw-muted">{birthdateMsg}</p>}
-        <p className="text-xs text-nw-muted">
-          Used to calculate your age for retirement and FI projections on the{" "}
-          <a href="/trends/scorecard" className="text-nw-mint">
-            Scorecard
-          </a>
-          .
-        </p>
       </Card>
 
       <Card>

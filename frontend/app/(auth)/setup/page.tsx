@@ -128,9 +128,6 @@ export default function SetupPage() {
             value={form.birthdate}
             onChange={(e) => update("birthdate", e.target.value)}
           />
-          <p className="text-xs text-nw-muted -mt-2">
-            Used to calculate your age for retirement and FI projections — you can add this later in Settings.
-          </p>
           {error && (
             <div className="rounded-md border border-[#5A3228] bg-nw-coral-tint px-3 py-2 text-xs text-nw-coral">
               {error}
