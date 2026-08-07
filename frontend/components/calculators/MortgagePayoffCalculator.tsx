@@ -229,7 +229,7 @@ export function MortgagePayoffCalculator() {
           <ResultTile label="Current Balance" value={fmtMoney(result.current_balance)} />
           <ResultTile
             label="Payoff Time"
-            value={result.months_to_payoff != null ? `${result.months_to_payoff} mo (${result.years_to_payoff} yr)` : "—"}
+            value={result.years_to_payoff != null ? `${result.years_to_payoff} years` : "—"}
           />
           <ResultTile label="Payoff Date" value={result.payoff_date ?? "—"} />
           <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
