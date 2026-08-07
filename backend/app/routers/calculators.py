@@ -13,7 +13,6 @@ from app.schemas.calculators import (
     CompoundInterestConverterInput,
     DebtConsolidationInput,
     DebtPayoffAvalancheInput,
-    EmergencyFundInput,
     FinancialIndependenceInput,
     HouseAffordabilityInput,
     InterestRateSolverInput,
@@ -23,7 +22,6 @@ from app.schemas.calculators import (
     LoanCalculatorInput,
     MortgageInput,
     MortgagePayoffInput,
-    PaymentCalculatorInput,
     RefinanceInput,
     RentVsBuyInput,
     RepaymentCalculatorInput,
@@ -34,14 +32,12 @@ from app.schemas.calculators import (
     RothIraInput,
     SavingsInput,
     SimpleInterestInput,
-    TargetEmergencyFundInput,
 )
 from app.services.calculators import (
     amortization,
     compound_interest_converter,
     debt_consolidation,
     debt_payoff_avalanche,
-    emergency_fund,
     financial_independence,
     house_affordability,
     interest_rate_solver,
@@ -51,7 +47,6 @@ from app.services.calculators import (
     loan_calculator,
     mortgage,
     mortgage_payoff,
-    payment_calculator,
     refinance,
     rent_vs_buy,
     repayment_calculator,
@@ -62,17 +57,14 @@ from app.services.calculators import (
     roth_ira,
     savings,
     simple_interest,
-    target_emergency_fund,
 )
 
 router = APIRouter(prefix="/calculators", tags=["calculators"])
 
 CALCULATORS = {
-    "emergency-fund": (EmergencyFundInput, emergency_fund.compute),
     "interest-rate": (InterestRateSolverInput, interest_rate_solver.compute),
     "simple-interest": (SimpleInterestInput, simple_interest.compute),
     "financial-independence": (FinancialIndependenceInput, financial_independence.compute),
-    "target-emergency-fund": (TargetEmergencyFundInput, target_emergency_fund.compute),
     # Housing & Mortgage redesign:
     "mortgage": (MortgageInput, mortgage.compute),
     "amortization": (AmortizationInput, amortization.compute),
@@ -93,7 +85,6 @@ CALCULATORS = {
     "savings": (SavingsInput, savings.compute),
     # Debt & Payment redesign:
     "loan": (LoanCalculatorInput, loan_calculator.compute),
-    "payment": (PaymentCalculatorInput, payment_calculator.compute),
     "repayment": (RepaymentCalculatorInput, repayment_calculator.compute),
     "debt-payoff": (DebtPayoffAvalancheInput, debt_payoff_avalanche.compute),
     "debt-consolidation": (DebtConsolidationInput, debt_consolidation.compute),
@@ -160,15 +151,6 @@ def calculator_defaults(
         debts = _open_non_mortgage_liability_accounts(conn, household_id)
         return {"debts": debts} if debts else {}
 
-    if name == "emergency-fund":
-        settings = get_household_settings(conn, household_id)
-        _, _, _, _, balance_by_type = balances_totals_at(conn, household_id, today)
-        liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
-        liquid_balance = sum(
-            (v for k, v in balance_by_type.items() if k.lower() in liquid_types), Decimal(0)
-        )
-        return {"liquid_balance": str(liquid_balance), "monthly_expense": str(_trailing_3mo_monthly_expense(conn, household_id, today))}
-
     if name == "house-affordability":
         income = gross_annual_income_at(conn, household_id, today)
         return {"annual_income": str(income)} if income else {}
@@ -193,18 +175,6 @@ def calculator_defaults(
         if row and row["latest_balance"]:
             return {"original_principal": str(row["latest_balance"])}
         return {}
-
-    if name == "target-emergency-fund":
-        settings = get_household_settings(conn, household_id)
-        _, _, _, _, balance_by_type = balances_totals_at(conn, household_id, today)
-        liquid_types = {t.lower() for t in settings.get("liquid_account_types", [])}
-        liquid_balance = sum(
-            (v for k, v in balance_by_type.items() if k.lower() in liquid_types), Decimal(0)
-        )
-        return {
-            "current_liquid_balance": str(liquid_balance),
-            "monthly_expense": str(_trailing_3mo_monthly_expense(conn, household_id, today)),
-        }
 
     if name == "financial-independence":
         total_assets, total_liabilities, _, _, _ = balances_totals_at(conn, household_id, today)

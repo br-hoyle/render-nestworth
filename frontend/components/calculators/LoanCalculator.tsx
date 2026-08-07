@@ -12,8 +12,13 @@ import {
   CalcCopy,
   CalcTabs,
   CalcLayout,
-  CalcFieldGrid,
+  CalcRow,
+  CalcCol,
+  CalcAnswer,
+  CalcViewToggle,
+  ScheduleTable,
   CalcEmptyState,
+  SelectField,
 } from "@/components/calculators/shared";
 import { FREQUENCY_OPTIONS, type CompoundFrequency } from "@/lib/calculatorTypes";
 
@@ -26,15 +31,17 @@ const TABS: { key: LoanType; label: string }[] = [
 ];
 
 const MODE_COPY: Record<LoanType, string> = {
-  amortized: "Paying back a fixed amount with regular payments — the common shape for mortgages, auto loans, student loans, or personal loans.",
-  deferred: "Nothing is paid until maturity, when the entire accrued amount comes due at once.",
-  bond: "The mirror image of a deferred loan — given a fixed amount due at maturity, this solves for what that's worth today.",
+  amortized:
+    "Paying back a fixed amount with regular payments — the common shape for mortgages, auto loans, student loans, or personal loans. Each payment covers that period's interest, with the remainder reducing the balance.",
+  deferred: "Nothing is paid until maturity, when the entire accrued amount comes due at once — interest compounds on itself the whole way.",
+  bond:
+    "The mirror image of a deferred loan — given a fixed amount due at maturity, this solves for what that's worth today by discounting it back at the given rate.",
 };
 
 const AMOUNT_LABEL: Record<LoanType, string> = {
   amortized: "Loan Amount",
   deferred: "Loan Amount",
-  bond: "Pre-Determined Due Amount",
+  bond: "Amount Due",
 };
 
 function YearlyBalanceChart({ data }: { data: { year: number; balance: number }[] }) {
@@ -56,6 +63,7 @@ function YearlyBalanceChart({ data }: { data: { year: number; balance: number }[
 
 export function LoanCalculator() {
   const [loanType, setLoanType] = useState<LoanType>("amortized");
+  const [view, setView] = useState<"chart" | "table">("chart");
   const [inputs, setInputs] = useState({
     principal: 20000,
     annual_rate: 0.07,
@@ -84,48 +92,42 @@ export function LoanCalculator() {
 
   const inputsPanel = (
     <>
-      <CalcFieldGrid>
-        <NumField
-          label={AMOUNT_LABEL[loanType]}
-          prefix="$"
-          value={inputs.principal}
-          onChange={(v) => setInputs((i) => ({ ...i, principal: v }))}
-        />
-        <NumField label="Term (Years)" value={inputs.term_years} onChange={(v) => setInputs((i) => ({ ...i, term_years: v }))} />
-        <label className="flex flex-col gap-1">
-          <span className="text-[11px] uppercase tracking-wide text-nw-muted">Compound Frequency</span>
-          <select
-            value={inputs.compound_frequency}
-            onChange={(e) => setInputs((i) => ({ ...i, compound_frequency: e.target.value as CompoundFrequency }))}
-            className="rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm text-nw-text"
-          >
-            {FREQUENCY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        {loanType === "amortized" && (
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-wide text-nw-muted">Payback Frequency</span>
-            <select
-              value={inputs.payback_frequency}
-              onChange={(e) => setInputs((i) => ({ ...i, payback_frequency: e.target.value as CompoundFrequency }))}
-              className="rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm text-nw-text"
-            >
-              {FREQUENCY_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <div className="sm:col-span-2 xl:col-span-3">
+      <CalcRow>
+        <CalcCol>
+          <NumField
+            label={AMOUNT_LABEL[loanType]}
+            prefix="$"
+            value={inputs.principal}
+            onChange={(v) => setInputs((i) => ({ ...i, principal: v }))}
+          />
+        </CalcCol>
+        <CalcCol>
+          <NumField label="Term (Years)" value={inputs.term_years} onChange={(v) => setInputs((i) => ({ ...i, term_years: v }))} />
+        </CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol>
           <NumField label="Interest Rate" percent value={inputs.annual_rate} onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
-        </div>
-      </CalcFieldGrid>
+        </CalcCol>
+        <CalcCol>
+          <SelectField
+            label="Compound Frequency"
+            value={inputs.compound_frequency}
+            onChange={(v) => setInputs((i) => ({ ...i, compound_frequency: v }))}
+            options={FREQUENCY_OPTIONS}
+          />
+        </CalcCol>
+        {loanType === "amortized" && (
+          <CalcCol>
+            <SelectField
+              label="Payback Frequency"
+              value={inputs.payback_frequency}
+              onChange={(v) => setInputs((i) => ({ ...i, payback_frequency: v }))}
+              options={FREQUENCY_OPTIONS}
+            />
+          </CalcCol>
+        )}
+      </CalcRow>
       <div className="pt-1">
         <CalcButton onClick={calculate} loading={loading} />
       </div>
@@ -139,6 +141,14 @@ export function LoanCalculator() {
       <p className="text-xs text-nw-coral">{String(result.error)}</p>
     ) : (
       <div className="flex flex-col gap-3">
+        <CalcAnswer>
+          {loanType === "amortized" &&
+            `Paying this off over ${inputs.term_years} years costs ${fmtMoney(result.payment_per_period)} per period — ${fmtMoney(result.total_interest)} in total interest.`}
+          {loanType === "deferred" &&
+            `Left untouched for ${inputs.term_years} years, this grows to ${fmtMoney(result.amount_due_at_maturity)} due at maturity — ${fmtMoney(result.total_interest)} in accrued interest.`}
+          {loanType === "bond" &&
+            `To be worth ${fmtMoney(inputs.principal)} in ${inputs.term_years} years, this is worth ${fmtMoney(result.initial_value)} today.`}
+        </CalcAnswer>
         <div className="flex flex-wrap gap-2">
           {loanType === "amortized" && (
             <>
@@ -160,7 +170,24 @@ export function LoanCalculator() {
             </>
           )}
         </div>
-        {loanType === "amortized" && <YearlyBalanceChart data={schedule} />}
+        {loanType === "amortized" && (
+          <>
+            <CalcViewToggle view={view} onChange={setView} />
+            {view === "chart" ? (
+              <YearlyBalanceChart data={schedule} />
+            ) : (
+              <ScheduleTable
+                rows={schedule}
+                columns={[
+                  { key: "year", label: "Year" },
+                  { key: "principal", label: "Principal Paid", format: "money" },
+                  { key: "interest", label: "Interest Paid", format: "money" },
+                  { key: "balance", label: "Balance", format: "money" },
+                ]}
+              />
+            )}
+          </>
+        )}
       </div>
     );
 

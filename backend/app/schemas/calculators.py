@@ -10,12 +10,6 @@ ExtendedCompoundFrequency = Literal[
 ]
 
 
-class EmergencyFundInput(BaseModel):
-    liquid_balance: Decimal = Decimal(0)
-    monthly_expense: Decimal = Decimal(0)
-    target_months: Decimal = Decimal(6)
-
-
 class InterestRateSolverInput(BaseModel):
     principal: Decimal
     target_monthly_payment: Decimal
@@ -48,13 +42,6 @@ class FinancialIndependenceInput(BaseModel):
     annual_expenses: Decimal
     expected_return: Decimal = Decimal("0.07")
     withdrawal_rate: Decimal = Decimal("0.04")
-
-
-class TargetEmergencyFundInput(BaseModel):
-    current_liquid_balance: Decimal = Decimal(0)
-    monthly_expense: Decimal = Decimal(0)
-    target_months: Decimal = Decimal(6)
-    months_to_reach_goal: int = 12
 
 
 # --- Retirement & Investment redesign ---
@@ -171,14 +158,6 @@ class LoanCalculatorInput(BaseModel):
     term_years: int = 5
     compound_frequency: CompoundFrequency = "monthly"
     payback_frequency: CompoundFrequency = "monthly"
-
-
-class PaymentCalculatorInput(BaseModel):
-    mode: Literal["fixed_term", "fixed_payments"] = "fixed_term"
-    principal: Decimal
-    annual_rate: Decimal = Decimal("0.07")
-    term_years: int | None = 5
-    monthly_payment: Decimal | None = None
 
 
 class RepaymentCalculatorInput(BaseModel):

@@ -118,14 +118,21 @@ the chosen compounding frequency's boundaries, not every month.
 
 ## Debt & Payment
 
-Five calculators, covering both sides of borrowing math — sizing/pricing a loan (Loan,
-Payment, Repayment) and paying down what's already owed (Debt Payoff, Debt Consolidation). A
-shared `_annuity.py` module backs the first three: `effective_period_rate` bridges a nominal
-annual rate stated at one compounding frequency to the effective rate for a (possibly
-different) payback frequency, `annuity_payment` is a frequency-agnostic generalization of
-`mortgage.monthly_payment`'s level-payment formula, and `periods_for_payment` closed-form
-inverts it (via `Decimal.ln()`) to solve for how many periods a fixed payment takes — no
-bisection needed here, unlike the Retirement & Investment section's `_solve.py` helper.
+Five calculators, covering both sides of borrowing math — sizing/pricing a loan or an
+uncompounded return (Loan, Repayment, Simple Interest) and paying down what's already owed
+(Debt Payoff, Debt Consolidation). The nav dropdown splits these into two columns: **Debt
+Calculators** (Loan, Debt Payoff, Debt Consolidation) and **Investment Calculators**
+(Repayment, Simple Interest). A shared `_annuity.py` module backs Loan and Repayment:
+`effective_period_rate` bridges a nominal annual rate stated at one compounding frequency to
+the effective rate for a (possibly different) payback frequency, `annuity_payment` is a
+frequency-agnostic generalization of `mortgage.monthly_payment`'s level-payment formula, and
+`periods_for_payment` closed-form inverts it (via `Decimal.ln()`) to solve for how many periods
+a fixed payment takes — no bisection needed here, unlike the Retirement & Investment section's
+`_solve.py` helper. The Payment Calculator, Emergency Fund Calculator, and Target Emergency
+Fund Calculator that previously sat in this section were removed: Payment duplicated Loan's
+Amortized tab and Repayment's Fixed Time/Fixed Installment modes with a narrower monthly-only
+input set, and both Emergency Fund calculators duplicated the Scorecard's Emergency Fund KPI
+(months-of-expenses-covered, red/yellow/green thresholds) without adding a distinct framing.
 
 ### Loan Calculator
 
@@ -145,27 +152,25 @@ Amortized/Deferred, but the amount predetermined to be due at maturity for Bond.
   here means that future amount, not money borrowed today), solves for its present value —
   `initial_value = face_value / (1 + rate/n)^(term_years × n)`.
 
-### Payment Calculator
-
-`payment_calculator.py` — the simplest of the three, monthly-only (no compound/payback
-frequency inputs, unlike Loan/Repayment) to match the spec's lighter-weight tool.
-
-- **Fixed Term** — given amount, rate, and term, `annuity_payment` finds the monthly payment.
-- **Fixed Payments** — given amount, rate, and what you can pay monthly, `periods_for_payment`
-  solves for the payoff time (rounded up to a whole month via `ROUND_CEILING`, since a partial
-  final month still requires a payment). Returns an explicit error rather than a runaway result
-  if the payment doesn't even cover the first period's interest.
-
 ### Repayment Calculator
 
-`repayment_calculator.py` — same two "solve for the missing piece" modes as Payment, but framed
-for an existing balance rather than a fresh loan, with independently configurable compound and
-payback frequencies (via `effective_period_rate`, exactly as in Loan's Amortized tab).
+`repayment_calculator.py` — solves for one of two unknowns on an existing balance (rather than
+a fresh loan), with independently configurable compound and payback frequencies (via
+`effective_period_rate`, exactly as in Loan's Amortized tab).
 
-- **Fixed Time** — given a balance, rate, and a term (years + extra months), finds the
-  per-period payment via `annuity_payment`.
+- **Fixed Time** — given a balance, rate, and a term in years, finds the per-period payment via
+  `annuity_payment`. (The backend also accepts an optional extra-months component for finer
+  terms; the calculator's own UI only exposes whole years, matching Loan Calculator's layout.)
 - **Fixed Installment** — given a balance, rate, and a fixed payment per period, finds how many
-  periods it takes via `periods_for_payment`.
+  periods it takes via `periods_for_payment`. Returns an explicit error rather than a runaway
+  result if the payment doesn't even cover the first period's interest.
+
+### Simple Interest Calculator
+
+`simple_interest.py` — interest that accrues on the principal only, with no compounding:
+`interest = principal × annual_rate × years`, `total = principal + interest`. The one
+calculator in this section with no iterative or closed-form solve — useful for short-term loans
+and some bonds/CDs where interest doesn't compound.
 
 ### Debt Payoff Calculator
 

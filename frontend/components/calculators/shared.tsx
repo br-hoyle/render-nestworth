@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 import { TextField } from "@/components/ui/TextField";
+import { Button } from "@/components/ui/Button";
 import { money } from "@/lib/format";
 
 /** Formats a dollar-amount field's value with thousands commas when the field isn't focused
@@ -460,6 +461,70 @@ export function ScheduleTable({ rows, columns }: { rows: Record<string, unknown>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export interface DebtTableRow {
+  name: string;
+  balance: number;
+  annual_rate: number;
+  /** Backend field names for "minimum monthly payment" differ across calculators (debt payoff
+   * vs. debt consolidation) — kept as one neutral key here, with each caller mapping it to
+   * whatever its own API payload expects. */
+  payment: number;
+}
+
+/** Shared multi-debt input table (Debt Payoff, Debt Consolidation) — a free-form list of debts,
+ * each with a name, balance, interest rate, and minimum monthly payment, with add/remove rows. */
+export function DebtTable({
+  rows,
+  onChange,
+  paymentLabel = "Minimum Monthly Payment",
+}: {
+  rows: DebtTableRow[];
+  onChange: (rows: DebtTableRow[]) => void;
+  paymentLabel?: string;
+}) {
+  function update(i: number, patch: Partial<DebtTableRow>) {
+    onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-[11px] uppercase tracking-wide text-nw-muted">Debts</div>
+      {rows.map((debt, i) => (
+        <div key={i} className="rounded-md border border-nw-border p-2 flex flex-col gap-1.5">
+          <input
+            type="text"
+            placeholder="Debt name"
+            value={debt.name}
+            onChange={(e) => update(i, { name: e.target.value })}
+            className="rounded-md border border-nw-border bg-nw-rail px-3 py-1.5 text-sm text-nw-text placeholder:text-nw-muted"
+          />
+          <CalcRow>
+            <CalcCol>
+              <NumField label="Balance" prefix="$" value={debt.balance} onChange={(v) => update(i, { balance: v })} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label="Interest Rate" percent value={debt.annual_rate} onChange={(v) => update(i, { annual_rate: v })} />
+            </CalcCol>
+            <CalcCol>
+              <NumField label={paymentLabel} prefix="$" value={debt.payment} onChange={(v) => update(i, { payment: v })} />
+            </CalcCol>
+          </CalcRow>
+          {rows.length > 1 && (
+            <button
+              type="button"
+              onClick={() => onChange(rows.filter((_, idx) => idx !== i))}
+              className="text-[10px] text-nw-coral self-start"
+            >
+              Remove debt
+            </button>
+          )}
+        </div>
+      ))}
+      <Button onClick={() => onChange([...rows, { name: "", balance: 5000, annual_rate: 0.18, payment: 150 }])}>+ Add debt</Button>
     </div>
   );
 }

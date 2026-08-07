@@ -7,7 +7,6 @@ from app.services.calculators import (
     compound_interest_converter,
     debt_consolidation,
     debt_payoff_avalanche,
-    emergency_fund,
     financial_independence,
     house_affordability,
     interest_rate_solver,
@@ -17,7 +16,6 @@ from app.services.calculators import (
     loan_calculator,
     mortgage,
     mortgage_payoff,
-    payment_calculator,
     refinance,
     rent_vs_buy,
     repayment_calculator,
@@ -28,7 +26,6 @@ from app.services.calculators import (
     roth_ira,
     savings,
     simple_interest,
-    target_emergency_fund,
 )
 
 
@@ -175,17 +172,6 @@ def test_amortize_engine_no_payoff_within_cap_returns_none():
     # A payment that doesn't even cover interest should never reach zero.
     result = _amortization.amortize(Decimal("100000"), Decimal("0.10"), payment=Decimal("100"), payments_per_year=12)
     assert result["periods_to_payoff"] is None
-
-
-def test_emergency_fund_basic():
-    result = emergency_fund.compute(Decimal("18000"), Decimal("6000"), Decimal("6"))
-    assert result["months_covered"] == Decimal("3.00")
-    assert result["shortfall"] == Decimal("18000.00")
-
-
-def test_emergency_fund_no_shortfall_when_target_met():
-    result = emergency_fund.compute(Decimal("40000"), Decimal("6000"), Decimal("6"))
-    assert result["shortfall"] == Decimal("0.00")
 
 
 def test_house_affordability_income_to_debt_back_end_binding():
@@ -337,28 +323,6 @@ def test_financial_independence_projects_forward():
     assert result["already_fi"] is False
     assert result["years_to_fi"] is not None
     assert result["years_to_fi"] > 0
-
-
-def test_target_emergency_fund_already_met():
-    result = target_emergency_fund.compute(
-        current_liquid_balance=Decimal("30000"),
-        monthly_expense=Decimal("4000"),
-        target_months=Decimal("6"),
-        months_to_reach_goal=12,
-    )
-    assert result["already_met"] is True
-    assert result["required_monthly_contribution"] == Decimal(0)
-
-
-def test_target_emergency_fund_required_contribution():
-    result = target_emergency_fund.compute(
-        current_liquid_balance=Decimal("0"),
-        monthly_expense=Decimal("2000"),
-        target_months=Decimal("6"),
-        months_to_reach_goal=12,
-    )
-    assert result["target_amount"] == Decimal("12000.00")
-    assert result["required_monthly_contribution"] == Decimal("1000.00")
 
 
 # --- Retirement & Investment redesign ---
@@ -641,36 +605,6 @@ def test_loan_calculator_bond_is_inverse_of_deferred():
     )
     grown = bond["initial_value"] * (Decimal("1.05") ** 5)
     assert abs(grown - Decimal("10000")) < Decimal("0.5")
-
-
-def test_payment_calculator_fixed_term_matches_mortgage_formula():
-    result = payment_calculator.compute(
-        principal=Decimal("200000"), annual_rate=Decimal("0.06"), mode="fixed_term", term_years=30
-    )
-    assert abs(result["monthly_payment"] - Decimal("1199.10")) < Decimal("0.05")
-
-
-def test_payment_calculator_fixed_payments_recovers_term():
-    # Solve for the payment on a 10-year loan, then feed that payment back in and confirm the
-    # fixed_payments mode recovers ~10 years (120 months).
-    fixed_term = payment_calculator.compute(
-        principal=Decimal("50000"), annual_rate=Decimal("0.07"), mode="fixed_term", term_years=10
-    )
-    result = payment_calculator.compute(
-        principal=Decimal("50000"),
-        annual_rate=Decimal("0.07"),
-        mode="fixed_payments",
-        monthly_payment=fixed_term["monthly_payment"],
-    )
-    assert abs(result["months_to_payoff"] - 120) <= 1
-
-
-def test_payment_calculator_payment_never_covers_interest():
-    result = payment_calculator.compute(
-        principal=Decimal("10000"), annual_rate=Decimal("0.24"), mode="fixed_payments", monthly_payment=Decimal("50")
-    )
-    assert result["error"] is not None
-    assert result["months_to_payoff"] is None
 
 
 def test_repayment_calculator_fixed_time_matches_fixed_installment():
