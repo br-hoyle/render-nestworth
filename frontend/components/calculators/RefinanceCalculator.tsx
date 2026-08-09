@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   NumField,
@@ -15,6 +15,7 @@ import {
   CalcAnswer,
   CalcEmptyState,
 } from "@/components/calculators/shared";
+import { Button } from "@/components/ui/Button";
 
 interface Result {
   error?: string;
@@ -43,11 +44,11 @@ export function RefinanceCalculator() {
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function calculate() {
+  function calculate(overrideCurrentBalance = currentBalance) {
     setLoading(true);
     api
       .post<Result>("/calculators/refinance", {
-        current_balance: currentBalance,
+        current_balance: overrideCurrentBalance,
         current_monthly_payment: currentMonthlyPayment,
         current_rate: currentRate,
         new_rate: newRate,
@@ -59,6 +60,21 @@ export function RefinanceCalculator() {
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    api.get<{ current_balance?: string }>("/calculators/refinance/defaults").then((defaults) => {
+      if (defaults.current_balance) setCurrentBalance(Number(defaults.current_balance));
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const defaults = await api.get<{ current_balance?: string }>("/calculators/refinance/defaults");
+    if (defaults.current_balance) {
+      const balance = Number(defaults.current_balance);
+      setCurrentBalance(balance);
+      calculate(balance);
+    }
   }
 
   const inputsPanel = (
@@ -97,8 +113,9 @@ export function RefinanceCalculator() {
           <NumField label="Cash Out Amount" prefix="$" value={cashOutAmount} onChange={setCashOutAmount} helper="Added to the new loan's balance; offsets the upfront cost." />
         </div>
       </CalcOptionalSection>
-      <div className="pt-1">
-        <CalcButton onClick={calculate} loading={loading} />
+      <div className="flex flex-col gap-2 pt-1">
+        <CalcButton onClick={() => calculate()} loading={loading} />
+        <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
     </>
   );

@@ -16,6 +16,7 @@ import type {
   TransactionRecord,
 } from "@/lib/types";
 import { money, titleCase, computeChangePct } from "@/lib/format";
+import { useAuth } from "@/lib/auth-context";
 import { NetWorthChart } from "@/components/charts/NetWorthChart";
 import { AllocationSunburst } from "@/components/charts/AllocationSunburst";
 import { KpiTile } from "@/components/kpi/KpiTile";
@@ -144,6 +145,8 @@ function formatDateLabel(isoDate: string): string {
 }
 
 export default function OverviewPage() {
+  const { session } = useAuth();
+  const welcomeTitle = session ? `Welcome back, ${session.household_name.replace(/^the\s+/i, "")} Household!` : "Welcome back!";
   const [range, setRange] = useState(12);
   const [stale, setStale] = useState<StaleAccountInfo[] | null>(null);
   const [series, setSeries] = useState<NetWorthSeriesResponse | null>(null);
@@ -211,8 +214,8 @@ export default function OverviewPage() {
   const isLoading = stale === null || series === null || accounts === null || scorecard === null || transactions === null;
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 flex flex-col gap-3">
-        <h1 className="text-lg font-medium">Overview</h1>
+      <div className="p-4 md:p-6 flex flex-col gap-4 max-w-6xl mx-auto w-full">
+        <h1 className="text-lg font-medium">{welcomeTitle}</h1>
         <LoadingBlock />
       </div>
     );
@@ -220,8 +223,8 @@ export default function OverviewPage() {
 
   if (points.length < 2) {
     return (
-      <div className="p-4 md:p-6 flex flex-col gap-3">
-        <h1 className="text-lg font-medium">Overview</h1>
+      <div className="p-4 md:p-6 flex flex-col gap-4 max-w-6xl mx-auto w-full">
+        <h1 className="text-lg font-medium">{welcomeTitle}</h1>
         <p className="text-sm text-nw-muted">
           Record a second balance to see a trend.{" "}
           <Link href="/update" className="text-nw-mint">
@@ -236,7 +239,7 @@ export default function OverviewPage() {
     <div className="p-4 md:p-6 flex flex-col gap-4 max-w-6xl mx-auto w-full">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <h1 className="text-lg font-medium">Overview</h1>
+          <h1 className="text-lg font-medium">{welcomeTitle}</h1>
         </div>
         <Link href="/update">
           <Button variant="primary">Update balances</Button>

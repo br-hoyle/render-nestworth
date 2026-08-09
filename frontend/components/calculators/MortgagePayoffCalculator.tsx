@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -108,6 +108,12 @@ export function MortgagePayoffCalculator() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<{ original_principal?: string }>("/calculators/mortgage-payoff/defaults").then((defaults) => {
+      if (defaults.original_principal) setOriginalPrincipal(Number(defaults.original_principal));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<{ original_principal?: string }>("/calculators/mortgage-payoff/defaults");

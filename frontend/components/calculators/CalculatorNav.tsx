@@ -31,7 +31,7 @@ export function CalculatorNav({
 }: {
   groups: string[];
   calculators: CalculatorNavEntry[];
-  active: string;
+  active: string | null;
   onSelect: (key: string) => void;
 }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -131,7 +131,7 @@ function GroupPanel({
 }: {
   groupLabel: string;
   entries: CalculatorNavEntry[];
-  active: string;
+  active: string | null;
   onSelect: (key: string) => void;
 }) {
   // A group renders as a columned grid whenever any entry sets `section` or `column` — named

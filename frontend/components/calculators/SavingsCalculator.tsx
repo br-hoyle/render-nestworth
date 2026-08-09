@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   NumField,
@@ -19,6 +19,7 @@ import {
 } from "@/components/calculators/shared";
 import { StackedGrowthChart } from "@/components/calculators/StackedGrowthChart";
 import { FREQUENCY_OPTIONS, type CompoundFrequency } from "@/lib/calculatorTypes";
+import { Button } from "@/components/ui/Button";
 
 export function SavingsCalculator() {
   const [inputs, setInputs] = useState({
@@ -35,13 +36,26 @@ export function SavingsCalculator() {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"chart" | "table">("chart");
 
-  function calculate() {
+  function calculate(overrides = inputs) {
     setLoading(true);
     api
-      .post<Record<string, unknown>>("/calculators/savings", inputs)
+      .post<Record<string, unknown>>("/calculators/savings", overrides)
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/savings/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const defaults = await api.get<Partial<typeof inputs>>("/calculators/savings/defaults");
+    const merged = { ...inputs, ...defaults };
+    setInputs(merged);
+    calculate(merged);
   }
 
   const schedule = (result?.schedule as { year: number; balance: number; starting_balance: number; contributions_to_date: number }[]) ?? [];
@@ -113,8 +127,9 @@ export function SavingsCalculator() {
           </CalcCol>
         </CalcRow>
       </CalcOptionalSection>
-      <div className="pt-1">
-        <CalcButton onClick={calculate} loading={loading} />
+      <div className="flex flex-col gap-2 pt-1">
+        <CalcButton onClick={() => calculate()} loading={loading} />
+        <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
     </>
   );

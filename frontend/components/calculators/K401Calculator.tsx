@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   NumField,
@@ -28,9 +28,9 @@ export function K401Calculator() {
     contribution_pct: 0.06,
     employer_match_pct: 0.5,
     employer_match_limit_pct: 0.06,
-    life_expectancy: 90,
+    life_expectancy: 85,
     annual_income_increase: 0.02,
-    avg_return: 0.07,
+    avg_return: 0.11,
     inflation_rate: 0.03,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
@@ -45,6 +45,12 @@ export function K401Calculator() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/401k/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<typeof inputs>>("/calculators/401k/defaults");

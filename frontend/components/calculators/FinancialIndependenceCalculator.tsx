@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -57,6 +57,12 @@ export function FinancialIndependenceCalculator() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/financial-independence/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<typeof inputs>>("/calculators/financial-independence/defaults");

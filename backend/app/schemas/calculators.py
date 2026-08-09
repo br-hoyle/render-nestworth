@@ -52,10 +52,10 @@ class RetirementNeedInput(BaseModel):
     retirement_age: int
     current_income: Decimal
     current_savings: Decimal = Decimal(0)
-    life_expectancy: int = 90
+    life_expectancy: int = 85
     annual_income_increase: Decimal = Decimal("0.02")
     income_replacement_pct: Decimal = Decimal("0.80")
-    avg_return: Decimal = Decimal("0.06")
+    avg_return: Decimal = Decimal("0.11")
     inflation_rate: Decimal = Decimal("0.03")
     other_income_monthly: Decimal = Decimal(0)
 
@@ -65,7 +65,7 @@ class RetirementSavingsPlanInput(BaseModel):
     retirement_age: int
     amount_needed_at_retirement: Decimal
     current_retirement_savings: Decimal = Decimal(0)
-    avg_investment_return: Decimal = Decimal("0.06")
+    avg_investment_return: Decimal = Decimal("0.11")
 
 
 class RetirementWithdrawalInput(BaseModel):
@@ -73,17 +73,17 @@ class RetirementWithdrawalInput(BaseModel):
     retirement_age: int
     current_retirement_savings: Decimal = Decimal(0)
     monthly_contribution: Decimal = Decimal(0)
-    life_expectancy: int = 90
-    avg_investment_return: Decimal = Decimal("0.06")
+    life_expectancy: int = 85
+    avg_investment_return: Decimal = Decimal("0.11")
     inflation_rate: Decimal = Decimal("0.03")
 
 
 class RetirementLongevityInput(BaseModel):
     retirement_savings_at_retirement: Decimal
     planned_withdrawal_amount: Decimal
-    avg_investment_return: Decimal = Decimal("0.06")
+    avg_investment_return: Decimal = Decimal("0.11")
     retirement_age: int = 65
-    life_expectancy: int = 90
+    life_expectancy: int = 85
 
 
 class InvestmentInput(BaseModel):
@@ -105,9 +105,9 @@ class K401Input(BaseModel):
     contribution_pct: Decimal = Decimal("0.06")
     employer_match_pct: Decimal = Decimal("0.50")
     employer_match_limit_pct: Decimal = Decimal("0.06")
-    life_expectancy: int = 90
+    life_expectancy: int = 85
     annual_income_increase: Decimal = Decimal("0.02")
-    avg_return: Decimal = Decimal("0.07")
+    avg_return: Decimal = Decimal("0.11")
     inflation_rate: Decimal = Decimal("0.03")
 
 
@@ -126,7 +126,7 @@ class RothIraInput(BaseModel):
     current_balance: Decimal = Decimal(0)
     maximize_contributions: bool = True
     annual_contribution: Decimal = Decimal("7000")
-    avg_return: Decimal = Decimal("0.07")
+    avg_return: Decimal = Decimal("0.11")
     marginal_tax_rate: Decimal = Decimal("0.22")
 
 

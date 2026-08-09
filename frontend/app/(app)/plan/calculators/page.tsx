@@ -79,9 +79,88 @@ const CALCULATORS: Entry[] = [
 
 const GROUPS: Group[] = ["Retirement & Investment", "Debt & Payment", "Housing & Mortgage"];
 
+// The landing view's "most popular calculators" list — a fixed, curated set (not derived from
+// CALCULATORS) so the blurbs can be one generic sentence per calculator rather than pulling in
+// a specific sub-tab's mode-dependent copy. Presented like search results: name + 1-2 sentence
+// description, each clickable to jump straight into that calculator.
+const POPULAR_CALCULATORS: { key: string; label: string; description: string }[] = [
+  {
+    key: "retirement",
+    label: "Retirement Calculator",
+    description:
+      "See if you're on track to retire — how much you'll need, how to get there, how much you can safely withdraw, and how long your money will last.",
+  },
+  {
+    key: "investment",
+    label: "Investment Calculator",
+    description: "Project how a lump sum plus regular contributions grows over time, or solve for the contribution or timeline needed to hit a target.",
+  },
+  {
+    key: "401k",
+    label: "401(k) Calculator",
+    description: "Project your 401(k) balance at retirement, including your employer's match, and the monthly income it could support.",
+  },
+  {
+    key: "loan",
+    label: "Loan Calculator",
+    description: "Work out payments, payoff schedules, and total interest for an amortized, deferred, or bond-style loan.",
+  },
+  {
+    key: "debt-payoff",
+    label: "Debt Payoff Calculator",
+    description:
+      "Pay down multiple debts fastest using the avalanche method, with optional extra payments to see how much time and interest you save.",
+  },
+  {
+    key: "mortgage",
+    label: "Mortgage Calculator",
+    description: "Estimate the full monthly cost of a home you're considering — principal, interest, property tax, insurance, PMI, and HOA.",
+  },
+  {
+    key: "house-affordability",
+    label: "House Affordability Calculator",
+    description: "Estimate how much home you can afford, either from your income and existing debts or from a fixed monthly budget.",
+  },
+  {
+    key: "rent-vs-buy",
+    label: "Rent vs. Buy Calculator",
+    description:
+      "Compare the true cost of buying a home against renting and investing the difference, accounting for equity, appreciation, and every recurring cost.",
+  },
+];
+
+function CalculatorsLanding({ onSelect }: { onSelect: (key: string) => void }) {
+  return (
+    <div className="flex flex-col gap-6 max-w-3xl">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-xl font-medium">Personal Finance Calculators</h1>
+        <p className="text-sm text-nw-muted">
+          Pick a calculator from the nav above, or jump straight into one of the most popular ones below.
+        </p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="text-[11px] uppercase tracking-wide text-nw-muted mb-1">Most Popular Calculators</div>
+        <div className="flex flex-col divide-y divide-nw-border rounded-lg border border-nw-border bg-nw-surface">
+          {POPULAR_CALCULATORS.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => onSelect(c.key)}
+              className="text-left px-4 py-3 hover:bg-nw-rail transition-colors flex flex-col gap-0.5"
+            >
+              <span className="text-sm font-medium text-nw-mint">{c.label}</span>
+              <span className="text-xs text-nw-muted">{c.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CalculatorsPage() {
-  const [active, setActive] = useState<string>("retirement");
-  const current = CALCULATORS.find((c) => c.key === active)!;
+  const [active, setActive] = useState<string | null>(null);
+  const current = active ? CALCULATORS.find((c) => c.key === active) : null;
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -96,9 +175,15 @@ export default function CalculatorsPage() {
           without section names — a plain 3-column, 2-row grid in a fixed (not alphabetical)
           order, filled down each column before moving to the next. */}
       <CalculatorNav groups={GROUPS} calculators={CALCULATORS} active={active} onSelect={setActive} />
-      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 md:p-6" key={active}>
-        {!current.hasOwnCopy && <h1 className="text-lg font-medium mb-4">{current.label}</h1>}
-        {current.render()}
+      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 md:p-6" key={active ?? "landing"}>
+        {current ? (
+          <>
+            {!current.hasOwnCopy && <h1 className="text-lg font-medium mb-4">{current.label}</h1>}
+            {current.render()}
+          </>
+        ) : (
+          <CalculatorsLanding onSelect={setActive} />
+        )}
       </div>
     </div>
   );

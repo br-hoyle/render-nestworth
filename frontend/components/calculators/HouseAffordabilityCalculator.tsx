@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   AmountOrPercentField,
@@ -110,6 +110,12 @@ export function HouseAffordabilityCalculator() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<{ annual_income?: string }>("/calculators/house-affordability/defaults").then((defaults) => {
+      if (defaults.annual_income) setAnnualIncome(Number(defaults.annual_income));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<{ annual_income?: string }>("/calculators/house-affordability/defaults");

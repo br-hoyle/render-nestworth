@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -62,12 +62,12 @@ function RetirementNeedTab() {
   const [inputs, setInputs] = useState({
     current_age: 35,
     retirement_age: 65,
-    life_expectancy: 90,
+    life_expectancy: 85,
     current_income: 80000,
     current_savings: 20000,
     annual_income_increase: 0.02,
     income_replacement_pct: 0.8,
-    avg_return: 0.06,
+    avg_return: 0.11,
     inflation_rate: 0.03,
     other_income_monthly: 0,
   });
@@ -83,6 +83,12 @@ function RetirementNeedTab() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/retirement-need/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<typeof inputs>>("/calculators/retirement-need/defaults");
@@ -195,7 +201,7 @@ function RetirementSavingsPlanTab() {
     retirement_age: 65,
     amount_needed_at_retirement: 1000000,
     current_retirement_savings: 20000,
-    avg_investment_return: 0.06,
+    avg_investment_return: 0.11,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -209,6 +215,12 @@ function RetirementSavingsPlanTab() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/retirement-savings-plan/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<typeof inputs>>("/calculators/retirement-savings-plan/defaults");
@@ -292,10 +304,10 @@ function RetirementWithdrawalTab() {
   const [inputs, setInputs] = useState({
     current_age: 55,
     retirement_age: 65,
-    life_expectancy: 90,
+    life_expectancy: 85,
     current_retirement_savings: 300000,
     monthly_contribution: 1000,
-    avg_investment_return: 0.06,
+    avg_investment_return: 0.11,
     inflation_rate: 0.03,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
@@ -310,6 +322,12 @@ function RetirementWithdrawalTab() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/retirement-withdrawal/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     const defaults = await api.get<Partial<typeof inputs>>("/calculators/retirement-withdrawal/defaults");
@@ -380,10 +398,10 @@ function RetirementWithdrawalTab() {
 function RetirementLongevityTab() {
   const [inputs, setInputs] = useState({
     retirement_age: 65,
-    life_expectancy: 90,
+    life_expectancy: 85,
     retirement_savings_at_retirement: 500000,
     planned_withdrawal_amount: 3000,
-    avg_investment_return: 0.06,
+    avg_investment_return: 0.11,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);

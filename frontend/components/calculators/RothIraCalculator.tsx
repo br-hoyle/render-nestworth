@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -32,7 +32,7 @@ export function RothIraCalculator() {
     retirement_age: 65,
     maximize_contributions: true,
     annual_contribution: 7000,
-    avg_return: 0.07,
+    avg_return: 0.11,
     marginal_tax_rate: 0.22,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
@@ -47,6 +47,13 @@ export function RothIraCalculator() {
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
   }
+
+  useEffect(() => {
+    api.get<Record<string, unknown>>("/calculators/roth-ira/defaults").then((defaults) => {
+      const { current_balance: _unused, ...rest } = defaults;
+      if (Object.keys(rest).length > 0) setInputs((i) => ({ ...i, ...(rest as Partial<typeof inputs>) }));
+    });
+  }, []);
 
   async function resetToMyNumbers() {
     // Current Balance isn't a visible input here (this calculator only projects from new

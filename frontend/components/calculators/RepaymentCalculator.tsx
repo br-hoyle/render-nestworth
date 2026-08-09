@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   NumField,
@@ -17,6 +17,7 @@ import {
   SelectField,
 } from "@/components/calculators/shared";
 import { FREQUENCY_OPTIONS, type CompoundFrequency } from "@/lib/calculatorTypes";
+import { Button } from "@/components/ui/Button";
 
 type Mode = "fixed_time" | "fixed_installment";
 
@@ -43,10 +44,10 @@ export function RepaymentCalculator() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function calculate() {
+  function calculate(overrides = inputs) {
     setLoading(true);
     api
-      .post<Record<string, unknown>>("/calculators/repayment", { ...inputs, mode })
+      .post<Record<string, unknown>>("/calculators/repayment", { ...overrides, mode })
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
@@ -55,6 +56,19 @@ export function RepaymentCalculator() {
   function switchMode(next: Mode) {
     setMode(next);
     setResult(null);
+  }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/repayment/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const defaults = await api.get<Partial<typeof inputs>>("/calculators/repayment/defaults");
+    const merged = { ...inputs, ...defaults };
+    setInputs(merged);
+    calculate(merged);
   }
 
   const inputsPanel = (
@@ -97,8 +111,9 @@ export function RepaymentCalculator() {
           />
         </CalcCol>
       </CalcRow>
-      <div className="pt-1">
-        <CalcButton onClick={calculate} loading={loading} />
+      <div className="flex flex-col gap-2 pt-1">
+        <CalcButton onClick={() => calculate()} loading={loading} />
+        <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
     </>
   );

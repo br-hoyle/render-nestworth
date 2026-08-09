@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -66,17 +66,28 @@ export function DebtPayoffCalculator() {
       .finally(() => setLoading(false));
   }
 
-  async function resetToMyNumbers() {
+  async function fetchDefaultDebts(): Promise<DebtTableRow[] | null> {
     const defaults = await api.get<{ debts?: { name: string; balance: string; annual_rate: string; minimum_payment: string }[] }>(
       "/calculators/debt-payoff/defaults"
     );
-    if (defaults.debts && defaults.debts.length > 0) {
-      const rows: DebtTableRow[] = defaults.debts.map((d) => ({
-        name: d.name,
-        balance: Number(d.balance),
-        annual_rate: Number(d.annual_rate),
-        payment: Number(d.minimum_payment),
-      }));
+    if (!defaults.debts || defaults.debts.length === 0) return null;
+    return defaults.debts.map((d) => ({
+      name: d.name,
+      balance: Number(d.balance),
+      annual_rate: Number(d.annual_rate),
+      payment: Number(d.minimum_payment),
+    }));
+  }
+
+  useEffect(() => {
+    fetchDefaultDebts().then((rows) => {
+      if (rows) setDebts(rows);
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const rows = await fetchDefaultDebts();
+    if (rows) {
       setDebts(rows);
       calculate(rows);
     }

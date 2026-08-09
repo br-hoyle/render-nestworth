@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   NumField,
@@ -20,6 +20,7 @@ import {
 } from "@/components/calculators/shared";
 import { StackedGrowthChart } from "@/components/calculators/StackedGrowthChart";
 import { FREQUENCY_OPTIONS, type CompoundFrequency, type ContributionTiming } from "@/lib/calculatorTypes";
+import { Button } from "@/components/ui/Button";
 
 type Mode = "end_amount" | "contribution" | "length";
 
@@ -50,10 +51,10 @@ export function InvestmentCalculator() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function calculate() {
+  function calculate(overrides = inputs) {
     setLoading(true);
     api
-      .post<Record<string, unknown>>("/calculators/investment", { ...inputs, solve_for: mode })
+      .post<Record<string, unknown>>("/calculators/investment", { ...overrides, solve_for: mode })
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
@@ -62,6 +63,19 @@ export function InvestmentCalculator() {
   function switchMode(next: Mode) {
     setMode(next);
     setResult(null);
+  }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/investment/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const defaults = await api.get<Partial<typeof inputs>>("/calculators/investment/defaults");
+    const merged = { ...inputs, ...defaults };
+    setInputs(merged);
+    calculate(merged);
   }
 
   const schedule = (result?.schedule as { year: number; balance: number; starting_balance: number; contributions_to_date: number }[]) ?? [];
@@ -157,8 +171,9 @@ export function InvestmentCalculator() {
           </select>
         </label>
       </CalcOptionalSection>
-      <div className="pt-1">
+      <div className="flex flex-col gap-2 pt-1">
         <CalcButton onClick={calculate} loading={loading} />
+        <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
     </>
   );

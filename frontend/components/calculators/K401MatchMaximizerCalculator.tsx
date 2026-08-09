@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { NumField, ResultTile, fmtMoney, CalcButton, CalcCopy, CalcLayout, CalcRow, CalcCol, CalcAnswer, CalcEmptyState } from "@/components/calculators/shared";
+import { Button } from "@/components/ui/Button";
 
 const SCALE_MAX = 20; // % — a wide-enough window to fit any realistic match/IRS-limit combo
 
@@ -45,13 +46,26 @@ export function K401MatchMaximizerCalculator() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
 
-  function calculate() {
+  function calculate(overrides = inputs) {
     setLoading(true);
     api
-      .post<Record<string, unknown>>("/calculators/401k-match-maximizer", inputs)
+      .post<Record<string, unknown>>("/calculators/401k-match-maximizer", overrides)
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/401k-match-maximizer/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const defaults = await api.get<Partial<typeof inputs>>("/calculators/401k-match-maximizer/defaults");
+    const merged = { ...inputs, ...defaults };
+    setInputs(merged);
+    calculate(merged);
   }
 
   const inputsPanel = (
@@ -99,8 +113,9 @@ export function K401MatchMaximizerCalculator() {
           />
         </CalcCol>
       </CalcRow>
-      <div className="pt-1">
-        <CalcButton onClick={calculate} loading={loading} />
+      <div className="flex flex-col gap-2 pt-1">
+        <CalcButton onClick={() => calculate()} loading={loading} />
+        <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
     </>
   );
