@@ -1,5 +1,6 @@
 import hashlib
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import text
@@ -19,6 +20,7 @@ from app.schemas.auth import (
     SessionResponse,
     SetupAccountRequest,
     SignupRequest,
+    UpdateBirthdateRequest,
     UpdateHouseholdNameRequest,
 )
 from app.security import (
@@ -48,14 +50,26 @@ def _decoy_question(username: str) -> str:
     return SECURITY_QUESTIONS[idx]
 
 
-def _to_session_response(household_id: str, household_name: str, username: str, expires_at: int) -> SessionResponse:
+def _to_session_response(
+    household_id: str,
+    household_name: str,
+    username: str,
+    expires_at: int,
+    birthdate: date | None = None,
+) -> SessionResponse:
     settings = get_settings()
     return SessionResponse(
         household_name=household_name,
         username=username,
         session_expires_at=expires_at,
         is_owner=bool(settings.owner_household_id) and household_id == settings.owner_household_id,
+        birthdate=birthdate,
     )
+
+
+def _decrypt_birthdate(birthdate_encrypted: str | None) -> date | None:
+    decrypted = decrypt_pii(birthdate_encrypted)
+    return date.fromisoformat(decrypted) if decrypted else None
 
 
 @router.post("/login", response_model=SessionResponse)
@@ -71,7 +85,7 @@ def login(
 
     row = conn.execute(
         text(
-            "select household_id, household_name, password_hash, status "
+            "select household_id, household_name, password_hash, status, birthdate_encrypted "
             "from users where username_lookup_hash = :username_hash"
         ),
         {"username_hash": hash_username(payload.username)},
@@ -96,7 +110,11 @@ def login(
     token, expires_at = create_session_token(str(row["household_id"]), payload.username)
     set_session_cookie(response, token)
     return _to_session_response(
-        str(row["household_id"]), decrypt_pii(row["household_name"]), payload.username, expires_at
+        str(row["household_id"]),
+        decrypt_pii(row["household_name"]),
+        payload.username,
+        expires_at,
+        _decrypt_birthdate(row["birthdate_encrypted"]),
     )
 
 
@@ -127,6 +145,7 @@ def setup_account(
             set password_hash = :password_hash,
                 security_question = :security_question,
                 security_answer_hash = :security_answer_hash,
+                birthdate_encrypted = :birthdate_encrypted,
                 status = 'active'
             where household_id = :household_id
             """
@@ -135,6 +154,7 @@ def setup_account(
             "password_hash": hash_secret(payload.password),
             "security_question": payload.security_question,
             "security_answer_hash": hash_secret(payload.security_answer.strip().lower()),
+            "birthdate_encrypted": encrypt_pii(payload.birthdate.isoformat()) if payload.birthdate else None,
             "household_id": row["household_id"],
         },
     )
@@ -142,7 +162,7 @@ def setup_account(
     token, expires_at = create_session_token(str(row["household_id"]), payload.username)
     set_session_cookie(response, token)
     return _to_session_response(
-        str(row["household_id"]), decrypt_pii(row["household_name"]), payload.username, expires_at
+        str(row["household_id"]), decrypt_pii(row["household_name"]), payload.username, expires_at, payload.birthdate
     )
 
 
@@ -174,10 +194,10 @@ def signup(
             """
             insert into users
                 (household_id, household_name, username_lookup_hash, username_encrypted,
-                 password_hash, security_question, security_answer_hash, status)
+                 password_hash, security_question, security_answer_hash, birthdate_encrypted, status)
             values
                 (:household_id, :household_name, :username_hash, :username_encrypted,
-                 :password_hash, :security_question, :security_answer_hash, 'active')
+                 :password_hash, :security_question, :security_answer_hash, :birthdate_encrypted, 'active')
             """
         ),
         {
@@ -188,13 +208,16 @@ def signup(
             "password_hash": hash_secret(payload.password),
             "security_question": payload.security_question,
             "security_answer_hash": hash_secret(payload.security_answer.strip().lower()),
+            "birthdate_encrypted": encrypt_pii(payload.birthdate.isoformat()) if payload.birthdate else None,
         },
     )
 
     clear_attempts(key)
     token, expires_at = create_session_token(str(household_id), payload.username)
     set_session_cookie(response, token)
-    return _to_session_response(str(household_id), payload.household_name, payload.username, expires_at)
+    return _to_session_response(
+        str(household_id), payload.household_name, payload.username, expires_at, payload.birthdate
+    )
 
 
 @router.post("/forgot-password/question", response_model=ForgotPasswordQuestionResponse)
@@ -250,13 +273,17 @@ def me(
     conn: Connection = Depends(get_owner_db),
 ) -> SessionResponse:
     row = conn.execute(
-        text("select household_name from users where household_id = :household_id"),
+        text("select household_name, birthdate_encrypted from users where household_id = :household_id"),
         {"household_id": session.household_id},
     ).mappings().first()
     if row is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     return _to_session_response(
-        session.household_id, decrypt_pii(row["household_name"]), session.username, session.expires_at
+        session.household_id,
+        decrypt_pii(row["household_name"]),
+        session.username,
+        session.expires_at,
+        _decrypt_birthdate(row["birthdate_encrypted"]),
     )
 
 
@@ -320,4 +347,40 @@ def update_household_name(
         text("update users set household_name = :name where household_id = :household_id"),
         {"name": encrypt_pii(payload.household_name), "household_id": session.household_id},
     )
-    return _to_session_response(session.household_id, payload.household_name, session.username, session.expires_at)
+    row = conn.execute(
+        text("select birthdate_encrypted from users where household_id = :household_id"),
+        {"household_id": session.household_id},
+    ).mappings().first()
+    return _to_session_response(
+        session.household_id,
+        payload.household_name,
+        session.username,
+        session.expires_at,
+        _decrypt_birthdate(row["birthdate_encrypted"]) if row else None,
+    )
+
+
+@router.patch("/birthdate", response_model=SessionResponse)
+def update_birthdate(
+    payload: UpdateBirthdateRequest,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_owner_db),
+) -> SessionResponse:
+    conn.execute(
+        text("update users set birthdate_encrypted = :birthdate where household_id = :household_id"),
+        {
+            "birthdate": encrypt_pii(payload.birthdate.isoformat()) if payload.birthdate else None,
+            "household_id": session.household_id,
+        },
+    )
+    row = conn.execute(
+        text("select household_name from users where household_id = :household_id"),
+        {"household_id": session.household_id},
+    ).mappings().first()
+    return _to_session_response(
+        session.household_id,
+        decrypt_pii(row["household_name"]) if row else session.username,
+        session.username,
+        session.expires_at,
+        payload.birthdate,
+    )

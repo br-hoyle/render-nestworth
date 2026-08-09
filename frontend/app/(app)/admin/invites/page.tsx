@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 interface Invite {
   household_id: string;
@@ -84,7 +85,7 @@ export default function InvitesPage() {
       </Card>
 
       <div className="flex flex-col">
-        {invites === null && <p className="text-sm text-nw-muted">Loading…</p>}
+        {invites === null && <LoadingBlock />}
         {invites?.map((inv) => (
           <div
             key={inv.household_id}

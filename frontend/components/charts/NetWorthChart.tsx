@@ -31,6 +31,16 @@ export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[
     return max / (max - min);
   }, [data]);
 
+  // Guarded here (not just by callers) so any future caller gets this for free — an
+  // AreaChart with 0-1 points renders axes with no visible line and no explanation.
+  if (data.length < 2) {
+    return (
+      <div style={{ height }} className="flex items-center justify-center">
+        <p className="text-xs text-nw-muted">Not enough history yet.</p>
+      </div>
+    );
+  }
+
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>

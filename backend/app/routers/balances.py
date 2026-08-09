@@ -247,6 +247,20 @@ def _query_dates(start: date, end: date, granularity: str) -> list[date]:
     return [start + timedelta(days=i) for i in range(max(days, 0) + 1)]
 
 
+def _latest_real_balance_date(conn: Connection, household_id: str) -> date | None:
+    """The most recent date the household actually entered a balance for any account — used to
+    cap the net worth series so it never extends past real data. Without this, the series (and
+    the chart's rightmost point, and the "BoB" day-over-day delta) would forward-fill every
+    account's last known balance all the way to today even when nothing was updated today —
+    fabricating a "today" data point out of stale numbers rather than reflecting an actual gap in
+    updates."""
+    row = conn.execute(
+        text("select max(full_date) as latest from balances where household_id = :household_id"),
+        {"household_id": household_id},
+    ).first()
+    return row.latest if row and row.latest else None
+
+
 @router.get("/networth/series")
 def networth_series(
     start: date,
@@ -255,7 +269,11 @@ def networth_series(
     session: Session = Depends(get_current_session),
     conn: Connection = Depends(get_tenant_db),
 ) -> dict:
-    today = end or date.today()
+    if end is not None:
+        today = end
+    else:
+        latest_real_date = _latest_real_balance_date(conn, session.household_id)
+        today = min(date.today(), latest_real_date) if latest_real_date else date.today()
     query_dates = _query_dates(start, today, granularity)
 
     accounts = conn.execute(

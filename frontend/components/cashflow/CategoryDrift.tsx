@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 interface CategoryTrend {
   label: string;
@@ -128,7 +129,7 @@ export function CategoryDrift({ months = 12, end }: { months?: number; end?: str
       </div>
 
       {trends === null ? (
-        <p className="text-xs text-nw-muted">Loading…</p>
+        <LoadingBlock className="py-6" />
       ) : trends.length === 0 ? (
         <p className="text-xs text-nw-muted">No expense history yet.</p>
       ) : !hasAnyRatio ? (

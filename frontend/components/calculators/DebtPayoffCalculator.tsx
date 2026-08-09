@@ -1,75 +1,189 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
+import { money } from "@/lib/format";
+import {
+  NumField,
+  ResultTile,
+  fmtMoney,
+  CalcButton,
+  CalcCopy,
+  CalcLayout,
+  CalcRow,
+  CalcCol,
+  CalcOptionalSection,
+  CalcAnswer,
+  CalcViewToggle,
+  ScheduleTable,
+  CalcEmptyState,
+  DebtTable,
+  type DebtTableRow,
+  SelectField,
+} from "@/components/calculators/shared";
 import { Button } from "@/components/ui/Button";
-import { NumField, ResultTile, fmtMoney } from "./shared";
 
-interface Inputs {
-  balance: number;
-  annual_rate: number;
-  monthly_payment: number;
-}
+const EMPTY_DEBT: DebtTableRow = { name: "", balance: 5000, annual_rate: 0.2, payment: 100 };
 
-interface Result {
-  payoff_months: number | null;
-  total_interest: string | null;
-  schedule: { month: number; balance: string }[];
-  error: string | null;
+function BalanceChart({ data }: { data: { year: number; total_balance: number }[] }) {
+  if (data.length < 2) return <p className="text-xs text-nw-muted">Not enough data yet.</p>;
+  return (
+    <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
+      <ResponsiveContainer width="100%" height={220}>
+        <LineChart data={data}>
+          <CartesianGrid stroke="var(--nw-border)" vertical={false} />
+          <XAxis dataKey="year" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+          <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={70} tickFormatter={(v) => money(v)} />
+          <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
+          <Line type="monotone" dataKey="total_balance" name="Total Balance" stroke="var(--nw-green)" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 export function DebtPayoffCalculator() {
-  const [inputs, setInputs] = useState<Inputs>({ balance: 0, annual_rate: 0.18, monthly_payment: 0 });
-  const [result, setResult] = useState<Result | null>(null);
+  const [debts, setDebts] = useState<DebtTableRow[]>([{ ...EMPTY_DEBT }]);
+  const [fixedTotalPayment, setFixedTotalPayment] = useState(true);
+  const [extraPayment, setExtraPayment] = useState(100);
+  const [extraPaymentFrequency, setExtraPaymentFrequency] = useState<"monthly" | "annually">("monthly");
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"chart" | "table">("chart");
 
-  async function resetToMyNumbers() {
-    const defaults = await api.get<Partial<Inputs>>("/calculators/debt-payoff/defaults");
-    setInputs((i) => ({ ...i, ...defaults, balance: Number(defaults.balance ?? i.balance) }));
+  function calculate(debtsOverride = debts) {
+    setLoading(true);
+    api
+      .post<Record<string, unknown>>("/calculators/debt-payoff", {
+        debts: debtsOverride.map((d) => ({ name: d.name, balance: d.balance, annual_rate: d.annual_rate, minimum_payment: d.payment })),
+        fixed_total_payment: fixedTotalPayment,
+        extra_payment: extraPayment,
+        extra_payment_frequency: extraPaymentFrequency,
+      })
+      .then(setResult)
+      .catch(() => setResult(null))
+      .finally(() => setLoading(false));
+  }
+
+  async function fetchDefaultDebts(): Promise<DebtTableRow[] | null> {
+    const defaults = await api.get<{ debts?: { name: string; balance: string; annual_rate: string; minimum_payment: string }[] }>(
+      "/calculators/debt-payoff/defaults"
+    );
+    if (!defaults.debts || defaults.debts.length === 0) return null;
+    return defaults.debts.map((d) => ({
+      name: d.name,
+      balance: Number(d.balance),
+      annual_rate: Number(d.annual_rate),
+      payment: Number(d.minimum_payment),
+    }));
   }
 
   useEffect(() => {
-    resetToMyNumbers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchDefaultDebts().then((rows) => {
+      if (rows) setDebts(rows);
+    });
   }, []);
 
-  useEffect(() => {
-    if (!inputs.balance || !inputs.monthly_payment) return;
-    const id = setTimeout(() => {
-      api.post<Result>("/calculators/debt-payoff", inputs).then(setResult).catch(() => setResult(null));
-    }, 300);
-    return () => clearTimeout(id);
-  }, [inputs]);
+  async function resetToMyNumbers() {
+    const rows = await fetchDefaultDebts();
+    if (rows) {
+      setDebts(rows);
+      calculate(rows);
+    }
+  }
 
-  return (
-    <div className="flex flex-col md:flex-row gap-4">
-      <div className="w-full md:w-56 flex-none flex flex-col gap-3">
-        <NumField label="Current balance" value={inputs.balance} onChange={(v) => setInputs((i) => ({ ...i, balance: v }))} />
-        <NumField label="APR" value={inputs.annual_rate} percent onChange={(v) => setInputs((i) => ({ ...i, annual_rate: v }))} />
-        <NumField label="Monthly payment" value={inputs.monthly_payment} onChange={(v) => setInputs((i) => ({ ...i, monthly_payment: v }))} />
+  const payoffOrder = (result?.payoff_order as string[]) ?? [];
+  const schedule = (result?.schedule as { year: number; total_balance: number }[]) ?? [];
+
+  const inputsPanel = (
+    <>
+      <SelectField
+        label="Fixed Total Payment"
+        value={fixedTotalPayment ? "yes" : "no"}
+        onChange={(v) => setFixedTotalPayment(v === "yes")}
+        options={[
+          { value: "yes", label: "Yes — redirect freed-up payments" },
+          { value: "no", label: "No — total outlay shrinks" },
+        ]}
+      />
+      <DebtTable rows={debts} onChange={setDebts} paymentLabel="Minimum Monthly Payment" />
+      <CalcOptionalSection>
+        <CalcRow>
+          <CalcCol>
+            <SelectField
+              label="Extra Payment Frequency"
+              value={extraPaymentFrequency}
+              onChange={setExtraPaymentFrequency}
+              options={[
+                { value: "monthly", label: "Monthly" },
+                { value: "annually", label: "Once a year (e.g. tax refund)" },
+              ]}
+            />
+          </CalcCol>
+          <CalcCol>
+            <NumField
+              label="Extra Payment Amount"
+              prefix="$"
+              value={extraPayment}
+              onChange={setExtraPayment}
+              helper="Goes to the highest-priority debt first."
+            />
+          </CalcCol>
+        </CalcRow>
+      </CalcOptionalSection>
+      <div className="flex flex-col gap-2 pt-1">
+        <CalcButton onClick={() => calculate()} loading={loading} />
         <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
-      <div className="flex-1 flex flex-col gap-3 min-w-0">
-        {result?.error ? (
-          <p className="text-sm text-nw-coral">{result.error}</p>
+    </>
+  );
+
+  const resultsPanel =
+    result === null ? (
+      <CalcEmptyState />
+    ) : result.error ? (
+      <p className="text-xs text-nw-coral">{String(result.error)}</p>
+    ) : (
+      <div className="flex flex-col gap-3">
+        <CalcAnswer>
+          {result.months_to_payoff != null
+            ? `You'll be debt-free in ${result.months_to_payoff} months (${result.years_to_payoff} years), paying ${fmtMoney(result.total_interest)} in total interest.`
+            : "At this pace, these debts won't be fully paid off — add an extra payment to make progress."}
+        </CalcAnswer>
+        <div className="flex flex-wrap gap-2">
+          <ResultTile
+            label="Debt-Free In"
+            value={result.months_to_payoff ? `${result.months_to_payoff} mo (${result.years_to_payoff} yr)` : "—"}
+          />
+          <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
+        </div>
+        {payoffOrder.length > 0 && (
+          <div className="rounded-lg border border-nw-border bg-nw-surface p-3">
+            <div className="text-[10px] uppercase tracking-wide text-nw-muted mb-1.5">Payoff Order (Avalanche)</div>
+            <ol className="flex flex-col gap-1 text-sm list-decimal list-inside">
+              {payoffOrder.map((name) => (
+                <li key={name}>{name}</li>
+              ))}
+            </ol>
+          </div>
+        )}
+        <CalcViewToggle view={view} onChange={setView} />
+        {view === "chart" ? (
+          <BalanceChart data={schedule} />
         ) : (
-          <>
-            <div className="flex flex-wrap gap-2">
-              <ResultTile label="Payoff" value={result?.payoff_months ? `${result.payoff_months} mo` : "—"} />
-              <ResultTile label="Total interest" value={fmtMoney(result?.total_interest)} />
-            </div>
-            {result && result.schedule.length > 0 && (
-              <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-1 max-h-64 overflow-auto">
-                {result.schedule.map((s) => (
-                  <div key={s.month} className="flex justify-between text-xs">
-                    <span className="text-nw-muted">Month {s.month}</span>
-                    <span>{fmtMoney(s.balance)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+          <ScheduleTable rows={schedule} columns={[{ key: "year", label: "Year" }, { key: "total_balance", label: "Total Balance", format: "money" }]} />
         )}
       </div>
+    );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <CalcCopy
+        title="Debt Payoff Calculator"
+        description="Pays down your debts using the avalanche method (highest interest rate first) — the most cost-efficient order. Add every debt you're carrying, and optionally throw extra money at it each month or year."
+      />
+      <CalcLayout inputs={inputsPanel} results={resultsPanel} />
     </div>
   );
 }

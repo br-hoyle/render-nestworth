@@ -8,6 +8,7 @@ import type { Account, HouseholdSettings, IncomeRecord, TransactionListResponse 
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 const SECURITY_QUESTIONS = [
   "What was your first pet's name?",
@@ -24,6 +25,10 @@ export default function SettingsPage() {
   const [householdName, setHouseholdName] = useState("");
   const [householdSaving, setHouseholdSaving] = useState(false);
   const [householdMsg, setHouseholdMsg] = useState<string | null>(null);
+
+  const [birthdate, setBirthdate] = useState("");
+  const [birthdateSaving, setBirthdateSaving] = useState(false);
+  const [birthdateMsg, setBirthdateMsg] = useState<string | null>(null);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -44,7 +49,10 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (session) setHouseholdName(session.household_name);
+    if (session) {
+      setHouseholdName(session.household_name);
+      setBirthdate(session.birthdate ?? "");
+    }
     api.get<HouseholdSettings>("/settings").then(setSettings);
   }, [session]);
 
@@ -60,6 +68,21 @@ export default function SettingsPage() {
       setHouseholdMsg(err instanceof ApiError ? err.message : "Something went wrong.");
     } finally {
       setHouseholdSaving(false);
+    }
+  }
+
+  async function saveBirthdate(e: React.FormEvent) {
+    e.preventDefault();
+    setBirthdateSaving(true);
+    setBirthdateMsg(null);
+    try {
+      await api.patch("/auth/birthdate", { birthdate: birthdate || null });
+      await refresh();
+      setBirthdateMsg("Saved.");
+    } catch (err) {
+      setBirthdateMsg(err instanceof ApiError ? err.message : "Something went wrong.");
+    } finally {
+      setBirthdateSaving(false);
     }
   }
 
@@ -167,6 +190,21 @@ export default function SettingsPage() {
           <span className="text-nw-muted">Username</span>
           <span>{session?.username} · not changeable</span>
         </div>
+
+        <form onSubmit={saveBirthdate} className="flex gap-2 items-end pt-3 border-t border-nw-border">
+          <div className="flex-1">
+            <TextField
+              label="Birthdate"
+              type="date"
+              value={birthdate}
+              onChange={(e) => setBirthdate(e.target.value)}
+            />
+          </div>
+          <Button type="submit" variant="primary" disabled={birthdateSaving}>
+            Save
+          </Button>
+        </form>
+        {birthdateMsg && <p className="text-xs text-nw-muted">{birthdateMsg}</p>}
       </Card>
 
       <Card>
@@ -224,6 +262,13 @@ export default function SettingsPage() {
           <span>1 hour inactivity · fixed</span>
         </div>
       </Card>
+
+      {settings === null && (
+        <Card>
+          <div className="text-sm font-medium">Preferences</div>
+          <LoadingBlock className="py-4" />
+        </Card>
+      )}
 
       {settings && (
         <Card>

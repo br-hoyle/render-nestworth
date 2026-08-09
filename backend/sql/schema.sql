@@ -46,6 +46,7 @@ create table if not exists users (
     password_hash text,
     security_question text,
     security_answer_hash text,
+    birthdate_encrypted text,
     status text not null default 'invited' check (status in ('invited', 'active')),
     created_date timestamptz not null default now()
 );
@@ -57,6 +58,13 @@ create table if not exists users (
 -- backend/scripts/migrate_anonymize_users.py does in one pass (backfill, then finalize).
 alter table users add column if not exists username_lookup_hash text;
 alter table users add column if not exists username_encrypted text;
+
+-- birthdate_encrypted: Fernet ciphertext (encrypt_pii/decrypt_pii) of an ISO date string,
+-- same PII treatment as household_name above. Nullable — optional at signup/setup, editable
+-- later from Settings. Drives the household_age used by the retirement/FI projections
+-- (see app.routers.scorecard.apply_birthdate_age_override); a household that hasn't entered
+-- one yet falls back to the manually-entered household_age setting.
+alter table users add column if not exists birthdate_encrypted text;
 
 -- ----------------------------------------------------------------------------
 -- 2. accounts (Type-2 slowly changing dimension)

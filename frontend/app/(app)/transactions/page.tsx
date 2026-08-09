@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { ImportWizard } from "@/components/transactions/ImportWizard";
 import { ClassifyModal } from "@/components/transactions/ClassifyModal";
 import { EditTransactionModal } from "@/components/transactions/EditTransactionModal";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 const PAGE_SIZES = [15, 25, 50, 100];
 
@@ -91,6 +92,18 @@ export default function TransactionsPage() {
 
   const total = result?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  // Only gates the very first load — result stays non-null (even for a zero-match filter)
+  // after that, so re-filtering/re-paging keeps the existing list visible while it refetches
+  // instead of blanking the whole page back to "Loading…".
+  if (result === null) {
+    return (
+      <div className="p-4 md:p-6 flex flex-col gap-3 max-w-4xl mx-auto w-full">
+        <h1 className="text-lg font-medium">Transactions</h1>
+        <LoadingBlock />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 max-w-4xl mx-auto w-full">

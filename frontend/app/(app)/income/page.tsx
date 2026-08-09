@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
 import { titleCase } from "@/lib/format";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 function money(v: string | number) {
   return Number(v).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -48,6 +49,15 @@ export default function IncomePage() {
     return acc;
   }, {});
 
+  if (records === null || summary === null || series === null) {
+    return (
+      <div className="p-4 md:p-6 flex flex-col gap-3 max-w-3xl mx-auto w-full">
+        <h1 className="text-lg font-medium">Income</h1>
+        <LoadingBlock />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 md:p-6 flex flex-col gap-4 max-w-3xl mx-auto w-full">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -60,84 +70,88 @@ export default function IncomePage() {
       <div className="rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-1">
         <div className="text-[10px] uppercase tracking-wide text-nw-muted">Household Income Today</div>
         <div className="text-3xl font-medium">
-          {summary ? money(summary.total_annual_income) : "—"}
+          {money(summary.total_annual_income)}
           <span className="text-sm text-nw-muted"> /yr</span>
         </div>
       </div>
 
-      {seriesData.length > 1 && (
-        <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <div className="text-sm font-medium">Gross vs. Net Income</div>
-              <p className="text-[10px] text-nw-muted">
-                Gross = effective-dated income records below. Net = actual income-type transactions.
-              </p>
-            </div>
-            {latestPoint && (
-              <div className="flex gap-3 text-right">
-                <div>
-                  <div className="text-[10px] uppercase text-nw-muted">Gross</div>
-                  <div className="text-sm">{money(latestPoint.gross_monthly)}/mo</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase text-nw-muted">Net</div>
-                  <div className="text-sm">{latestPoint.net_monthly !== null ? `${money(latestPoint.net_monthly)}/mo` : "—"}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase text-nw-muted">Diff</div>
-                  <div className={"text-sm " + (latestPoint.diff_pct !== null && latestPoint.diff_pct <= 0 ? "text-nw-green" : "text-nw-coral")}>
-                    {latestPoint.diff_dollar !== null ? money(latestPoint.diff_dollar) : "—"}
-                    {latestPoint.diff_pct !== null && ` (${latestPoint.diff_pct >= 0 ? "+" : ""}${latestPoint.diff_pct.toFixed(0)}%)`}
-                  </div>
+      <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <div className="text-sm font-medium">Gross vs. Net Income</div>
+            <p className="text-[10px] text-nw-muted">
+              Gross = effective-dated income records below. Net = actual income-type transactions.
+            </p>
+          </div>
+          {seriesData.length > 1 && latestPoint && (
+            <div className="flex gap-3 text-right">
+              <div>
+                <div className="text-[10px] uppercase text-nw-muted">Gross</div>
+                <div className="text-sm">{money(latestPoint.gross_monthly)}/mo</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase text-nw-muted">Net</div>
+                <div className="text-sm">{latestPoint.net_monthly !== null ? `${money(latestPoint.net_monthly)}/mo` : "—"}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase text-nw-muted">Diff</div>
+                <div className={"text-sm " + (latestPoint.diff_pct !== null && latestPoint.diff_pct <= 0 ? "text-nw-green" : "text-nw-coral")}>
+                  {latestPoint.diff_dollar !== null ? money(latestPoint.diff_dollar) : "—"}
+                  {latestPoint.diff_pct !== null && ` (${latestPoint.diff_pct >= 0 ? "+" : ""}${latestPoint.diff_pct.toFixed(0)}%)`}
                 </div>
               </div>
-            )}
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={seriesData}>
-              <CartesianGrid stroke="var(--nw-border)" vertical={false} />
-              <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
-              <YAxis
-                yAxisId="left"
-                tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
-                tickLine={false}
-                axisLine={false}
-                width={60}
-                tickFormatter={(v) => money(v)}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
-                tickLine={false}
-                axisLine={false}
-                width={40}
-                tickFormatter={(v) => `${v}%`}
-              />
-              <Tooltip
-                contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
-                itemStyle={{ color: "var(--nw-text)" }}
-                labelStyle={{ color: "var(--nw-text)" }}
-                formatter={(value, name) => (name === "Diff %" ? [`${Number(value).toFixed(0)}%`, name] : [money(Number(value)), name])}
-              />
-              <Bar yAxisId="left" dataKey="gross" name="Gross" fill="var(--nw-green-line)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-              <Bar yAxisId="left" dataKey="net" name="Net" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="diff_pct"
-                name="Diff %"
-                stroke="var(--nw-amber)"
-                strokeWidth={2}
-                dot={false}
-                connectNulls
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-          <p className="text-[10px] text-nw-muted">Amber line = Diff % (Gross − Net, right axis). Net shows "—" for months with no imported transactions.</p>
+            </div>
+          )}
         </div>
-      )}
+        {seriesData.length > 1 ? (
+          <>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={seriesData}>
+                <CartesianGrid stroke="var(--nw-border)" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+                <YAxis
+                  yAxisId="left"
+                  tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={60}
+                  tickFormatter={(v) => money(v)}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={40}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip
+                  contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
+                  itemStyle={{ color: "var(--nw-text)" }}
+                  labelStyle={{ color: "var(--nw-text)" }}
+                  formatter={(value, name) => (name === "Diff %" ? [`${Number(value).toFixed(0)}%`, name] : [money(Number(value)), name])}
+                />
+                <Bar yAxisId="left" dataKey="gross" name="Gross" fill="var(--nw-green-line)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                <Bar yAxisId="left" dataKey="net" name="Net" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="diff_pct"
+                  name="Diff %"
+                  stroke="var(--nw-amber)"
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <p className="text-[10px] text-nw-muted">Amber line = Diff % (Gross − Net, right axis). Net shows "—" for months with no imported transactions.</p>
+          </>
+        ) : (
+          <p className="text-xs text-nw-muted py-6 text-center">Not enough history yet.</p>
+        )}
+      </div>
 
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="text-[10px] uppercase tracking-wide text-nw-muted">Records</div>

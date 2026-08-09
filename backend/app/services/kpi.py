@@ -239,18 +239,22 @@ def fi_number(i: KpiInputs) -> Decimal:
     return annual_expense / withdrawal_rate
 
 
-def fi_progress(i: KpiInputs) -> tuple[float | None, str, float | None]:
-    """Returns (target dollar amount, color, progress-to-target percent) — the tile shows the
-    FI number as its headline value and the percent as the progress bar, rather than the
-    reverse, so the dollar goal itself is visible at a glance."""
+def fi_progress(i: KpiInputs) -> tuple[float | None, str]:
+    """Returns (target dollar amount, color) — the headline value is the FI number itself.
+    Progress-to-target is intentionally NOT returned here: per the household's explicit
+    request, this tile shows only the target figure with no progress bar, and the
+    percent-to-target is instead surfaced on the Net Worth tile (see net_worth_value),
+    which shows the CURRENT dollar figure that's actually progressing toward this target.
+    Color still reflects the same underlying progress internally, just isn't exposed as a
+    number here."""
     target = fi_number(i)
     if target <= 0:
-        return None, "yellow", None
+        return None, "yellow"
     progress_pct = float(i.net_worth / target * 100)
     red = _threshold(i.settings, "fi_progress", "red_below", 50)
     green = _threshold(i.settings, "fi_progress", "green_at_or_above", 100)
     color = color_for_higher_is_better(progress_pct, red, green)
-    return float(target), color, progress_pct
+    return float(target), color
 
 
 def target_net_worth(i: KpiInputs) -> tuple[float | None, str, float | None]:
@@ -312,14 +316,32 @@ def debt_payoff_runway_months(i: KpiInputs) -> tuple[float | None, str]:
     return months, color_for_lower_is_better(months, green, red)
 
 
-def net_worth_value(i: KpiInputs) -> tuple[float, str]:
-    return float(i.net_worth), ("green" if i.net_worth >= 0 else "coral")
+def net_worth_value(i: KpiInputs) -> tuple[float, str, float | None]:
+    """Color stays sign-based (green/coral) regardless of FI progress — that judgment is
+    about solvency, not about being "behind" on a savings goal. progress_pct (net worth ÷
+    the same FI number fi_progress targets) is included purely as extra data for the
+    tile's progress bar/target display; moved here from fi_progress per the household's
+    explicit request."""
+    color = "green" if i.net_worth >= 0 else "coral"
+    target = fi_number(i)
+    progress_pct = float(i.net_worth / target * 100) if target > 0 else None
+    return float(i.net_worth), color, progress_pct
 
 
 def total_debt_value(i: KpiInputs) -> tuple[float, str]:
     """Raw dollar total of every liability — informational, not graded: there's no
-    household-size-independent threshold for what a "good" absolute debt total is."""
+    household-size-independent threshold for what a "good" absolute debt total is. The
+    household's goal for this figure is $0; the Scorecard's %-to-goal for this metric is
+    computed frontend-side from its own history (see targetInfoFor's zero-goal handling),
+    since there's no non-zero denominator to divide by here."""
     return float(i.total_liabilities), "neutral"
+
+
+def total_non_property_debt_value(i: KpiInputs) -> tuple[float, str]:
+    """Every liability EXCEPT mortgages/HELOCs/etc — the debt that isn't secured by (and
+    roughly offset by) a home's value, so it reads as the more urgent payoff target. Same
+    $0-goal / history-relative %-to-goal treatment as Total Debt."""
+    return float(i.total_liabilities - i.property_liability_value), "neutral"
 
 
 def net_cash_flow(i: KpiInputs) -> tuple[float, str]:

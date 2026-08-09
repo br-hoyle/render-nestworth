@@ -19,6 +19,7 @@ import { CashFlowSankey } from "@/components/charts/CashFlowSankey";
 import { CategoryDrift } from "@/components/cashflow/CategoryDrift";
 import { SpendPatterns } from "@/components/cashflow/SpendPatterns";
 import { MerchantLeaderboard } from "@/components/cashflow/MerchantLeaderboard";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 const RANGES: { label: string; months: number | null }[] = [
   { label: "Last Month", months: 1 },
@@ -164,9 +165,18 @@ export default function CashFlowPage() {
     [byMonth, needsByMonth, wantsByMonth]
   );
 
-  if (transactions?.length === 0) {
+  if (transactions === null) {
     return (
-      <div className="p-4 md:p-6 flex flex-col gap-3">
+      <div className="p-4 md:p-6 flex flex-col gap-4 max-w-5xl mx-auto w-full">
+        <h1 className="text-lg font-medium">Cash Flow</h1>
+        <LoadingBlock />
+      </div>
+    );
+  }
+
+  if (transactions.length === 0) {
+    return (
+      <div className="p-4 md:p-6 flex flex-col gap-4 max-w-5xl mx-auto w-full">
         <div className="flex items-baseline gap-2 flex-wrap">
           <h1 className="text-lg font-medium">Cash Flow</h1>
           <span className="text-xs text-nw-muted">

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Account, Balance } from "@/lib/types";
 import { money } from "@/lib/format";
+import { LoadingBlock } from "@/components/ui/Spinner";
 
 export function AccountBalanceHistory({ account }: { account: Account }) {
   const [balances, setBalances] = useState<Balance[] | null>(null);
@@ -13,7 +14,7 @@ export function AccountBalanceHistory({ account }: { account: Account }) {
     api.get<Balance[]>(`/balances?account_id=${account.account_id}`).then(setBalances);
   }, [account.account_id]);
 
-  if (balances === null) return <p className="text-xs text-nw-muted">Loading…</p>;
+  if (balances === null) return <LoadingBlock className="py-6" />;
   if (balances.length === 0) return <p className="text-xs text-nw-muted">No balance snapshots recorded yet.</p>;
 
   const sorted = [...balances].sort((a, b) => b.full_date.localeCompare(a.full_date));

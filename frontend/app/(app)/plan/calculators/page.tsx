@@ -1,86 +1,189 @@
 "use client";
 
 import { useState } from "react";
-import clsx from "clsx";
-import { CompoundGrowthCalculator } from "@/components/calculators/CompoundGrowthCalculator";
+import { CalculatorNav } from "@/components/calculators/CalculatorNav";
+import { LoanCalculator } from "@/components/calculators/LoanCalculator";
+import { RepaymentCalculator } from "@/components/calculators/RepaymentCalculator";
 import { DebtPayoffCalculator } from "@/components/calculators/DebtPayoffCalculator";
-import { EmergencyFundCalculator } from "@/components/calculators/EmergencyFundCalculator";
+import { DebtConsolidationCalculator } from "@/components/calculators/DebtConsolidationCalculator";
+import { SimpleInterestCalculator } from "@/components/calculators/SimpleInterestCalculator";
 import { HouseAffordabilityCalculator } from "@/components/calculators/HouseAffordabilityCalculator";
 import { MortgageCalculator } from "@/components/calculators/MortgageCalculator";
-import { RebalancingCalculator } from "@/components/calculators/RebalancingCalculator";
+import { AmortizationCalculator } from "@/components/calculators/AmortizationCalculator";
+import { MortgagePayoffCalculator } from "@/components/calculators/MortgagePayoffCalculator";
+import { RefinanceCalculator } from "@/components/calculators/RefinanceCalculator";
+import { RentVsBuyCalculator } from "@/components/calculators/RentVsBuyCalculator";
 import { RetirementCalculator } from "@/components/calculators/RetirementCalculator";
-import { GenericCalculator } from "@/components/calculators/GenericCalculator";
-import { GENERIC_CALCULATORS } from "@/components/calculators/genericConfigs";
+import { InvestmentCalculator } from "@/components/calculators/InvestmentCalculator";
+import { RothIraCalculator } from "@/components/calculators/RothIraCalculator";
+import { K401Calculator } from "@/components/calculators/K401Calculator";
+import { K401MatchMaximizerCalculator } from "@/components/calculators/K401MatchMaximizerCalculator";
+import { InterestRateCalculator } from "@/components/calculators/InterestRateCalculator";
+import { CompoundingRateConverter } from "@/components/calculators/CompoundingRateConverter";
+import { SavingsCalculator } from "@/components/calculators/SavingsCalculator";
+import { FinancialIndependenceCalculator } from "@/components/calculators/FinancialIndependenceCalculator";
+
+type Group = "Retirement & Investment" | "Debt & Payment" | "Housing & Mortgage";
 
 type Entry = {
   key: string;
   label: string;
-  group: "Safety" | "Housing" | "Retirement" | "Investment" | "Debt";
-  optional?: boolean;
+  group: Group;
   render: () => React.ReactNode;
+  /** True for components that render their own CalcCopy title/description internally — every
+   * calculator in the app now does, so this stays true throughout, but the flag (and the
+   * fallback plain-title render below) is kept as a safety net for anything added later without
+   * its own copy block. */
+  hasOwnCopy?: boolean;
+  /** Which named subsection this entry belongs to in its group's nav mega-menu (e.g.
+   * "Retirement Calculators" vs "Investment Calculators", or "Debt Calculators" vs
+   * "Investment Calculators" under Debt & Payment), and which column within that subsection —
+   * see CalculatorNav's GroupPanel for how these render. Column numbers are scoped per section,
+   * not globally, so two different sections can each start at column 1. */
+  section?: string;
+  column?: number;
 };
 
+// All three sections are fully redesigned — every calculator has its own math, copy, and
+// visuals via the shared Calculate-button UI kit, and Retirement & Investment / Debt & Payment
+// both split their nav dropdown into named columns. Emergency Fund, Target Emergency Fund, and
+// the standalone Payment Calculator were dropped from Debt & Payment: their "how many months am
+// I covered" and "solve for one of two loan unknowns" framings duplicated what the Emergency
+// Fund KPI (Scorecard) and Loan/Repayment calculators already cover.
 const CALCULATORS: Entry[] = [
-  { key: "target-emergency-fund", label: "Target emergency fund", group: "Safety", render: () => <GenericCalculator config={GENERIC_CALCULATORS["target-emergency-fund"]} /> },
-  { key: "emergency-fund", label: "Emergency fund", group: "Safety", render: () => <EmergencyFundCalculator /> },
+  { key: "retirement", label: "Retirement Calculator", group: "Retirement & Investment", render: () => <RetirementCalculator />, hasOwnCopy: true, section: "Retirement Calculators", column: 1 },
+  { key: "financial-independence", label: "Financial Independence Calculator", group: "Retirement & Investment", render: () => <FinancialIndependenceCalculator />, hasOwnCopy: true, section: "Retirement Calculators", column: 1 },
+  { key: "roth-ira", label: "Roth IRA Calculator", group: "Retirement & Investment", render: () => <RothIraCalculator />, hasOwnCopy: true, section: "Retirement Calculators", column: 1 },
+  { key: "401k", label: "401(k) Calculator", group: "Retirement & Investment", render: () => <K401Calculator />, hasOwnCopy: true, section: "Retirement Calculators", column: 2 },
+  { key: "401k-match-maximizer", label: "401(k) Match Maximizer", group: "Retirement & Investment", render: () => <K401MatchMaximizerCalculator />, hasOwnCopy: true, section: "Retirement Calculators", column: 2 },
 
-  { key: "mortgage", label: "Mortgage / payoff", group: "Housing", render: () => <MortgageCalculator /> },
-  { key: "amortization", label: "Amortization", group: "Housing", render: () => <GenericCalculator config={GENERIC_CALCULATORS.amortization} /> },
-  { key: "house-affordability", label: "House affordability", group: "Housing", render: () => <HouseAffordabilityCalculator /> },
-  { key: "refinance", label: "Refinance", group: "Housing", render: () => <GenericCalculator config={GENERIC_CALCULATORS.refinance} /> },
+  { key: "investment", label: "Investment Calculator", group: "Retirement & Investment", render: () => <InvestmentCalculator />, hasOwnCopy: true, section: "Investment Calculators", column: 3 },
+  { key: "savings", label: "Savings Calculator", group: "Retirement & Investment", render: () => <SavingsCalculator />, hasOwnCopy: true, section: "Investment Calculators", column: 3 },
+  { key: "interest-rate", label: "Interest Rate Calculator", group: "Retirement & Investment", render: () => <InterestRateCalculator />, hasOwnCopy: true, section: "Investment Calculators", column: 4 },
+  { key: "compound-interest", label: "Compounding Rate Converter", group: "Retirement & Investment", render: () => <CompoundingRateConverter />, hasOwnCopy: true, section: "Investment Calculators", column: 4 },
 
-  { key: "retirement", label: "Retirement / FI drawdown", group: "Retirement", render: () => <RetirementCalculator /> },
-  { key: "financial-independence", label: "Financial independence", group: "Retirement", render: () => <GenericCalculator config={GENERIC_CALCULATORS["financial-independence"]} /> },
-  { key: "roth-ira", label: "Roth IRA", group: "Retirement", render: () => <GenericCalculator config={GENERIC_CALCULATORS["roth-ira"]} /> },
-  { key: "ira", label: "Traditional IRA", group: "Retirement", render: () => <GenericCalculator config={GENERIC_CALCULATORS.ira} /> },
+  { key: "loan", label: "Loan Calculator", group: "Debt & Payment", render: () => <LoanCalculator />, hasOwnCopy: true, section: "Debt Calculators", column: 1 },
+  { key: "debt-payoff", label: "Debt Payoff Calculator", group: "Debt & Payment", render: () => <DebtPayoffCalculator />, hasOwnCopy: true, section: "Debt Calculators", column: 1 },
+  { key: "debt-consolidation", label: "Debt Consolidation Calculator", group: "Debt & Payment", render: () => <DebtConsolidationCalculator />, hasOwnCopy: true, section: "Debt Calculators", column: 1 },
 
-  { key: "compound-growth", label: "Compound growth", group: "Investment", render: () => <CompoundGrowthCalculator /> },
-  { key: "investment", label: "Investment growth", group: "Investment", render: () => <GenericCalculator config={GENERIC_CALCULATORS.investment} /> },
-  { key: "compound-interest", label: "Compound interest", group: "Investment", render: () => <GenericCalculator config={GENERIC_CALCULATORS["compound-interest"]} /> },
-  { key: "savings", label: "Savings goal", group: "Investment", render: () => <GenericCalculator config={GENERIC_CALCULATORS.savings} /> },
-  { key: "simple-interest", label: "Simple interest", group: "Investment", render: () => <GenericCalculator config={GENERIC_CALCULATORS["simple-interest"]} /> },
-  { key: "interest-rate", label: "Interest rate solver", group: "Investment", render: () => <GenericCalculator config={GENERIC_CALCULATORS["interest-rate"]} /> },
-  { key: "rebalancing", label: "Rebalancing", group: "Investment", optional: true, render: () => <RebalancingCalculator /> },
+  { key: "repayment", label: "Repayment Calculator", group: "Debt & Payment", render: () => <RepaymentCalculator />, hasOwnCopy: true, section: "Payment Calculators", column: 1 },
+  { key: "simple-interest", label: "Simple Interest Calculator", group: "Debt & Payment", render: () => <SimpleInterestCalculator />, hasOwnCopy: true, section: "Payment Calculators", column: 1 },
 
-  { key: "debt-payoff", label: "Debt payoff", group: "Debt", render: () => <DebtPayoffCalculator /> },
-  { key: "debt-acceleration", label: "Debt acceleration", group: "Debt", render: () => <GenericCalculator config={GENERIC_CALCULATORS["debt-acceleration"]} /> },
-  { key: "debt-consolidation", label: "Debt consolidation", group: "Debt", render: () => <GenericCalculator config={GENERIC_CALCULATORS["debt-consolidation"]} /> },
-  { key: "loan", label: "Loan", group: "Debt", render: () => <GenericCalculator config={GENERIC_CALCULATORS.loan} /> },
-  { key: "repayment", label: "Repayment", group: "Debt", render: () => <GenericCalculator config={GENERIC_CALCULATORS.repayment} /> },
-  { key: "student-loan", label: "Student loan", group: "Debt", render: () => <GenericCalculator config={GENERIC_CALCULATORS["student-loan"]} /> },
+  { key: "mortgage", label: "Mortgage Calculator", group: "Housing & Mortgage", render: () => <MortgageCalculator />, hasOwnCopy: true, column: 1 },
+  { key: "mortgage-payoff", label: "Mortgage Payoff Calculator", group: "Housing & Mortgage", render: () => <MortgagePayoffCalculator />, hasOwnCopy: true, column: 1 },
+  { key: "house-affordability", label: "House Affordability Calculator", group: "Housing & Mortgage", render: () => <HouseAffordabilityCalculator />, hasOwnCopy: true, column: 2 },
+  { key: "rent-vs-buy", label: "Rent vs. Buy Calculator", group: "Housing & Mortgage", render: () => <RentVsBuyCalculator />, hasOwnCopy: true, column: 2 },
+  { key: "refinance", label: "Refinance Calculator", group: "Housing & Mortgage", render: () => <RefinanceCalculator />, hasOwnCopy: true, column: 3 },
+  { key: "amortization", label: "Amortization Calculator", group: "Housing & Mortgage", render: () => <AmortizationCalculator />, hasOwnCopy: true, column: 3 },
 ];
 
-const GROUPS: Entry["group"][] = ["Safety", "Housing", "Retirement", "Investment", "Debt"];
+const GROUPS: Group[] = ["Retirement & Investment", "Debt & Payment", "Housing & Mortgage"];
+
+// The landing view's "most popular calculators" list — a fixed, curated set (not derived from
+// CALCULATORS) so the blurbs can be one generic sentence per calculator rather than pulling in
+// a specific sub-tab's mode-dependent copy. Presented like search results: name + 1-2 sentence
+// description, each clickable to jump straight into that calculator.
+const POPULAR_CALCULATORS: { key: string; label: string; description: string }[] = [
+  {
+    key: "retirement",
+    label: "Retirement Calculator",
+    description:
+      "See if you're on track to retire — how much you'll need, how to get there, how much you can safely withdraw, and how long your money will last.",
+  },
+  {
+    key: "investment",
+    label: "Investment Calculator",
+    description: "Project how a lump sum plus regular contributions grows over time, or solve for the contribution or timeline needed to hit a target.",
+  },
+  {
+    key: "401k",
+    label: "401(k) Calculator",
+    description: "Project your 401(k) balance at retirement, including your employer's match, and the monthly income it could support.",
+  },
+  {
+    key: "loan",
+    label: "Loan Calculator",
+    description: "Work out payments, payoff schedules, and total interest for an amortized, deferred, or bond-style loan.",
+  },
+  {
+    key: "debt-payoff",
+    label: "Debt Payoff Calculator",
+    description:
+      "Pay down multiple debts fastest using the avalanche method, with optional extra payments to see how much time and interest you save.",
+  },
+  {
+    key: "mortgage",
+    label: "Mortgage Calculator",
+    description: "Estimate the full monthly cost of a home you're considering — principal, interest, property tax, insurance, PMI, and HOA.",
+  },
+  {
+    key: "house-affordability",
+    label: "House Affordability Calculator",
+    description: "Estimate how much home you can afford, either from your income and existing debts or from a fixed monthly budget.",
+  },
+  {
+    key: "rent-vs-buy",
+    label: "Rent vs. Buy Calculator",
+    description:
+      "Compare the true cost of buying a home against renting and investing the difference, accounting for equity, appreciation, and every recurring cost.",
+  },
+];
+
+function CalculatorsLanding({ onSelect }: { onSelect: (key: string) => void }) {
+  return (
+    <div className="flex flex-col gap-6 max-w-3xl">
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-xl font-medium">Personal Finance Calculators</h1>
+        <p className="text-sm text-nw-muted">
+          Pick a calculator from the nav above, or jump straight into one of the most popular ones below.
+        </p>
+      </div>
+      <div className="flex flex-col gap-1">
+        <div className="text-[11px] uppercase tracking-wide text-nw-muted mb-1">Most Popular Calculators</div>
+        <div className="flex flex-col divide-y divide-nw-border rounded-lg border border-nw-border bg-nw-surface">
+          {POPULAR_CALCULATORS.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => onSelect(c.key)}
+              className="text-left px-4 py-3 hover:bg-nw-rail transition-colors flex flex-col gap-0.5"
+            >
+              <span className="text-sm font-medium text-nw-mint">{c.label}</span>
+              <span className="text-xs text-nw-muted">{c.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function CalculatorsPage() {
-  const [active, setActive] = useState<string>("mortgage");
-  const current = CALCULATORS.find((c) => c.key === active)!;
+  const [active, setActive] = useState<string | null>(null);
+  const current = active ? CALCULATORS.find((c) => c.key === active) : null;
 
   return (
-    <div className="flex flex-col md:flex-row h-full min-h-0">
-      <div className="w-full md:w-56 flex-none flex flex-col gap-1 overflow-y-auto p-3 border-b md:border-b-0 md:border-r border-nw-border bg-nw-rail">
-        {GROUPS.map((group) => (
-          <div key={group} className="flex flex-col gap-0.5 mb-2">
-            <div className="text-[9px] uppercase tracking-wider text-nw-muted px-2 mt-2 mb-0.5">{group}</div>
-            {CALCULATORS.filter((c) => c.group === group).map((c) => (
-              <button
-                key={c.key}
-                onClick={() => setActive(c.key)}
-                className={clsx(
-                  "text-left rounded-md px-2 py-1.5 text-xs whitespace-nowrap",
-                  active === c.key ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted hover:text-nw-text"
-                )}
-              >
-                {c.label}
-                {c.optional && <span className="text-[9px] text-nw-muted ml-1">opt</span>}
-              </button>
-            ))}
-          </div>
-        ))}
-      </div>
-      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 md:p-6" key={active}>
-        <h1 className="text-lg font-medium mb-4">{current.label}</h1>
-        {current.render()}
+    <div className="flex flex-col h-full min-h-0">
+      {/* A mega-menu-style nav replaces both the old left sidebar and the native-<select>
+          version that followed it — the sidebar's fixed width ate into the space calculators
+          needed for their inputs (pushing the Calculate button below the fold on several), and
+          plain <select>s read more like a form than site navigation. Hovering or clicking a
+          section opens a panel of that section's calculators below the bar, closing on
+          click-away, Escape, or picking one. Retirement & Investment and Debt & Payment both
+          split their panels further into named, columned subsections instead of one flat
+          alphabetical grid. Housing & Mortgage's 6 entries use the same column mechanism
+          without section names — a plain 3-column, 2-row grid in a fixed (not alphabetical)
+          order, filled down each column before moving to the next. */}
+      <CalculatorNav groups={GROUPS} calculators={CALCULATORS} active={active} onSelect={setActive} />
+      <div className="flex-1 min-w-0 min-h-0 overflow-y-auto p-4 md:p-6" key={active ?? "landing"}>
+        {current ? (
+          <>
+            {!current.hasOwnCopy && <h1 className="text-lg font-medium mb-4">{current.label}</h1>}
+            {current.render()}
+          </>
+        ) : (
+          <CalculatorsLanding onSelect={setActive} />
+        )}
       </div>
     </div>
   );

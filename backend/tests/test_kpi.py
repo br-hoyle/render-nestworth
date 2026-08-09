@@ -20,11 +20,13 @@ from app.services.kpi import (
     net_cash_flow,
     net_income_rate,
     net_worth_growth_yoy,
+    net_worth_value,
     net_worth_velocity,
     savings_efficiency,
     savings_rate,
     target_net_worth,
     total_debt_value,
+    total_non_property_debt_value,
     wants_ratio,
 )
 
@@ -137,11 +139,27 @@ def test_net_worth_growth_yoy_negative():
 
 def test_fi_progress():
     # annual expense = 24000/3*12 = 96000; fi number (target) = 96000/0.04 = 2,400,000
-    # progress = 100000/2400000 = 4.1666% -> red
-    value, color, progress_pct = fi_progress(make_inputs())
+    # progress (internal, for color only) = 100000/2400000 = 4.1666% -> red; no progress_pct
+    # is returned — that now lives on net_worth_value instead.
+    value, color = fi_progress(make_inputs())
     assert value == 2_400_000.0
-    assert round(progress_pct, 2) == 4.17
     assert color == "red"
+
+
+def test_net_worth_value_carries_fi_progress_to_target():
+    # Same FI number as above (2,400,000); net worth 100000 -> progress 4.1666%. Color stays
+    # sign-based (green), independent of that progress percentage.
+    value, color, progress_pct = net_worth_value(make_inputs())
+    assert value == 100000.0
+    assert color == "green"
+    assert round(progress_pct, 2) == 4.17
+
+
+def test_net_worth_value_negative_is_coral_regardless_of_progress():
+    value, color, progress_pct = net_worth_value(make_inputs(net_worth=Decimal("-5000")))
+    assert value == -5000.0
+    assert color == "coral"
+    assert progress_pct is not None
 
 
 def test_debt_to_income_from_paydown_pace():
@@ -179,6 +197,13 @@ def test_debt_payoff_runway_no_progress_returns_none():
 def test_total_debt_value_is_informational():
     value, color = total_debt_value(make_inputs())
     assert value == 50000.0
+    assert color == "neutral"
+
+
+def test_total_non_property_debt_value_excludes_property_liabilities():
+    inputs = make_inputs(property_liability_value=Decimal("30000"))
+    value, color = total_non_property_debt_value(inputs)
+    assert value == 20000.0
     assert color == "neutral"
 
 
