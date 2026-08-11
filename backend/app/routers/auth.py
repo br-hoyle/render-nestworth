@@ -39,6 +39,11 @@ GENERIC_LOGIN_ERROR = "Username or password is incorrect."
 GENERIC_RESET_ERROR = "That didn't match our records."
 RATE_LIMIT_ERROR = "Too many attempts. Please wait a while and try again."
 
+# Invite-only gate for the currently-open self-serve signup form: the household owner shares
+# this code out of band (see README) with whichever friends/family they want to invite. Plain
+# text on purpose — see README for why this doesn't need to be a real secret.
+FRIENDS_FAMILY_CODE = "24527"
+
 
 def _client_key(request: Request, username: str) -> str:
     ip = request.client.host if request.client else "unknown"
@@ -176,6 +181,10 @@ def signup(
     key = f"signup:{request.client.host if request.client else 'unknown'}"
     if is_rate_limited(key):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, detail=RATE_LIMIT_ERROR)
+
+    if payload.friends_family_code.strip() != FRIENDS_FAMILY_CODE:
+        register_failed_attempt(key)
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="That invite code isn't valid.")
 
     if payload.password != payload.confirm_password:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Passwords do not match.")

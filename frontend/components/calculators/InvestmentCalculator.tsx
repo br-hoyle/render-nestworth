@@ -41,7 +41,7 @@ export function InvestmentCalculator() {
   const [view, setView] = useState<"chart" | "table">("chart");
   const [inputs, setInputs] = useState({
     current_savings: 10000,
-    annual_rate: 0.07,
+    annual_rate: 0.1,
     compound_frequency: "annually" as CompoundFrequency,
     contribution_timing: "end" as ContributionTiming,
     term_years: 20,
@@ -172,7 +172,7 @@ export function InvestmentCalculator() {
         </label>
       </CalcOptionalSection>
       <div className="flex flex-col gap-2 pt-1">
-        <CalcButton onClick={calculate} loading={loading} />
+        <CalcButton onClick={() => calculate()} loading={loading} />
         <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
       </div>
     </>

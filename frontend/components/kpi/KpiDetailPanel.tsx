@@ -9,6 +9,7 @@ import { THRESHOLD_CONFIG } from "@/lib/kpiThresholds";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { LoadingBlock } from "@/components/ui/Spinner";
+import { Modal } from "@/components/ui/Modal";
 
 // Top-level settings fields (not kpi_thresholds) that back a metric's own formula — edited
 // alongside thresholds since both live in the same household_settings PATCH. Age is
@@ -75,14 +76,20 @@ export function KpiDetailPanel({
   const content = KPI_CONTENT[metric.slug];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-lg border border-nw-border bg-nw-rail p-3 flex flex-col gap-3 max-h-[85vh] overflow-y-auto"
+    <Modal
+      onClose={onClose}
+      className="w-full max-w-sm rounded-lg border border-nw-border bg-nw-rail p-3 flex flex-col gap-3 max-h-[85vh] overflow-y-auto"
+    >
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+        className="flex flex-col gap-3"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium">{titleCase(metric.label)}</h2>
-          <button onClick={onClose} className="text-nw-muted text-xs">
+          <button type="button" onClick={onClose} className="text-nw-muted text-xs">
             ✕
           </button>
         </div>
@@ -153,11 +160,11 @@ export function KpiDetailPanel({
         )}
 
         {(thresholdConfig || assumptionConfig) && settings !== null && (
-          <Button variant="primary" onClick={save} disabled={saving}>
+          <Button type="submit" variant="primary" disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
         )}
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

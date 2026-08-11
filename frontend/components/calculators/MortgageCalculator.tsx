@@ -62,7 +62,7 @@ function YearlyBalanceChart({ data }: { data: { year: number; balance: number }[
 export function MortgageCalculator() {
   const [homePrice, setHomePrice] = useState(400000);
   const [downPayment, setDownPayment] = useState<AmountOrPercent>({ value: 0.2, isPercent: true });
-  const [annualRate, setAnnualRate] = useState(0.065);
+  const [annualRate, setAnnualRate] = useState(0.1);
   const [termYears, setTermYears] = useState(30);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [propertyTax, setPropertyTax] = useState<AmountOrPercent>({ value: 0.012, isPercent: true });
@@ -158,7 +158,7 @@ export function MortgageCalculator() {
           taxes/insurance/fees — and pays off {result.payoff_date}.
         </CalcAnswer>
         <div className="flex flex-wrap gap-2">
-          <ResultTile label="Total Monthly Payment" value={fmtMoney(result.total_monthly_payment)} />
+          <ResultTile label="Total Payment" value={fmtMoney(result.total_monthly_payment)} />
           <ResultTile label="Principal & Interest" value={fmtMoney(result.monthly_pi)} />
           <ResultTile label="Loan Amount" value={fmtMoney(result.loan_amount)} />
           <ResultTile label="Payoff Date" value={result.payoff_date} />

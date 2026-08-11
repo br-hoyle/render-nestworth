@@ -1,10 +1,13 @@
+// Brand guide, "Numbers & money": "Signs, not just colour. Any column of amounts uses a
+// true minus (−, U+2212)." Intl's currency formatter emits a plain hyphen, so swap it.
 export function money(v: number | string, opts: { maximumFractionDigits?: number } = {}) {
   const n = typeof v === "string" ? Number(v) : v;
-  return n.toLocaleString(undefined, {
+  const formatted = n.toLocaleString(undefined, {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: opts.maximumFractionDigits ?? 0,
   });
+  return formatted.replace(/^-/, "−");
 }
 
 export function formatMetricValue(value: number | null, unit: string): string {

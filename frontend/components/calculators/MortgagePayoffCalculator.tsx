@@ -71,7 +71,7 @@ export function MortgagePayoffCalculator() {
   const [originalPrincipal, setOriginalPrincipal] = useState(300000);
   const [startDate, setStartDate] = useState(TODAY);
   const [originalTermYears, setOriginalTermYears] = useState(30);
-  const [annualRate, setAnnualRate] = useState(0.065);
+  const [annualRate, setAnnualRate] = useState(0.1);
   const [remainingTermYears, setRemainingTermYears] = useState(25);
   const [extraMonthly, setExtraMonthly] = useState(0);
   const [extraMonthlyStartDate, setExtraMonthlyStartDate] = useState(TODAY);

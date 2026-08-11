@@ -116,6 +116,18 @@ def create_income(
     )
 
 
+@router.delete("/{income_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_income(
+    income_id: uuid.UUID,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> None:
+    conn.execute(
+        text("delete from income where income_id = :id and household_id = :household_id"),
+        {"id": income_id, "household_id": session.household_id},
+    )
+
+
 @router.post("/{income_id}/end", status_code=status.HTTP_204_NO_CONTENT)
 def end_income(
     income_id: uuid.UUID,

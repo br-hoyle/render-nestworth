@@ -10,7 +10,7 @@ export function Card({
   return (
     <div
       className={clsx(
-        "rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2",
+        "nw-elevate rounded-2xl border border-nw-border bg-nw-surface p-3 flex flex-col gap-2",
         className
       )}
     >

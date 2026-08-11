@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
+import { ThemedLogo } from "@/components/brand/ThemedLogo";
 
 // Keep in sync with backend/app/schemas/auth.py SECURITY_QUESTIONS.
 const SECURITY_QUESTIONS = [
@@ -28,6 +28,7 @@ export default function SignupPage() {
     confirmPassword: "",
     securityQuestion: SECURITY_QUESTIONS[0],
     securityAnswer: "",
+    friendsFamilyCode: "",
     birthdate: "",
   });
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export default function SignupPage() {
         confirm_password: form.confirmPassword,
         security_question: form.securityQuestion,
         security_answer: form.securityAnswer,
+        friends_family_code: form.friendsFamilyCode,
         birthdate: form.birthdate || null,
       });
       await login(form.username, form.password);
@@ -67,11 +69,10 @@ export default function SignupPage() {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm flex flex-col gap-4">
-        <Image
-          src="/brand/full-logo.png"
-          alt="NestWorth"
+        <ThemedLogo
+          variant="logo-tagline"
           width={200}
-          height={41}
+          height={46}
           className="self-center mb-2"
         />
         <h1 className="text-base font-medium text-center">Create your household</h1>
@@ -141,6 +142,13 @@ export default function SignupPage() {
             type="date"
             value={form.birthdate}
             onChange={(e) => update("birthdate", e.target.value)}
+          />
+          <TextField
+            label="Invitation Code"
+            name="friendsFamilyCode"
+            value={form.friendsFamilyCode}
+            onChange={(e) => update("friendsFamilyCode", e.target.value)}
+            required
           />
           {error && (
             <div className="rounded-md border border-[#5A3228] bg-nw-coral-tint px-3 py-2 text-xs text-nw-coral">

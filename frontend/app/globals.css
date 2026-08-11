@@ -1,28 +1,55 @@
 @import "tailwindcss";
 
 /*
-  NestWorth brand palette, lifted directly from the wireframe (NestWorth Wireframes.dc.html).
-  Dark-first design — the app is a single dark theme (matches the wireframe, no light mode).
+  NestWorth brand palette — sourced from brand-assets/nestworth-brand-guide.pdf ("The look,
+  voice, and mechanics of NestWorth", v1.0). Dark-first (CLAUDE.md default), with full
+  light-mode parity: every --nw-* token below has a `[data-theme="light"]` counterpart.
+
+  A handful of tokens (--nw-ground, --nw-rail, --nw-track, --nw-line-hi, and the *-tint/-deep/
+  -line variants) are this app's own derived surfaces, not literal guide swatches — they're
+  interpolated to stay perceptually consistent with the guide's canvas/surface/border anchors
+  while preserving the app's existing raised/sunken layering.
 */
 :root {
-  --nw-bg: #0b0f0d;
-  --nw-ground: #070a08;
-  --nw-surface: #171c19;
-  --nw-rail: #101511;
-  --nw-border: #242b26;
-  --nw-text: #f4f8f3;
-  --nw-muted: #7c9385;
-  --nw-green: #37bd57;
-  --nw-mint: #a7e9c2;
-  --nw-coral: #e8664b;
-  --nw-amber: #f2b84b;
-  --nw-green-tint: #132b1b;
+  --nw-ground: #0a0c0b;
+  --nw-bg: #0e100f;
+  --nw-rail: #141813;
+  --nw-surface: #171a18;
+  --nw-border: #2c312e;
+  --nw-text: #f2f5f3;
+  --nw-muted: #a3ada7;
+  --nw-green: #46c063;
+  --nw-mint: #6ecb88;
+  --nw-coral: #f0796f;
+  --nw-amber: #e8a33d;
+  --nw-green-tint: #14261a;
   --nw-green-line: #1f5230;
-  --nw-green-deep: #28893f;
-  --nw-track: #1e2621;
-  --nw-line-hi: #33403a;
+  --nw-green-deep: #24893c;
+  --nw-track: #1f2321;
+  --nw-line-hi: #3a453f;
   --nw-coral-tint: #2a1512;
   --nw-amber-tint: #2a2213;
+}
+
+:root[data-theme="light"] {
+  --nw-ground: #edf0ef;
+  --nw-bg: #edf0ef;
+  --nw-rail: #f5f7f6;
+  --nw-surface: #ffffff;
+  --nw-border: #d7ddda;
+  --nw-text: #101412;
+  --nw-muted: #56615c;
+  --nw-green: #24893c;
+  --nw-mint: #1a692e;
+  --nw-coral: #c6382f;
+  --nw-amber: #b77813;
+  --nw-green-tint: #e9f6ed;
+  --nw-green-line: #6ecb88;
+  --nw-green-deep: #1a692e;
+  --nw-track: #e3e7e5;
+  --nw-line-hi: #c2c9c5;
+  --nw-coral-tint: #fbeae8;
+  --nw-amber-tint: #fbf1de;
 }
 
 @theme inline {
@@ -44,7 +71,8 @@
   --color-nw-line-hi: var(--nw-line-hi);
   --color-nw-coral-tint: var(--nw-coral-tint);
   --color-nw-amber-tint: var(--nw-amber-tint);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-public-sans);
+  --font-display: var(--font-poppins);
 }
 
 html {
@@ -52,8 +80,82 @@ html {
   color-scheme: dark;
 }
 
+:root[data-theme="light"] html,
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
 body {
   background: var(--nw-bg);
   color: var(--nw-text);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-public-sans), system-ui, sans-serif;
+  /* Brand guide, "Numbers & money": tabular figures everywhere a column of amounts appears. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Brand guide, "Typography": Poppins is reserved for display/headings, never body copy. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-poppins), var(--font-public-sans), system-ui, sans-serif;
+  font-weight: 600;
+}
+
+/* Brand guide, "Accessibility floor": visible 3px green focus ring at 3px offset, both themes. */
+:focus-visible {
+  outline: 3px solid var(--nw-green);
+  outline-offset: 3px;
+}
+
+/* Brand guide, "Layout": light mode cards get a soft 1px/2px shadow; dark mode lifts surfaces
+   with lightness only, never shadow — so this is a light-theme-only override. */
+[data-theme="light"] .nw-elevate {
+  box-shadow: 0 1px 2px rgba(16, 20, 18, 0.06);
+}
+
+/* Marketing page, light mode only — dark mode keeps each section's normal canvas/rail/surface
+   background untouched. The header, "Tracks" strip, CTA band and footer become one vibrant
+   green (the same green as the app's own buttons), bookending a white hero section, and the
+   CTA band + footer are meant to read as a single seamless block (hence the matching border
+   color, which makes the seam between them disappear).
+
+   .nw-marketing-green is for bands with ordinary text/links/buttons in them (header, tracks,
+   footer) — everything text-like inside is forced to the light "on-accent" color.
+   .nw-marketing-green-cta is the CTA band specifically: it contains a `variant="onAccent"`
+   button that supplies its own (deliberately different) colors, so — unlike the other bands —
+   it does NOT force a color onto <button> elements, only onto headings/paragraphs/links. */
+[data-theme="light"] .nw-marketing-green,
+[data-theme="light"] .nw-marketing-green-cta {
+  background: var(--nw-green);
+  border-color: var(--nw-green);
+}
+[data-theme="light"] .nw-marketing-green :is(h1, h2, h3, p, span, a, button) {
+  color: var(--nw-bg);
+}
+[data-theme="light"] .nw-marketing-green-cta :is(h1, h2, h3, p, span, a) {
+  color: var(--nw-bg);
+}
+
+/* The hero section's background goes fully white (surface) in light mode. */
+[data-theme="light"] .nw-marketing-white {
+  background: var(--nw-surface);
+}
+
+/* The embedded sign-in/create-account card reads as a subtle gray card sitting on that white
+   hero, distinct from both the white section behind it and the green header above it. */
+[data-theme="light"] .nw-marketing-card {
+  background: #f1f2f0;
+}
+
+/* The CTA band's "Create your household" button is a plain `variant="primary"` Button (green
+   fill) — correct as-is in dark mode, where the band around it isn't green. In light mode the
+   band becomes the same green as the button, so the fill would disappear into it; this
+   compound selector (higher specificity than Button's own single-class utilities, so it wins
+   regardless of stylesheet order) inverts it to a light fill with green text instead. */
+[data-theme="light"] .nw-marketing-green-cta .nw-cta-button {
+  background: var(--nw-bg);
+  color: var(--nw-green);
+}
+[data-theme="light"] .nw-marketing-green-cta .nw-cta-button:hover {
+  background: var(--nw-surface);
 }

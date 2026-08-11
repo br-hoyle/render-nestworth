@@ -1,12 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
+import { ThemedLogo } from "@/components/brand/ThemedLogo";
 
 // Keep in sync with backend/app/schemas/auth.py SECURITY_QUESTIONS.
 const SECURITY_QUESTIONS = [
@@ -65,7 +65,7 @@ export default function SetupPage() {
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <Image src="/brand/brandmark.png" alt="" width={26} height={26} />
+          <ThemedLogo variant="brandmark" width={26} height={26} />
           <h1 className="text-base font-medium">Set up your account</h1>
         </div>
         <p className="text-sm text-nw-muted">

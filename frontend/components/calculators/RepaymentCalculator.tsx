@@ -35,7 +35,7 @@ export function RepaymentCalculator() {
   const [mode, setMode] = useState<Mode>("fixed_time");
   const [inputs, setInputs] = useState({
     balance: 15000,
-    annual_rate: 0.08,
+    annual_rate: 0.1,
     compound_frequency: "monthly" as CompoundFrequency,
     payback_frequency: "monthly" as CompoundFrequency,
     term_years: 3,

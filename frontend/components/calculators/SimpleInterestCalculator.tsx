@@ -7,7 +7,7 @@ import { NumField, ResultTile, fmtMoney, CalcButton, CalcCopy, CalcLayout, CalcR
 export function SimpleInterestCalculator() {
   const [inputs, setInputs] = useState({
     principal: 10000,
-    annual_rate: 0.05,
+    annual_rate: 0.1,
     years: 1,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);

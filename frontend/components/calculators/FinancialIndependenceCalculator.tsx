@@ -42,7 +42,7 @@ export function FinancialIndependenceCalculator() {
     current_net_worth: 100000,
     annual_savings: 30000,
     annual_expenses: 60000,
-    expected_return: 0.07,
+    expected_return: 0.1,
     withdrawal_rate: 0.04,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);

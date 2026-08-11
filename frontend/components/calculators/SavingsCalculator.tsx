@@ -25,7 +25,7 @@ export function SavingsCalculator() {
   const [inputs, setInputs] = useState({
     starting_balance: 1000,
     monthly_contribution: 300,
-    interest_rate: 0.04,
+    interest_rate: 0.1,
     compound_frequency: "monthly" as CompoundFrequency,
     term_years: 10,
     monthly_contribution_increase_pct: 0,

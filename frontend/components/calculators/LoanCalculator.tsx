@@ -66,7 +66,7 @@ export function LoanCalculator() {
   const [view, setView] = useState<"chart" | "table">("chart");
   const [inputs, setInputs] = useState({
     principal: 20000,
-    annual_rate: 0.07,
+    annual_rate: 0.1,
     term_years: 5,
     compound_frequency: "monthly" as CompoundFrequency,
     payback_frequency: "monthly" as CompoundFrequency,

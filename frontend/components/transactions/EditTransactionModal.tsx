@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import type { TransactionRecord } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { Modal } from "@/components/ui/Modal";
 
 export function EditTransactionModal({
   transaction,
@@ -71,21 +72,31 @@ export function EditTransactionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-sm rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
+    <Modal onClose={onClose} className="w-full max-w-sm rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+        className="flex flex-col gap-3"
+      >
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium">Edit transaction</h2>
-          <button onClick={onClose} className="text-nw-muted text-xs">✕</button>
+          <button type="button" onClick={onClose} className="text-nw-muted text-xs">✕</button>
         </div>
         <TextField label="Date" type="date" value={form.date} onChange={(e) => update("date", e.target.value)} />
         <TextField label="Merchant" value={form.merchant} onChange={(e) => update("merchant", e.target.value)} />
         <div className="flex gap-2">
-          <TextField label="Group" value={form.group} onChange={(e) => update("group", e.target.value)} />
-          <TextField label="Item" value={form.item} onChange={(e) => update("item", e.target.value)} />
+          <div className="flex-1 min-w-0">
+            <TextField label="Group" value={form.group} onChange={(e) => update("group", e.target.value)} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <TextField label="Item" value={form.item} onChange={(e) => update("item", e.target.value)} />
+          </div>
         </div>
         <TextField label="Account name" value={form.account_name} onChange={(e) => update("account_name", e.target.value)} />
         <div className="flex gap-2">
-          <div className="flex flex-col gap-1 flex-1">
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
             <label className="text-[11px] uppercase tracking-wide text-nw-muted">Type</label>
             <select
               value={form.type}
@@ -96,19 +107,21 @@ export function EditTransactionModal({
               <option value="expense">expense</option>
             </select>
           </div>
-          <TextField label="Amount" type="number" step="0.01" value={form.amount} onChange={(e) => update("amount", e.target.value)} />
+          <div className="flex-1 min-w-0">
+            <TextField label="Amount" type="number" step="0.01" value={form.amount} onChange={(e) => update("amount", e.target.value)} />
+          </div>
         </div>
         <TextField label="Note" value={form.note} onChange={(e) => update("note", e.target.value)} />
         {error && <p className="text-xs text-nw-coral">{error}</p>}
         <div className="flex gap-2 justify-between">
-          <Button variant="danger" disabled={deleting} onClick={remove}>
+          <Button type="button" variant="danger" disabled={deleting} onClick={remove}>
             {deleting ? "Deleting…" : "Delete"}
           </Button>
-          <Button variant="primary" disabled={saving} onClick={save}>
+          <Button type="submit" variant="primary" disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
         </div>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

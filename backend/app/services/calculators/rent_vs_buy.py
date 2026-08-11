@@ -159,7 +159,12 @@ def compute(
         buy_net_cost = cumulative_buy_outflow - net_sale_proceeds
         rent_net_cost = cumulative_rent_outflow
 
-        investment_growth = abs(upfront_diff) * ((1 + avg_investment_return) ** year - 1)
+        # Whoever's side of `upfront_diff` this is holds a running investment pot that's grown
+        # every year since move-in — `investment_pot_value` is the *whole* pot (the upfront
+        # principal plus every year's growth), not just this year's growth, so it can double as
+        # a "what has this side actually built up" figure for the value chart/table below.
+        investment_pot_value = abs(upfront_diff) * (1 + avg_investment_return) ** year
+        investment_growth = investment_pot_value - abs(upfront_diff)
         if upfront_diff >= 0:
             rent_net_cost -= investment_growth
         else:
@@ -169,6 +174,13 @@ def compute(
         avg_buy_cost = buy_net_cost / months
         avg_rent_cost = rent_net_cost / months
 
+        # "Value" side of each option — what you'd actually be holding at this point, which
+        # (unlike the cost figures above) never reads as a confusing negative number: home
+        # equity net of what it'd cost to sell, plus the investment pot if this is the side
+        # that holds it.
+        buy_value = net_sale_proceeds + (investment_pot_value if upfront_diff < 0 else Decimal(0))
+        rent_value = investment_pot_value if upfront_diff >= 0 else Decimal(0)
+
         schedule.append(
             {
                 "year": year,
@@ -177,6 +189,14 @@ def compute(
                 "home_equity": round(home_value - loan_balance, 2),
                 "avg_buy_cost": round(avg_buy_cost, 2),
                 "avg_rent_cost": round(avg_rent_cost, 2),
+                "year_buy_outflow": round(year_buy_outflow, 2),
+                "year_rent_outflow": round(year_rent_outflow, 2),
+                "cumulative_buy_outflow": round(cumulative_buy_outflow, 2),
+                "cumulative_rent_outflow": round(cumulative_rent_outflow, 2),
+                "net_sale_proceeds": round(net_sale_proceeds, 2),
+                "investment_pot_value": round(investment_pot_value, 2),
+                "buy_value": round(buy_value, 2),
+                "rent_value": round(rent_value, 2),
             }
         )
 
@@ -202,5 +222,9 @@ def compute(
         "home_value_at_horizon": final["home_value"],
         "avg_buy_cost_at_horizon": final["avg_buy_cost"],
         "avg_rent_cost_at_horizon": final["avg_rent_cost"],
+        "upfront_diff": round(upfront_diff, 2),
+        "investing_side": "rent" if upfront_diff >= 0 else "buy",
+        "down_payment_amount": round(down_payment_amount, 2),
+        "closing_costs_amount": round(closing_costs_amount, 2),
         "schedule": schedule,
     }

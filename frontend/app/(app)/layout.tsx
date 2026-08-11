@@ -14,7 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.replace("/login");
+      router.replace("/");
     }
   }, [status, router]);
 
@@ -34,7 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     status === "authenticated" && secondsRemaining !== null && secondsRemaining < 300;
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 min-w-0 flex flex-col">
         {showCountdown && (

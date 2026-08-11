@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { ThemeToggleButton } from "@/components/ui/ThemeToggle";
 
 const MANAGE_LINKS = [
   { href: "/accounts", label: "Accounts" },
@@ -30,6 +31,10 @@ export default function MorePage() {
 
       <div className="text-[9px] uppercase tracking-wider text-nw-muted px-1 mt-4 mb-1">
         Household
+      </div>
+      <div className="flex justify-between items-center py-3 border-t border-nw-border text-sm">
+        Appearance
+        <ThemeToggleButton />
       </div>
       <Link
         href="/settings"
