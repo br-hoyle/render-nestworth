@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
 import { LoadingBlock } from "@/components/ui/Spinner";
+import { ThemeSegmentedControl } from "@/components/ui/ThemeToggle";
+import { DeleteHouseholdModal } from "@/components/settings/DeleteHouseholdModal";
 
 const SECURITY_QUESTIONS = [
   "What was your first pet's name?",
@@ -44,9 +46,9 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<HouseholdSettings | null>(null);
   const [prefsSaving, setPrefsSaving] = useState(false);
 
-  const [deleteConfirm, setDeleteConfirm] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState<"balances" | "transactions" | null>(null);
 
   useEffect(() => {
     if (session) {
@@ -155,21 +157,38 @@ export default function SettingsPage() {
     }
   }
 
-  async function deleteHousehold() {
-    if (deleteConfirm !== session?.household_name) return;
-    setDeleting(true);
+  async function downloadCsv(kind: "balances" | "transactions") {
+    setExportingCsv(kind);
     try {
-      await api.delete("/settings/household");
-      await logout();
-      router.push("/login");
+      const blob = await api.getBlob(`/${kind}/export.csv`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nestworth-${kind}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
     } finally {
-      setDeleting(false);
+      setExportingCsv(null);
     }
+  }
+
+  async function handleHouseholdDeleted() {
+    setShowDeleteModal(false);
+    await logout();
+    router.push("/");
   }
 
   return (
     <div className="p-4 md:p-6 max-w-lg flex flex-col gap-4">
       <h1 className="text-lg font-medium">Settings</h1>
+
+      <Card>
+        <div className="text-sm font-medium">Appearance</div>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-nw-muted">Theme</span>
+          <ThemeSegmentedControl />
+        </div>
+      </Card>
 
       <Card>
         <div className="text-sm font-medium">Household</div>
@@ -305,24 +324,32 @@ export default function SettingsPage() {
       <Card>
         <div className="text-sm font-medium">Data</div>
         <Button onClick={exportData} disabled={exporting}>
-          {exporting ? "Exporting…" : "Export all data"}
+          {exporting ? "Exporting…" : "Export all data (JSON)"}
+        </Button>
+        <Button onClick={() => downloadCsv("balances")} disabled={exportingCsv === "balances"}>
+          {exportingCsv === "balances" ? "Downloading…" : "Download account balances (CSV)"}
+        </Button>
+        <Button onClick={() => downloadCsv("transactions")} disabled={exportingCsv === "transactions"}>
+          {exportingCsv === "transactions" ? "Downloading…" : "Download transactions (CSV)"}
         </Button>
         <div className="pt-3 border-t border-nw-border flex flex-col gap-2">
           <span className="text-xs text-nw-coral">Danger zone</span>
           <p className="text-xs text-nw-muted">
-            Type <b>{session?.household_name}</b> to confirm deleting this household and all of its data. This
-            cannot be undone.
+            Permanently delete {session?.household_name} and everything in it.
           </p>
-          <TextField value={deleteConfirm} onChange={(e) => setDeleteConfirm(e.target.value)} />
-          <Button
-            variant="danger"
-            disabled={deleteConfirm !== session?.household_name || deleting}
-            onClick={deleteHousehold}
-          >
-            {deleting ? "Deleting…" : "Delete household"}
+          <Button variant="danger" onClick={() => setShowDeleteModal(true)} className="self-start">
+            Delete household
           </Button>
         </div>
       </Card>
+
+      {showDeleteModal && session && (
+        <DeleteHouseholdModal
+          householdName={session.household_name}
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={handleHouseholdDeleted}
+        />
+      )}
     </div>
   );
 }

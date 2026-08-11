@@ -49,8 +49,25 @@ async function request<T>(
   return (await res.json()) as T;
 }
 
+/** For endpoints that return a file (CSV export) rather than JSON — same base URL/credentials
+ * handling as `request`, but resolves to a Blob instead of trying to JSON-parse the body. */
+async function requestBlob(path: string): Promise<Blob> {
+  const res = await fetch(`${API_URL}${path}`, { method: "GET", credentials: "include" });
+  if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      // no JSON body
+    }
+    throw new ApiError(res.status, body);
+  }
+  return res.blob();
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
+  getBlob: (path: string) => requestBlob(path),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
   patch: <T>(path: string, body?: unknown) =>

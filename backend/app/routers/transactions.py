@@ -1,9 +1,11 @@
+import csv
+import io
 import json
 import uuid
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -16,6 +18,7 @@ from app.schemas.transactions import (
     PreviewErrorRow,
     PreviewRow,
     TransactionCategoryRule,
+    TransactionCreate,
     TransactionListResponse,
     TransactionRead,
     TransactionUpdate,
@@ -144,6 +147,82 @@ _CATEGORY_JOIN = """
         and tc_group."group" = coalesce(t."group", '')
         and tc_group.item = ''
 """
+
+
+@router.post("", response_model=TransactionRead, status_code=status.HTTP_201_CREATED)
+def create_transaction(
+    payload: TransactionCreate,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> TransactionRead:
+    """Manual single-transaction entry — same dedup fingerprint as the CSV import path, so a
+    manually-typed transaction that happens to match an already-imported row (or a duplicate
+    click) is silently absorbed rather than double-counted."""
+    fingerprint = compute_fingerprint(session.household_id, payload.date, payload.merchant or "", payload.amount, payload.note or "")
+    row = conn.execute(
+        text(
+            """
+            insert into transactions
+                (transaction_id, household_id, date, "group", item, type, merchant,
+                 account_name, amount, note, source_file, dedup_fingerprint)
+            values
+                (:transaction_id, :household_id, :date, :group, :item, :type, :merchant,
+                 :account_name, :amount, :note, null, :fingerprint)
+            on conflict (household_id, dedup_fingerprint) do nothing
+            returning transaction_id, date, "group", item, type, merchant, account_name,
+                      amount, note, source_file
+            """
+        ),
+        {
+            "transaction_id": uuid.uuid4(),
+            "household_id": session.household_id,
+            "date": payload.date,
+            "group": payload.group,
+            "item": payload.item,
+            "type": payload.type,
+            "merchant": payload.merchant,
+            "account_name": payload.account_name,
+            "amount": payload.amount,
+            "note": payload.note,
+            "fingerprint": fingerprint,
+        },
+    ).mappings().first()
+    if row is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="A transaction with the same date, merchant, amount, and note already exists.",
+        )
+    return TransactionRead(**row)
+
+
+@router.get("/export.csv")
+def export_transactions_csv(
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> Response:
+    rows = conn.execute(
+        text(
+            f'select t.transaction_id, t.date, t."group", t.item, t.type, t.merchant, '
+            f'coalesce(tc_item.flow_type, tc_group.flow_type) as flow_type, '
+            f't.account_name, t.note, t.source_file {_CATEGORY_JOIN} '
+            f"where t.household_id = :household_id order by t.date desc, t.transaction_id"
+        ),
+        {"household_id": session.household_id},
+    ).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["transaction_id", "date", "group", "item", "type", "merchant", "flow_type", "account", "note", "source_file"]
+    )
+    for row in rows:
+        writer.writerow(row)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=nestworth-transactions.csv"},
+    )
 
 
 @router.get("", response_model=TransactionListResponse)

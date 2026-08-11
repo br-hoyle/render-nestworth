@@ -67,7 +67,7 @@ function RetirementNeedTab() {
     current_savings: 20000,
     annual_income_increase: 0.02,
     income_replacement_pct: 0.8,
-    avg_return: 0.11,
+    avg_return: 0.1,
     inflation_rate: 0.03,
     other_income_monthly: 0,
   });
@@ -171,10 +171,10 @@ function RetirementNeedTab() {
             : `You need to contribute an extra ${fmtMoney(result.required_additional_monthly_savings)} per month to hit your target required nest egg of ${fmtMoney(result.required_balance)} at age ${inputs.retirement_age}.`}
         </CalcAnswer>
         <div className="flex flex-wrap gap-2">
-          <ResultTile label="Nest Egg Needed" value={fmtMoney(result.required_balance)} />
-          <ResultTile label="Projected at Retirement" value={fmtMoney(result.projected_savings_at_retirement)} />
+          <ResultTile label="Nest Egg Required at Retirement" value={fmtMoney(result.required_balance)} />
+          <ResultTile label="Projected at Balance Retirement" value={fmtMoney(result.projected_savings_at_retirement)} />
           {!result.on_track && (
-            <ResultTile label="Extra Monthly Savings Needed" value={fmtMoney(result.required_additional_monthly_savings)} />
+            <ResultTile label="Additional Monthly Savings Required" value={fmtMoney(result.required_additional_monthly_savings)} />
           )}
         </div>
         <CalcViewToggle view={view} onChange={setView} />
@@ -201,7 +201,7 @@ function RetirementSavingsPlanTab() {
     retirement_age: 65,
     amount_needed_at_retirement: 1000000,
     current_retirement_savings: 20000,
-    avg_investment_return: 0.11,
+    avg_investment_return: 0.1,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -307,7 +307,7 @@ function RetirementWithdrawalTab() {
     life_expectancy: 85,
     current_retirement_savings: 300000,
     monthly_contribution: 1000,
-    avg_investment_return: 0.11,
+    avg_investment_return: 0.1,
     inflation_rate: 0.03,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
@@ -401,7 +401,7 @@ function RetirementLongevityTab() {
     life_expectancy: 85,
     retirement_savings_at_retirement: 500000,
     planned_withdrawal_amount: 3000,
-    avg_investment_return: 0.11,
+    avg_investment_return: 0.1,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);

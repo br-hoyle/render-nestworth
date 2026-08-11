@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
@@ -228,6 +228,59 @@ def list_balances(
         {"household_id": session.household_id, "account_id": account_id},
     ).mappings().all()
     return [BalanceRead(**row) for row in rows]
+
+
+@router.delete("/balances/{balance_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_balance(
+    balance_id: uuid.UUID,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> None:
+    conn.execute(
+        text("delete from balances where balance_id = :id and household_id = :household_id"),
+        {"id": balance_id, "household_id": session.household_id},
+    )
+
+
+@router.get("/balances/export.csv")
+def export_balances_csv(
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> Response:
+    """Every balance snapshot the household has recorded, joined to whichever version of the
+    account (a Type-2 SCD) was actually in effect on that snapshot's date — so a renamed or
+    reclassified account still exports historically-accurate labels rather than just its
+    current ones."""
+    rows = conn.execute(
+        text(
+            """
+            select b.balance_id, a.balance_type, a.institution_name, a.category,
+                   a.account_type, a.account_name, b.full_date, b.balance
+            from balances b
+            join accounts a
+                on a.account_id = b.account_id
+                and b.full_date >= a.effective_start_date
+                and b.full_date < a.effective_end_date
+            where b.household_id = :household_id
+            order by a.account_name, b.full_date
+            """
+        ),
+        {"household_id": session.household_id},
+    ).all()
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["balance_id", "balance_type", "institution_name", "category", "account_type", "account_name", "full_date", "balance"]
+    )
+    for row in rows:
+        writer.writerow(row)
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=nestworth-balances.csv"},
+    )
 
 
 def _query_dates(start: date, end: date, granularity: str) -> list[date]:

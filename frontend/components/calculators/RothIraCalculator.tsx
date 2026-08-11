@@ -32,7 +32,7 @@ export function RothIraCalculator() {
     retirement_age: 65,
     maximize_contributions: true,
     annual_contribution: 7000,
-    avg_return: 0.11,
+    avg_return: 0.1,
     marginal_tax_rate: 0.22,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);

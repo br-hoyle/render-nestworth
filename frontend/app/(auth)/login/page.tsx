@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -8,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
+import { ThemedLogo } from "@/components/brand/ThemedLogo";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -34,11 +34,10 @@ export default function LoginPage() {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm flex flex-col gap-4">
-        <Image
-          src="/brand/full-logo.png"
-          alt="NestWorth"
+        <ThemedLogo
+          variant="logo-tagline"
           width={220}
-          height={45}
+          height={51}
           className="self-center mb-2"
         />
         <p className="text-sm text-nw-muted">Sign in to your household.</p>

@@ -132,14 +132,15 @@ export default function IncomePage() {
                   labelStyle={{ color: "var(--nw-text)" }}
                   formatter={(value, name) => (name === "Diff %" ? [`${Number(value).toFixed(0)}%`, name] : [money(Number(value)), name])}
                 />
-                <Bar yAxisId="left" dataKey="gross" name="Gross" fill="var(--nw-green-line)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-                <Bar yAxisId="left" dataKey="net" name="Net" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                {/* Fixed hex, not theme vars — these series colors shouldn't shift with light/dark mode. */}
+                <Bar yAxisId="left" dataKey="gross" name="Gross" fill="#1f5230" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                <Bar yAxisId="left" dataKey="net" name="Net" fill="#46c063" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="diff_pct"
                   name="Diff %"
-                  stroke="var(--nw-amber)"
+                  stroke="#e8a33d"
                   strokeWidth={2}
                   dot={false}
                   connectNulls
@@ -204,7 +205,21 @@ export default function IncomePage() {
                       {r.effective_start_date} → {r.is_open ? "open" : r.effective_end_date}
                     </span>
                   </div>
-                  <span className="font-medium">{money(r.income)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{money(r.income)}</span>
+                    <button
+                      type="button"
+                      aria-label="Delete income record"
+                      onClick={async () => {
+                        if (!window.confirm("Delete this income record?")) return;
+                        await api.delete(`/income/${r.income_id}`);
+                        load();
+                      }}
+                      className="text-nw-muted hover:text-nw-coral text-xs"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

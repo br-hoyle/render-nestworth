@@ -6,15 +6,17 @@ import { api } from "@/lib/api";
 import type { TransactionListResponse, TransactionRecord, UnclassifiedGroup } from "@/lib/types";
 import { money } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
+import { TextField } from "@/components/ui/TextField";
 import { ImportWizard } from "@/components/transactions/ImportWizard";
 import { ClassifyModal } from "@/components/transactions/ClassifyModal";
 import { EditTransactionModal } from "@/components/transactions/EditTransactionModal";
+import { AddTransactionModal } from "@/components/transactions/AddTransactionModal";
 import { LoadingBlock } from "@/components/ui/Spinner";
 
 const PAGE_SIZES = [15, 25, 50, 100];
 
 const NEED_WANT_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: "Need/Want: all" },
+  { value: "", label: "All" },
   { value: "needs", label: "Needs" },
   { value: "wants", label: "Wants" },
   { value: "savings", label: "Savings" },
@@ -55,6 +57,7 @@ export default function TransactionsPage() {
   const [unclassified, setUnclassified] = useState<UnclassifiedGroup[] | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [showClassify, setShowClassify] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<TransactionRecord | null>(null);
 
   function load() {
@@ -111,6 +114,7 @@ export default function TransactionsPage() {
         <h1 className="text-lg font-medium">Transactions</h1>
         <div className="flex gap-2">
           <Button onClick={() => router.push("/transactions/categories")}>Update categories</Button>
+          <Button onClick={() => setShowAdd(true)}>+ New transaction</Button>
           <Button variant="primary" onClick={() => setShowImport((s) => !s)}>
             {showImport ? "Close import" : "Import CSV"}
           </Button>
@@ -141,73 +145,92 @@ export default function TransactionsPage() {
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <input
-          type="date"
-          value={filters.start}
-          onChange={(e) => setFilters((f) => ({ ...f, start: e.target.value }))}
-          className="rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          type="date"
-          value={filters.end}
-          onChange={(e) => setFilters((f) => ({ ...f, end: e.target.value }))}
-          className="rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          placeholder="Group"
-          value={filters.group}
-          onChange={(e) => setFilters((f) => ({ ...f, group: e.target.value }))}
-          className="w-24 rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          placeholder="Item"
-          value={filters.item}
-          onChange={(e) => setFilters((f) => ({ ...f, item: e.target.value }))}
-          className="w-24 rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          placeholder="Merchant"
-          value={filters.search}
-          onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-          className="w-28 rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          placeholder="Account"
-          value={filters.account_name}
-          onChange={(e) => setFilters((f) => ({ ...f, account_name: e.target.value }))}
-          className="w-28 rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          type="number"
-          placeholder="Min $"
-          value={filters.amount_min}
-          onChange={(e) => setFilters((f) => ({ ...f, amount_min: e.target.value }))}
-          className="w-20 rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <input
-          type="number"
-          placeholder="Max $"
-          value={filters.amount_max}
-          onChange={(e) => setFilters((f) => ({ ...f, amount_max: e.target.value }))}
-          className="w-20 rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        />
-        <select
-          value={filters.flow_type}
-          onChange={(e) => setFilters((f) => ({ ...f, flow_type: e.target.value }))}
-          className="rounded-full border border-nw-border bg-nw-rail px-3 py-1.5 text-xs"
-        >
-          {NEED_WANT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS) && (
-          <button onClick={() => setFilters(EMPTY_FILTERS)} className="text-xs text-nw-mint px-2">
-            Clear
-          </button>
-        )}
+      <div className="rounded-2xl border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] uppercase tracking-wide text-nw-muted font-medium">Filters</span>
+          {JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS) && (
+            <button onClick={() => setFilters(EMPTY_FILTERS)} className="text-xs text-nw-mint">
+              Clear all filters
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] uppercase tracking-wide text-nw-muted">From date</label>
+            <input
+              type="date"
+              value={filters.start}
+              onChange={(e) => setFilters((f) => ({ ...f, start: e.target.value }))}
+              className="rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] uppercase tracking-wide text-nw-muted">To date</label>
+            <input
+              type="date"
+              value={filters.end}
+              onChange={(e) => setFilters((f) => ({ ...f, end: e.target.value }))}
+              className="rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
+            />
+          </div>
+          <TextField
+            label="Merchant"
+            placeholder="Search merchant"
+            value={filters.search}
+            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+          />
+          <TextField
+            label="Account"
+            placeholder="Any account"
+            value={filters.account_name}
+            onChange={(e) => setFilters((f) => ({ ...f, account_name: e.target.value }))}
+          />
+          <TextField
+            label="Group"
+            placeholder="Any group"
+            value={filters.group}
+            onChange={(e) => setFilters((f) => ({ ...f, group: e.target.value }))}
+          />
+          <TextField
+            label="Item"
+            placeholder="Any item"
+            value={filters.item}
+            onChange={(e) => setFilters((f) => ({ ...f, item: e.target.value }))}
+          />
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] uppercase tracking-wide text-nw-muted">Amount range</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                placeholder="Min $"
+                value={filters.amount_min}
+                onChange={(e) => setFilters((f) => ({ ...f, amount_min: e.target.value }))}
+                className="w-full rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
+              />
+              <input
+                type="number"
+                placeholder="Max $"
+                value={filters.amount_max}
+                onChange={(e) => setFilters((f) => ({ ...f, amount_max: e.target.value }))}
+                className="w-full rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] uppercase tracking-wide text-nw-muted">Need / want</label>
+            <select
+              value={filters.flow_type}
+              onChange={(e) => setFilters((f) => ({ ...f, flow_type: e.target.value }))}
+              className="rounded-md border border-nw-border bg-nw-rail px-3 py-2 text-sm"
+            >
+              {NEED_WANT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {result?.items.length === 0 && (
@@ -271,6 +294,17 @@ export default function TransactionsPage() {
           onClose={() => setShowClassify(false)}
           onSaved={() => {
             setShowClassify(false);
+            loadUnclassified();
+          }}
+        />
+      )}
+
+      {showAdd && (
+        <AddTransactionModal
+          onClose={() => setShowAdd(false)}
+          onSaved={() => {
+            setShowAdd(false);
+            load();
             loadUnclassified();
           }}
         />

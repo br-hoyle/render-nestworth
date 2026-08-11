@@ -24,7 +24,7 @@ interface ComparisonRow {
 
 export function CompoundingRateConverter() {
   const [inputs, setInputs] = useState({
-    input_rate: 0.05,
+    input_rate: 0.1,
     input_compound_frequency: "monthly" as ExtendedCompoundFrequency,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);

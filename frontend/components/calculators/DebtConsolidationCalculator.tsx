@@ -108,8 +108,8 @@ export function DebtConsolidationCalculator() {
         </CalcAnswer>
         <div className="flex flex-wrap gap-2">
           <ResultTile label="Total Balance" value={fmtMoney(result.total_balance)} />
-          <ResultTile label="Blended Current Rate" value={`${Number(result.blended_current_rate_pct).toFixed(2)}%`} />
-          <ResultTile label="Current Total Payment" value={fmtMoney(result.current_total_monthly_payment)} />
+          <ResultTile label="Blended Rate" value={`${Number(result.blended_current_rate_pct).toFixed(2)}%`} />
+          <ResultTile label="Total Payment" value={fmtMoney(result.current_total_monthly_payment)} />
           <ResultTile label="New Payment" value={fmtMoney(result.new_monthly_payment)} />
           <ResultTile label="Monthly Savings" value={fmtMoney(result.monthly_savings)} />
           <ResultTile label="New Loan Total Cost (incl. fee)" value={fmtMoney(result.new_total_cost_including_fee)} />

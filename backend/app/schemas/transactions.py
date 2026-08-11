@@ -2,6 +2,7 @@ import uuid
 import datetime
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -60,6 +61,17 @@ class TransactionRead(BaseModel):
 class TransactionListResponse(BaseModel):
     items: list[TransactionRead]
     total: int
+
+
+class TransactionCreate(BaseModel):
+    date: date
+    group: str | None = None
+    item: str | None = None
+    type: Literal["income", "expense"]
+    merchant: str | None = None
+    account_name: str | None = None
+    amount: Decimal
+    note: str | None = None
 
 
 class TransactionUpdate(BaseModel):

@@ -56,7 +56,7 @@ const TODAY = new Date().toISOString().slice(0, 10);
 export function AmortizationCalculator() {
   const [principal, setPrincipal] = useState(300000);
   const [startDate, setStartDate] = useState(TODAY);
-  const [annualRate, setAnnualRate] = useState(0.065);
+  const [annualRate, setAnnualRate] = useState(0.1);
   const [termYears, setTermYears] = useState(30);
   const [extraMonthly, setExtraMonthly] = useState(0);
   const [extraMonthlyStartDate, setExtraMonthlyStartDate] = useState(TODAY);

@@ -5,7 +5,9 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { Account } from "@/lib/types";
 import { money } from "@/lib/format";
 
-const CATEGORY_COLORS = ["var(--nw-mint)", "var(--nw-green)", "var(--nw-green-deep)", "var(--nw-green-line)", "var(--nw-amber)", "var(--nw-muted)"];
+// Fixed regardless of light/dark theme — a category's color shouldn't shift when the
+// household toggles appearance, only the surrounding chrome (tooltip, card) should.
+const CATEGORY_COLORS = ["#6ecb88", "#46c063", "#24893c", "#1f5230", "#e8a33d", "#a3ada7"];
 
 export function AllocationSunburst({ accounts, height = 200 }: { accounts: Account[]; height?: number }) {
   const { inner, outer } = useMemo(() => buildRings(accounts), [accounts]);

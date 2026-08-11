@@ -34,10 +34,10 @@ interface Result {
 
 export function RefinanceCalculator() {
   const [currentBalance, setCurrentBalance] = useState(300000);
-  const [currentRate, setCurrentRate] = useState(0.07);
+  const [currentRate, setCurrentRate] = useState(0.1);
   const [currentMonthlyPayment, setCurrentMonthlyPayment] = useState(2000);
   const [newLoanCostsFees, setNewLoanCostsFees] = useState(3000);
-  const [newRate, setNewRate] = useState(0.055);
+  const [newRate, setNewRate] = useState(0.1);
   const [newTermYears, setNewTermYears] = useState(30);
   const [newLoanPoints, setNewLoanPoints] = useState(0);
   const [cashOutAmount, setCashOutAmount] = useState(0);
@@ -135,7 +135,7 @@ export function RefinanceCalculator() {
         <div className="flex flex-wrap gap-2">
           <ResultTile label="Monthly Savings" value={fmtMoney(result.monthly_savings)} />
           <ResultTile label="Breakeven" value={result.breakeven_months != null ? `${result.breakeven_months} mo` : "—"} />
-          <ResultTile label="Lifetime Interest Saved" value={fmtMoney(result.lifetime_interest_saved)} />
+          <ResultTile label="Interest Saved" value={fmtMoney(result.lifetime_interest_saved)} />
           <ResultTile label="Net Upfront Cost" value={fmtMoney(result.net_upfront_cost)} />
         </div>
         <div className="rounded-lg border border-nw-border bg-nw-surface overflow-x-auto">

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
@@ -14,6 +13,8 @@ import {
 } from "react-icons/md";
 import { TbMoneybagPlus } from "react-icons/tb";
 import { useAuth } from "@/lib/auth-context";
+import { ThemedLogo } from "@/components/brand/ThemedLogo";
+import { ThemeToggleButton } from "@/components/ui/ThemeToggle";
 
 const NAV_GROUPS: { heading: string; items: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] }[] = [
   {
@@ -45,7 +46,7 @@ export function Sidebar() {
   return (
     <div className="hidden md:flex w-[190px] flex-none flex-col gap-0.5 border-r border-nw-border bg-nw-rail p-2.5">
       <div className="flex items-center gap-2 px-1 py-2 mb-2">
-        <Image src="/brand/brandmark.png" alt="" width={20} height={20} />
+        <ThemedLogo variant="brandmark" width={20} height={20} />
         <span className="text-sm font-semibold">
           Nest<span className="text-nw-green">Worth</span>
         </span>
@@ -79,6 +80,8 @@ export function Sidebar() {
       ))}
 
       <div className="flex-1" />
+
+      <ThemeToggleButton className="justify-start" />
 
       <Link
         href="/settings"

@@ -19,7 +19,7 @@ class InterestRateSolverInput(BaseModel):
 
 class SimpleInterestInput(BaseModel):
     principal: Decimal
-    annual_rate: Decimal = Decimal("0.05")
+    annual_rate: Decimal = Decimal("0.10")
     years: Decimal = Decimal(1)
 
 
@@ -40,7 +40,7 @@ class FinancialIndependenceInput(BaseModel):
     current_net_worth: Decimal = Decimal(0)
     annual_savings: Decimal = Decimal(0)
     annual_expenses: Decimal
-    expected_return: Decimal = Decimal("0.07")
+    expected_return: Decimal = Decimal("0.10")
     withdrawal_rate: Decimal = Decimal("0.04")
 
 
@@ -55,7 +55,7 @@ class RetirementNeedInput(BaseModel):
     life_expectancy: int = 85
     annual_income_increase: Decimal = Decimal("0.02")
     income_replacement_pct: Decimal = Decimal("0.80")
-    avg_return: Decimal = Decimal("0.11")
+    avg_return: Decimal = Decimal("0.10")
     inflation_rate: Decimal = Decimal("0.03")
     other_income_monthly: Decimal = Decimal(0)
 
@@ -65,7 +65,7 @@ class RetirementSavingsPlanInput(BaseModel):
     retirement_age: int
     amount_needed_at_retirement: Decimal
     current_retirement_savings: Decimal = Decimal(0)
-    avg_investment_return: Decimal = Decimal("0.11")
+    avg_investment_return: Decimal = Decimal("0.10")
 
 
 class RetirementWithdrawalInput(BaseModel):
@@ -74,21 +74,21 @@ class RetirementWithdrawalInput(BaseModel):
     current_retirement_savings: Decimal = Decimal(0)
     monthly_contribution: Decimal = Decimal(0)
     life_expectancy: int = 85
-    avg_investment_return: Decimal = Decimal("0.11")
+    avg_investment_return: Decimal = Decimal("0.10")
     inflation_rate: Decimal = Decimal("0.03")
 
 
 class RetirementLongevityInput(BaseModel):
     retirement_savings_at_retirement: Decimal
     planned_withdrawal_amount: Decimal
-    avg_investment_return: Decimal = Decimal("0.11")
+    avg_investment_return: Decimal = Decimal("0.10")
     retirement_age: int = 65
     life_expectancy: int = 85
 
 
 class InvestmentInput(BaseModel):
     current_savings: Decimal = Decimal(0)
-    annual_rate: Decimal = Decimal("0.07")
+    annual_rate: Decimal = Decimal("0.10")
     compound_frequency: CompoundFrequency = "monthly"
     contribution_timing: Literal["beginning", "end"] = "end"
     solve_for: Literal["end_amount", "contribution", "length"] = "end_amount"
@@ -107,7 +107,7 @@ class K401Input(BaseModel):
     employer_match_limit_pct: Decimal = Decimal("0.06")
     life_expectancy: int = 85
     annual_income_increase: Decimal = Decimal("0.02")
-    avg_return: Decimal = Decimal("0.11")
+    avg_return: Decimal = Decimal("0.10")
     inflation_rate: Decimal = Decimal("0.03")
 
 
@@ -126,7 +126,7 @@ class RothIraInput(BaseModel):
     current_balance: Decimal = Decimal(0)
     maximize_contributions: bool = True
     annual_contribution: Decimal = Decimal("7000")
-    avg_return: Decimal = Decimal("0.11")
+    avg_return: Decimal = Decimal("0.10")
     marginal_tax_rate: Decimal = Decimal("0.22")
 
 
@@ -138,7 +138,7 @@ class CompoundInterestConverterInput(BaseModel):
 
 class SavingsInput(BaseModel):
     starting_balance: Decimal = Decimal(0)
-    interest_rate: Decimal = Decimal("0.04")
+    interest_rate: Decimal = Decimal("0.10")
     term_years: int = 10
     annual_contribution: Decimal = Decimal(0)
     annual_contribution_increase_pct: Decimal = Decimal(0)
@@ -154,7 +154,7 @@ class SavingsInput(BaseModel):
 class LoanCalculatorInput(BaseModel):
     loan_type: Literal["amortized", "deferred", "bond"] = "amortized"
     principal: Decimal
-    annual_rate: Decimal = Decimal("0.07")
+    annual_rate: Decimal = Decimal("0.10")
     term_years: int = 5
     compound_frequency: CompoundFrequency = "monthly"
     payback_frequency: CompoundFrequency = "monthly"
@@ -163,7 +163,7 @@ class LoanCalculatorInput(BaseModel):
 class RepaymentCalculatorInput(BaseModel):
     mode: Literal["fixed_time", "fixed_installment"] = "fixed_time"
     balance: Decimal
-    annual_rate: Decimal = Decimal("0.07")
+    annual_rate: Decimal = Decimal("0.10")
     compound_frequency: CompoundFrequency = "monthly"
     payback_frequency: CompoundFrequency = "monthly"
     term_years: int | None = 5
@@ -192,7 +192,7 @@ class MortgageInput(BaseModel):
     home_price: Decimal
     down_payment_value: Decimal = Decimal("0.20")
     down_payment_is_percent: bool = True
-    annual_rate: Decimal = Decimal("0.065")
+    annual_rate: Decimal = Decimal("0.10")
     term_years: int = 30
     start_date: date
     property_tax_value: Decimal = Decimal(0)
@@ -209,7 +209,7 @@ class MortgageInput(BaseModel):
 
 class AmortizationInput(BaseModel):
     principal: Decimal
-    annual_rate: Decimal = Decimal("0.065")
+    annual_rate: Decimal = Decimal("0.10")
     term_years: int = 30
     start_date: date
     extra_monthly: Decimal = Decimal(0)
@@ -223,7 +223,7 @@ class AmortizationInput(BaseModel):
 class MortgagePayoffInput(BaseModel):
     original_principal: Decimal
     original_term_years: int = 30
-    annual_rate: Decimal = Decimal("0.065")
+    annual_rate: Decimal = Decimal("0.10")
     start_date: date
     remaining_term_years: int = 25
     remaining_term_months: int = 0
@@ -244,7 +244,7 @@ class HouseAffordabilityInput(BaseModel):
     monthly_budget: Decimal = Decimal(0)
     monthly_debts: Decimal = Decimal(0)
     term_years: int = 30
-    annual_rate: Decimal = Decimal("0.065")
+    annual_rate: Decimal = Decimal("0.10")
     down_payment_value: Decimal = Decimal("0.20")
     down_payment_is_percent: bool = True
     property_tax_value: Decimal = Decimal(0)
@@ -279,7 +279,7 @@ class RentVsBuyInput(BaseModel):
     down_payment_is_percent: bool = True
     closing_costs_value: Decimal = Decimal("0.03")
     closing_costs_is_percent: bool = True
-    annual_rate: Decimal = Decimal("0.065")
+    annual_rate: Decimal = Decimal("0.10")
     loan_term_years: int = 30
     property_tax_pct: Decimal = Decimal("0.012")
     home_insurance_pct: Decimal = Decimal("0.005")
@@ -294,7 +294,7 @@ class RentVsBuyInput(BaseModel):
     rental_increase_pct: Decimal = Decimal("0.03")
     renters_insurance_value: Decimal = Decimal("0.01")
     renters_insurance_is_percent: bool = True
-    avg_investment_return: Decimal = Decimal("0.07")
+    avg_investment_return: Decimal = Decimal("0.10")
     marginal_federal_rate: Decimal = Decimal("0.22")
     marginal_state_rate: Decimal = Decimal("0.05")
     tax_filing_status: Literal["single", "married_filing_jointly", "head_of_household"] = "single"

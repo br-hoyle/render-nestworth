@@ -30,7 +30,7 @@ export function K401Calculator() {
     employer_match_limit_pct: 0.06,
     life_expectancy: 85,
     annual_income_increase: 0.02,
-    avg_return: 0.11,
+    avg_return: 0.1,
     inflation_rate: 0.03,
   });
   const [result, setResult] = useState<Record<string, unknown> | null>(null);

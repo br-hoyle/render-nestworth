@@ -50,6 +50,7 @@ DEFAULT_SETTINGS = {
     "monthly_investment_contribution": 0,
     "monthly_retirement_contribution": 0,
     "kpi_thresholds": DEFAULT_KPI_THRESHOLDS,
+    "theme_preference": "system",  # "system" | "light" | "dark"
 }
 
 
@@ -76,6 +77,7 @@ class HouseholdSettings(BaseModel):
     monthly_investment_contribution: float = 0
     monthly_retirement_contribution: float = 0
     kpi_thresholds: dict = DEFAULT_KPI_THRESHOLDS
+    theme_preference: str = "system"
 
 
 def _merge_one_level(defaults: dict, stored: dict) -> dict:

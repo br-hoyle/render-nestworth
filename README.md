@@ -61,6 +61,23 @@ cd backend
 pytest
 ```
 
+## Inviting friends & family
+
+Self-serve signup (`/signup`, and the "Create account" tab on the marketing page) is gated
+behind a shared invite code rather than being fully open — `POST /auth/signup` rejects any
+request whose `friends_family_code` doesn't match the hardcoded value below
+(`backend/app/routers/auth.py`, `FRIENDS_FAMILY_CODE`):
+
+```
+24527
+```
+
+Share this code directly with whoever you want to invite (text, email, whatever) — it isn't
+shown anywhere in the app's own UI. It's a soft, plain-text gate against random signups, not a
+real secret: anyone with the code can create a household, and the code itself grants no other
+access. Rotate it by changing the constant in `auth.py` and redeploying if it ever leaks further
+than intended.
+
 ## Deployment
 
 See [`docs/SETUP_SUPABASE.md`](docs/SETUP_SUPABASE.md) and

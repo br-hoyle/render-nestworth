@@ -47,6 +47,7 @@ class SignupRequest(BaseModel):
     confirm_password: str
     security_question: str
     security_answer: str
+    friends_family_code: str
     birthdate: date | None = None
 
     @field_validator("password")

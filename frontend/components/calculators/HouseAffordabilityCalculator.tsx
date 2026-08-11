@@ -70,7 +70,7 @@ export function HouseAffordabilityCalculator() {
   const [monthlyBudget, setMonthlyBudget] = useState(2500);
 
   const [termYears, setTermYears] = useState(30);
-  const [annualRate, setAnnualRate] = useState(0.065);
+  const [annualRate, setAnnualRate] = useState(0.1);
   const [downPayment, setDownPayment] = useState<AmountOrPercent>({ value: 0.2, isPercent: true });
   const [propertyTax, setPropertyTax] = useState<AmountOrPercent>({ value: 0.012, isPercent: true });
   const [homeInsurance, setHomeInsurance] = useState<AmountOrPercent>({ value: 0.005, isPercent: true });
