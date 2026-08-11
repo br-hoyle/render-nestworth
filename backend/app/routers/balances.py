@@ -27,6 +27,7 @@ router = APIRouter(tags=["balances"])
 OPEN_ENDED = date(9999, 12, 31)
 
 _DATE_FORMATS = ["%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"]
+_DATE_COLUMN_ALIASES = ("date", "full_date")
 
 
 def _parse_date(raw: str) -> date | None:
@@ -37,6 +38,23 @@ def _parse_date(raw: str) -> date | None:
         except ValueError:
             continue
     return None
+
+
+def _sniff_delimiter(sample: str) -> str:
+    """Balance exports (and spreadsheet-authored imports) are as likely to be tab-separated
+    as comma-separated, so detect the delimiter instead of assuming Excel-dialect commas."""
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=",\t;").delimiter
+    except csv.Error:
+        return ","
+
+
+def _date_from_row(normalized: dict[str, str]) -> str:
+    for column in _DATE_COLUMN_ALIASES:
+        value = normalized.get(column, "")
+        if value:
+            return value
+    return ""
 
 
 @router.post("/balances/import", response_model=BalanceImportResult)
@@ -58,13 +76,13 @@ async def import_balance_history(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Account not found.")
 
     raw = (await file.read()).decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(raw))
+    reader = csv.DictReader(io.StringIO(raw), delimiter=_sniff_delimiter(raw[:4096]))
 
     errors: list[BalanceImportRowError] = []
     inserted = 0
     for i, row in enumerate(reader, start=1):
         normalized = {k.strip().lower(): (v or "") for k, v in row.items()}
-        date_raw = normalized.get("date", "")
+        date_raw = _date_from_row(normalized)
         balance_raw = normalized.get("balance", "")
 
         parsed_date = _parse_date(date_raw)
@@ -114,7 +132,7 @@ async def bulk_import_balance_history(
     the same file with `account_mapping` (JSON: {label: account_id | null}, null = skip)
     commits the upsert."""
     raw = (await file.read()).decode("utf-8-sig")
-    reader = csv.DictReader(io.StringIO(raw))
+    reader = csv.DictReader(io.StringIO(raw), delimiter=_sniff_delimiter(raw[:4096]))
     rows = list(reader)
 
     if not rows:
@@ -152,7 +170,7 @@ async def bulk_import_balance_history(
             skipped += 1
             continue
 
-        date_raw = normalized.get("date", "")
+        date_raw = _date_from_row(normalized)
         balance_raw = normalized.get("balance", "")
         parsed_date = _parse_date(date_raw)
         if parsed_date is None:
