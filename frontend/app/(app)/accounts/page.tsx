@@ -321,6 +321,7 @@ export default function AccountsPage() {
         account_type: values.account_type,
         balance_type: values.balance_type,
         effective_start_date: values.start_date,
+        effective_end_date: values.end_date,
       });
       setPanel(null);
       await load();
@@ -330,34 +331,19 @@ export default function AccountsPage() {
     }
   }
 
-  async function handleRevise(account: Account, values: AccountFormValues) {
-    try {
-      await api.patch(`/accounts/${account.account_id}`, {
-        account_name: values.account_name,
-        institution_name: values.institution_name,
-        category: values.category,
-        account_type: values.account_type,
-        balance_type: values.balance_type,
-        new_revision_start_date: values.start_date,
-      });
-      setPanel(null);
-      await load();
-      if (filter === "active") await loadGrid();
-    } catch (err) {
-      throw new Error(err instanceof ApiError ? err.message : "Could not save revision.");
-    }
-  }
-
-  async function handleClose(account: Account) {
-    const endDate = window.prompt("Close this account as of (YYYY-MM-DD):", new Date().toISOString().slice(0, 10));
-    if (!endDate) return;
-    try {
-      await api.post(`/accounts/${account.account_id}/close`, { effective_end_date: endDate });
-      await load();
-      if (filter === "active") await loadGrid();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not close account.");
-    }
+  async function handleUpdate(account: Account, values: AccountFormValues) {
+    await api.patch(`/accounts/${account.account_id}`, {
+      account_name: values.account_name,
+      institution_name: values.institution_name,
+      category: values.category,
+      account_type: values.account_type,
+      balance_type: values.balance_type,
+      effective_start_date: values.start_date,
+      effective_end_date: values.end_date,
+    });
+    setPanel(null);
+    await load();
+    if (filter === "active") await loadGrid();
   }
 
   return (
@@ -546,7 +532,8 @@ export default function AccountsPage() {
 
             {panel === "create" ? (
               <AccountForm
-                startDateLabel="Effective start date"
+                startDateLabel="Account Open Date"
+                endDateLabel="Account Closure Date"
                 submitLabel="Create account"
                 onSubmit={handleCreate}
                 onCancel={() => setPanel(null)}
@@ -555,29 +542,23 @@ export default function AccountsPage() {
             ) : panelTab === "history" ? (
               <AccountBalanceHistory account={panel} />
             ) : (
-              <>
-                <AccountForm
-                  initial={{
-                    account_name: panel.account_name,
-                    institution_name: panel.institution_name,
-                    category: panel.category,
-                    account_type: panel.account_type,
-                    balance_type: panel.balance_type,
-                    start_date: new Date().toISOString().slice(0, 10),
-                  }}
-                  startDateLabel="New revision starts"
-                  note="Editing never rewrites history. Saving closes the current row at the date below and opens a new one."
-                  submitLabel="Save revision"
-                  onSubmit={(values) => handleRevise(panel, values)}
-                  onCancel={() => setPanel(null)}
-                  onClose={() => setPanel(null)}
-                />
-                {panel.is_open && (
-                  <button onClick={() => handleClose(panel)} className="mt-3 text-xs text-nw-coral">
-                    Close account…
-                  </button>
-                )}
-              </>
+              <AccountForm
+                initial={{
+                  account_name: panel.account_name,
+                  institution_name: panel.institution_name,
+                  category: panel.category,
+                  account_type: panel.account_type,
+                  balance_type: panel.balance_type,
+                  start_date: panel.effective_start_date,
+                  end_date: panel.effective_end_date,
+                }}
+                startDateLabel="Account Open Date"
+                endDateLabel="Account Closure Date"
+                submitLabel="Save changes"
+                onSubmit={(values) => handleUpdate(panel, values)}
+                onCancel={() => setPanel(null)}
+                onClose={() => setPanel(null)}
+              />
             )}
           </div>
         )}

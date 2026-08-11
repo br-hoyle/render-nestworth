@@ -18,13 +18,15 @@ class AccountBase(BaseModel):
 
 class AccountCreate(AccountBase):
     effective_start_date: date
+    effective_end_date: date = OPEN_ENDED
 
 
-class AccountRevise(AccountBase):
-    """Submitted as an edit to an existing (open) account row. Closes that row and opens
-    a new one — never an in-place update."""
+class AccountUpdate(AccountBase):
+    """Submitted as an edit to an existing account row. Updates that row in place —
+    including its own effective dates — rather than creating a new revision."""
 
-    new_revision_start_date: date
+    effective_start_date: date
+    effective_end_date: date
 
 
 class AccountClose(BaseModel):

@@ -13,6 +13,14 @@ class IncomeCreate(BaseModel):
     effective_end_date: date = date(9999, 12, 31)
 
 
+class IncomeUpdate(BaseModel):
+    individual: str
+    company: str
+    income: Decimal
+    effective_start_date: date
+    effective_end_date: date
+
+
 class IncomeRead(BaseModel):
     income_id: uuid.UUID
     individual: str

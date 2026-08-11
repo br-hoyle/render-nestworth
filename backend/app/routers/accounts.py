@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from typing import Literal
 
@@ -13,8 +13,8 @@ from app.schemas.accounts import (
     AccountClose,
     AccountCreate,
     AccountRead,
-    AccountRevise,
     AccountSparkline,
+    AccountUpdate,
     BalanceGridCategory,
     BalanceGridResponse,
     BalanceGridRow,
@@ -354,9 +354,11 @@ def create_account(
 ) -> AccountRead:
     existing = _existing_ranges(conn, session.household_id, payload.account_name)
     try:
-        validate_no_overlap(existing, DateRange(payload.effective_start_date, OPEN_ENDED))
+        validate_no_overlap(existing, DateRange(payload.effective_start_date, payload.effective_end_date))
     except OverlapError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e))
 
     account_id = uuid.uuid4()
     conn.execute(
@@ -367,7 +369,7 @@ def create_account(
                  account_type, account_name, effective_start_date, effective_end_date)
             values
                 (:account_id, :household_id, :balance_type, :institution_name, :category,
-                 :account_type, :account_name, :start, '9999-12-31')
+                 :account_type, :account_name, :start, :end)
             """
         ),
         {
@@ -379,6 +381,7 @@ def create_account(
             "account_type": payload.account_type,
             "account_name": payload.account_name,
             "start": payload.effective_start_date,
+            "end": payload.effective_end_date,
         },
     )
     return AccountRead(
@@ -389,86 +392,84 @@ def create_account(
         account_type=payload.account_type,
         account_name=payload.account_name,
         effective_start_date=payload.effective_start_date,
-        effective_end_date=OPEN_ENDED,
-        is_open=True,
+        effective_end_date=payload.effective_end_date,
+        is_open=payload.effective_end_date == OPEN_ENDED,
         latest_balance=None,
     )
 
 
-@router.patch("/{account_id}", response_model=AccountRead, status_code=status.HTTP_201_CREATED)
-def revise_account(
+@router.patch("/{account_id}", response_model=AccountRead, status_code=status.HTTP_200_OK)
+def update_account(
     account_id: uuid.UUID,
-    payload: AccountRevise,
+    payload: AccountUpdate,
     session: Session = Depends(get_current_session),
     conn: Connection = Depends(get_tenant_db),
 ) -> AccountRead:
     current = conn.execute(
         text(
-            "select account_id, effective_start_date, effective_end_date from accounts "
-            "where account_id = :account_id and household_id = :household_id"
+            "select account_id from accounts where account_id = :account_id and household_id = :household_id"
         ),
         {"account_id": account_id, "household_id": session.household_id},
     ).mappings().first()
 
     if current is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
-    if current["effective_end_date"] != OPEN_ENDED:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Only the currently open revision can be edited.")
-    if payload.new_revision_start_date <= current["effective_start_date"]:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST,
-            detail="The new revision must start after the current revision's start date.",
-        )
-
-    prior_end = payload.new_revision_start_date - timedelta(days=1)
 
     existing = _existing_ranges(
         conn, session.household_id, payload.account_name, exclude_account_id=account_id
     )
     try:
-        validate_no_overlap(existing, DateRange(payload.new_revision_start_date, OPEN_ENDED))
+        validate_no_overlap(existing, DateRange(payload.effective_start_date, payload.effective_end_date))
     except OverlapError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-    new_account_id = uuid.uuid4()
-    conn.execute(
-        text("update accounts set effective_end_date = :end where account_id = :account_id"),
-        {"end": prior_end, "account_id": account_id},
-    )
     conn.execute(
         text(
             """
-            insert into accounts
-                (account_id, household_id, balance_type, institution_name, category,
-                 account_type, account_name, effective_start_date, effective_end_date)
-            values
-                (:account_id, :household_id, :balance_type, :institution_name, :category,
-                 :account_type, :account_name, :start, '9999-12-31')
+            update accounts set
+                balance_type = :balance_type,
+                institution_name = :institution_name,
+                category = :category,
+                account_type = :account_type,
+                account_name = :account_name,
+                effective_start_date = :start,
+                effective_end_date = :end
+            where account_id = :account_id and household_id = :household_id
             """
         ),
         {
-            "account_id": new_account_id,
+            "account_id": account_id,
             "household_id": session.household_id,
             "balance_type": payload.balance_type,
             "institution_name": payload.institution_name,
             "category": payload.category,
             "account_type": payload.account_type,
             "account_name": payload.account_name,
-            "start": payload.new_revision_start_date,
+            "start": payload.effective_start_date,
+            "end": payload.effective_end_date,
         },
     )
 
+    latest_balance = conn.execute(
+        text(
+            "select balance from balances where account_id = :account_id order by full_date desc limit 1"
+        ),
+        {"account_id": account_id},
+    ).scalar()
+
     return AccountRead(
-        account_id=new_account_id,
+        account_id=account_id,
         balance_type=payload.balance_type,
         institution_name=payload.institution_name,
         category=payload.category,
         account_type=payload.account_type,
         account_name=payload.account_name,
-        effective_start_date=payload.new_revision_start_date,
-        effective_end_date=OPEN_ENDED,
-        is_open=True,
-        latest_balance=None,
+        effective_start_date=payload.effective_start_date,
+        effective_end_date=payload.effective_end_date,
+        is_open=payload.effective_end_date == OPEN_ENDED,
+        latest_balance=latest_balance,
     )
 
 
