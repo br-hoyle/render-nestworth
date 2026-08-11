@@ -16,6 +16,7 @@ import { ChangeCell } from "@/components/ui/ChangeCell";
 import { AccountForm, AccountFormValues } from "@/components/forms/AccountForm";
 import { AccountBalanceHistory } from "@/components/forms/AccountBalanceHistory";
 import { LoadingBlock } from "@/components/ui/Spinner";
+import { Modal } from "@/components/ui/Modal";
 
 type Filter = "active" | "closed" | "all";
 
@@ -653,12 +654,11 @@ function BulkUploadModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="w-full max-w-md rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium">Upload balances</h2>
-          <button onClick={onClose} className="text-nw-muted text-xs">✕</button>
-        </div>
+    <Modal onClose={onClose} className="w-full max-w-md rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-medium">Upload balances</h2>
+        <button type="button" onClick={onClose} className="text-nw-muted text-xs">✕</button>
+      </div>
 
         {!distinctAccounts && (
           <>
@@ -726,7 +726,6 @@ function BulkUploadModal({
             </Button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
