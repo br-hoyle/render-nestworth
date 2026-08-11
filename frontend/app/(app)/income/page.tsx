@@ -5,8 +5,9 @@ import { ComposedChart, Bar, CartesianGrid, Line, ResponsiveContainer, Tooltip, 
 import { api, ApiError } from "@/lib/api";
 import type { IncomeConflict, IncomeRecord, IncomeSeriesResponse, IncomeSummary } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/ui/TextField";
 import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
+import { IncomeConflictError, IncomeForm, type IncomeFormValues } from "@/components/forms/IncomeForm";
 import { titleCase } from "@/lib/format";
 import { LoadingBlock } from "@/components/ui/Spinner";
 
@@ -18,6 +19,7 @@ export default function IncomePage() {
   const [records, setRecords] = useState<IncomeRecord[] | null>(null);
   const [summary, setSummary] = useState<IncomeSummary | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<IncomeRecord | null>(null);
   const [filter, setFilter] = useState<"active" | "all">("active");
   const [series, setSeries] = useState<IncomeSeriesResponse | null>(null);
 
@@ -48,6 +50,22 @@ export default function IncomePage() {
     (acc[r.individual] ??= []).push(r);
     return acc;
   }, {});
+
+  async function handleUpdate(record: IncomeRecord, values: IncomeFormValues) {
+    try {
+      await api.patch(`/income/${record.income_id}`, {
+        individual: values.individual,
+        company: values.company,
+        income: Number(values.income),
+        effective_start_date: values.effective_start_date,
+        effective_end_date: values.effective_end_date,
+      });
+      setEditing(null);
+      await load();
+    } catch (err) {
+      throw new Error(err instanceof ApiError ? err.message : "Could not save changes.");
+    }
+  }
 
   if (records === null || summary === null || series === null) {
     return (
@@ -182,6 +200,26 @@ export default function IncomePage() {
         />
       )}
 
+      {editing && (
+        <Modal onClose={() => setEditing(null)}>
+          <div className="w-full max-w-sm rounded-lg border border-nw-border bg-nw-rail p-4">
+            <IncomeForm
+              initial={{
+                individual: editing.individual,
+                company: editing.company,
+                income: editing.income,
+                effective_start_date: editing.effective_start_date,
+                effective_end_date: editing.effective_end_date,
+              }}
+              submitLabel="Save changes"
+              onSubmit={(values) => handleUpdate(editing, values)}
+              onCancel={() => setEditing(null)}
+              onClose={() => setEditing(null)}
+            />
+          </div>
+        </Modal>
+      )}
+
       {visibleRecords.length === 0 && (
         <p className="text-sm text-nw-muted">No {filter === "active" ? "active " : ""}income records yet.</p>
       )}
@@ -209,6 +247,14 @@ export default function IncomePage() {
                     <span className="font-medium">{money(r.income)}</span>
                     <button
                       type="button"
+                      aria-label="Edit income record"
+                      onClick={() => setEditing(r)}
+                      className="text-nw-muted hover:text-nw-mint text-xs"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
                       aria-label="Delete income record"
                       onClick={async () => {
                         if (!window.confirm("Delete this income record?")) return;
@@ -231,104 +277,33 @@ export default function IncomePage() {
 }
 
 function IncomeFormCard({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
-  const [individual, setIndividual] = useState("");
-  const [company, setCompany] = useState("");
-  const [income, setIncome] = useState("");
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [conflict, setConflict] = useState<IncomeConflict | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function submit(e?: React.FormEvent) {
-    e?.preventDefault();
-    setError(null);
-    setSubmitting(true);
+  async function submit(values: IncomeFormValues) {
     try {
       await api.post("/income", {
-        individual,
-        company,
-        income: Number(income),
-        effective_start_date: startDate,
+        individual: values.individual,
+        company: values.company,
+        income: Number(values.income),
+        effective_start_date: values.effective_start_date,
+        effective_end_date: values.effective_end_date,
       });
       onDone();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setConflict(err.body as IncomeConflict);
-      } else {
-        setError(err instanceof ApiError ? err.message : "Something went wrong.");
+        throw new IncomeConflictError(err.body as IncomeConflict);
       }
-    } finally {
-      setSubmitting(false);
+      throw new Error(err instanceof ApiError ? err.message : "Something went wrong.");
     }
   }
 
-  async function resolveAndRetry() {
-    if (!conflict?.suggested_resolution_end_date) return;
-    setSubmitting(true);
-    setError(null);
-    try {
-      await api.post(`/income/${conflict.income_id}/end`, {
-        effective_end_date: conflict.suggested_resolution_end_date,
-      });
-      setConflict(null);
-      await submit();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setSubmitting(false);
-    }
+  async function resolveConflict(conflict: IncomeConflict) {
+    await api.post(`/income/${conflict.income_id}/end`, {
+      effective_end_date: conflict.suggested_resolution_end_date,
+    });
   }
 
   return (
     <Card>
-      <form onSubmit={submit} className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          <TextField label="Individual" value={individual} onChange={(e) => setIndividual(e.target.value)} required />
-          <TextField label="Company" value={company} onChange={(e) => setCompany(e.target.value)} required />
-        </div>
-        <div className="flex gap-2">
-          <TextField
-            label="Annual income"
-            type="number"
-            value={income}
-            onChange={(e) => setIncome(e.target.value)}
-            required
-          />
-          <TextField
-            label="Effective start date"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            required
-          />
-        </div>
-        {conflict && (
-          <div className="rounded-md border border-[#5A3228] bg-nw-coral-tint px-3 py-2 text-xs text-nw-coral flex flex-col gap-2">
-            <span>
-              This overlaps {conflict.individual}&apos;s existing record ({conflict.effective_start_date} →{" "}
-              {conflict.effective_end_date}).
-            </span>
-            {conflict.suggested_resolution_end_date && (
-              <button
-                type="button"
-                onClick={resolveAndRetry}
-                className="self-start underline"
-              >
-                End the previous record on {conflict.suggested_resolution_end_date} and retry
-              </button>
-            )}
-          </div>
-        )}
-        {error && <p className="text-xs text-nw-coral">{error}</p>}
-        <div className="flex gap-2 justify-end">
-          <Button type="button" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? "Saving…" : "Save"}
-          </Button>
-        </div>
-      </form>
+      <IncomeForm submitLabel="Save" onSubmit={submit} onResolveConflict={resolveConflict} onCancel={onCancel} />
     </Card>
   );
 }

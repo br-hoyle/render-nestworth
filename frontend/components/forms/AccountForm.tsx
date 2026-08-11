@@ -12,11 +12,13 @@ export interface AccountFormValues {
   account_type: string;
   balance_type: "asset" | "liability";
   start_date: string;
+  end_date: string;
 }
 
 export function AccountForm({
   initial,
   startDateLabel,
+  endDateLabel,
   note,
   submitLabel,
   onSubmit,
@@ -25,6 +27,7 @@ export function AccountForm({
 }: {
   initial?: Partial<AccountFormValues>;
   startDateLabel: string;
+  endDateLabel: string;
   note?: string;
   submitLabel: string;
   onSubmit: (values: AccountFormValues) => Promise<void>;
@@ -43,6 +46,7 @@ export function AccountForm({
     account_type: initialType,
     balance_type: initialBalanceType,
     start_date: initial?.start_date ?? new Date().toISOString().slice(0, 10),
+    end_date: initial?.end_date ?? "9999-12-31",
   });
   // Whether the Type dropdown should show "Other" selected with a free-text field below it —
   // true both when the user picks "Other" and when an existing account's type doesn't match
@@ -193,6 +197,13 @@ export function AccountForm({
         type="date"
         value={values.start_date}
         onChange={(e) => update("start_date", e.target.value)}
+        required
+      />
+      <TextField
+        label={endDateLabel}
+        type="date"
+        value={values.end_date}
+        onChange={(e) => update("end_date", e.target.value)}
         required
       />
       {error && (

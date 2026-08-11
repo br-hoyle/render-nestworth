@@ -16,16 +16,37 @@ from app.schemas.income import (
     IncomeSeriesPoint,
     IncomeSeriesResponse,
     IncomeSummary,
+    IncomeUpdate,
 )
 from app.services.effective_dates import (
     DateRange,
     OPEN_ENDED_SENTINEL,
+    OverlapError,
     find_conflict,
     resolve_by_ending_previous_the_day_before,
     validate_no_overlap,
 )
 
 router = APIRouter(prefix="/income", tags=["income"])
+
+
+def _existing_ranges(
+    conn: Connection,
+    household_id: str,
+    individual: str,
+    company: str,
+    exclude_income_id: uuid.UUID | None = None,
+) -> list[DateRange]:
+    query = (
+        "select effective_start_date, effective_end_date from income "
+        "where household_id = :household_id and individual = :individual and company = :company"
+    )
+    params: dict = {"household_id": household_id, "individual": individual, "company": company}
+    if exclude_income_id is not None:
+        query += " and income_id != :exclude_income_id"
+        params["exclude_income_id"] = exclude_income_id
+    rows = conn.execute(text(query), params).all()
+    return [DateRange(r.effective_start_date, r.effective_end_date) for r in rows]
 
 
 @router.get("", response_model=list[IncomeRead])
@@ -52,6 +73,9 @@ def create_income(
     session: Session = Depends(get_current_session),
     conn: Connection = Depends(get_tenant_db),
 ) -> IncomeRead:
+    if payload.effective_end_date < payload.effective_start_date:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="End date must be on or after the start date.")
+
     rows = conn.execute(
         text(
             "select income_id, effective_start_date, effective_end_date from income "
@@ -105,6 +129,64 @@ def create_income(
             "end": payload.effective_end_date,
         },
     )
+    return IncomeRead(
+        income_id=income_id,
+        individual=payload.individual,
+        company=payload.company,
+        income=payload.income,
+        effective_start_date=payload.effective_start_date,
+        effective_end_date=payload.effective_end_date,
+        is_open=payload.effective_end_date == OPEN_ENDED_SENTINEL,
+    )
+
+
+@router.patch("/{income_id}", response_model=IncomeRead, status_code=status.HTTP_200_OK)
+def update_income(
+    income_id: uuid.UUID,
+    payload: IncomeUpdate,
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> IncomeRead:
+    current = conn.execute(
+        text("select income_id from income where income_id = :income_id and household_id = :household_id"),
+        {"income_id": income_id, "household_id": session.household_id},
+    ).mappings().first()
+    if current is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+
+    existing = _existing_ranges(
+        conn, session.household_id, payload.individual, payload.company, exclude_income_id=income_id
+    )
+    try:
+        validate_no_overlap(existing, DateRange(payload.effective_start_date, payload.effective_end_date))
+    except OverlapError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    conn.execute(
+        text(
+            """
+            update income set
+                individual = :individual,
+                company = :company,
+                income = :income,
+                effective_start_date = :start,
+                effective_end_date = :end
+            where income_id = :income_id and household_id = :household_id
+            """
+        ),
+        {
+            "income_id": income_id,
+            "household_id": session.household_id,
+            "individual": payload.individual,
+            "company": payload.company,
+            "income": payload.income,
+            "start": payload.effective_start_date,
+            "end": payload.effective_end_date,
+        },
+    )
+
     return IncomeRead(
         income_id=income_id,
         individual=payload.individual,
