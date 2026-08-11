@@ -673,12 +673,12 @@ function BulkUploadModal({
                   <select
                     value={mapping[label] ?? ""}
                     onChange={(e) => setMapping((m) => ({ ...m, [label]: e.target.value }))}
-                    className="w-40 flex-none rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs"
+                    className="w-64 flex-none rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs"
                   >
                     <option value="">Skip</option>
                     {accounts.map((a) => (
                       <option key={a.account_id} value={a.account_id}>
-                        {a.account_name}
+                        {a.account_name} - {a.account_type} ({a.institution_name})
                       </option>
                     ))}
                   </select>
