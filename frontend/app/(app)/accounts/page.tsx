@@ -635,7 +635,7 @@ function BulkUploadModal({
   }
 
   return (
-    <Modal onClose={onClose} className="w-full max-w-md rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
+    <Modal onClose={onClose} className="w-full max-w-2xl rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium">Upload balances</h2>
         <button type="button" onClick={onClose} className="text-nw-muted text-xs">✕</button>
@@ -669,7 +669,7 @@ function BulkUploadModal({
             <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
               {distinctAccounts.map((label) => (
                 <div key={label} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1 truncate">{label}</span>
+                  <span className="flex-1 break-words">{label}</span>
                   <select
                     value={mapping[label] ?? ""}
                     onChange={(e) => setMapping((m) => ({ ...m, [label]: e.target.value }))}
