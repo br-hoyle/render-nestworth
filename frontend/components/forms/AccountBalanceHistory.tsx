@@ -50,15 +50,27 @@ export function AccountBalanceHistory({ account }: { account: Account }) {
     <div className="flex flex-col gap-3">
       <form onSubmit={addBalance} className="flex flex-col gap-2">
         <div className="flex gap-2">
-          <TextField label="Date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-          <TextField
-            label="Balance ($)"
-            type="number"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
+          <div className="flex-1 min-w-0">
+            <TextField
+              label="Date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+              className="w-full"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <TextField
+              label="Balance ($)"
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              className="w-full"
+            />
+          </div>
         </div>
         {error && <p className="text-xs text-nw-coral">{error}</p>}
         <Button type="submit" variant="primary" disabled={saving}>

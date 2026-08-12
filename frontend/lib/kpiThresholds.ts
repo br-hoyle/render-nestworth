@@ -98,7 +98,7 @@ function netCashFlowGoal(metric: KpiMetric, allMetrics: KpiMetric[]): TargetInfo
 // Cases, in priority order:
 //   1. net_worth — its progress_pct is computed backend-side against the FI number, but the
 //      FI number itself (the dollar target) isn't on the net_worth metric; it's the headline
-//      value of the sibling "fi_progress" (Target Net Worth) metric, so borrow it from there.
+//      value of the sibling "fi_progress" (Financial Independence) metric, so borrow it from there.
 //      fi_progress itself no longer renders as a tile, but stays in the metrics list as data.
 //   2. net_cash_flow — see netCashFlowGoal above.
 //   3. ZERO_GOAL_FROM_HISTORY_SLUGS — see zeroGoalFromHistory above.

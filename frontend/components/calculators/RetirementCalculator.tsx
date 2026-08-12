@@ -23,9 +23,10 @@ import {
 import { StackedGrowthChart } from "@/components/calculators/StackedGrowthChart";
 import { Button } from "@/components/ui/Button";
 
-type Mode = "need" | "save" | "withdraw" | "longevity";
+type Mode = "need" | "save" | "have" | "withdraw" | "longevity";
 
 const TABS: { key: Mode; label: string }[] = [
+  { key: "have", label: "How Much You'll Have" },
   { key: "need", label: "How Much to Retire" },
   { key: "save", label: "How to Save" },
   { key: "withdraw", label: "How Much to Withdraw" },
@@ -300,6 +301,112 @@ function RetirementSavingsPlanTab() {
   return <CalcLayout inputs={inputsPanel} results={resultsPanel} />;
 }
 
+function RetirementProjectionTab() {
+  const [inputs, setInputs] = useState({
+    current_age: 35,
+    retirement_age: 65,
+    current_retirement_savings: 20000,
+    monthly_contribution: 500,
+    avg_investment_return: 0.1,
+  });
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [view, setView] = useState<"chart" | "table">("chart");
+
+  function calculate(overrides = inputs) {
+    setLoading(true);
+    api
+      .post<Record<string, unknown>>("/calculators/retirement-projection", overrides)
+      .then(setResult)
+      .catch(() => setResult(null))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    api.get<Partial<typeof inputs>>("/calculators/retirement-projection/defaults").then((defaults) => {
+      if (Object.keys(defaults).length > 0) setInputs((i) => ({ ...i, ...defaults }));
+    });
+  }, []);
+
+  async function resetToMyNumbers() {
+    const defaults = await api.get<Partial<typeof inputs>>("/calculators/retirement-projection/defaults");
+    const merged = { ...inputs, ...defaults };
+    setInputs(merged);
+    calculate(merged);
+  }
+
+  const inputsPanel = (
+    <>
+      <CalcRow>
+        <CalcCol><NumField label="Current Age" value={inputs.current_age} onChange={(v) => setInputs((i) => ({ ...i, current_age: v }))} /></CalcCol>
+        <CalcCol><NumField label="Retirement Age" value={inputs.retirement_age} onChange={(v) => setInputs((i) => ({ ...i, retirement_age: v }))} /></CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol><NumField label="Current Retirement Savings" prefix="$" value={inputs.current_retirement_savings} onChange={(v) => setInputs((i) => ({ ...i, current_retirement_savings: v }))} /></CalcCol>
+        <CalcCol><NumField label="Monthly Contributions" prefix="$" value={inputs.monthly_contribution} onChange={(v) => setInputs((i) => ({ ...i, monthly_contribution: v }))} /></CalcCol>
+      </CalcRow>
+      <CalcRow>
+        <CalcCol>
+          <NumField
+            label="Investment Return"
+            percent
+            value={inputs.avg_investment_return}
+            onChange={(v) => setInputs((i) => ({ ...i, avg_investment_return: v }))}
+            helper="10–12% is a good place to start. That’s what the S&P 500 has averaged annually over the last 30 years."
+          />
+        </CalcCol>
+      </CalcRow>
+      <div className="flex flex-col gap-2 pt-1">
+        <CalcButton onClick={() => calculate()} loading={loading} />
+        <Button onClick={resetToMyNumbers}>Reset to my numbers</Button>
+      </div>
+    </>
+  );
+
+  const schedule = (result?.schedule as { age: number; balance: number; starting_balance: number; contributions_to_date: number }[]) ?? [];
+  const stackedData = schedule.map((row) => ({
+    label: row.age,
+    starting: row.starting_balance,
+    contributions: row.contributions_to_date,
+    growth: Math.max(0, row.balance - row.starting_balance - row.contributions_to_date),
+  }));
+
+  const resultsPanel =
+    result === null ? (
+      <CalcEmptyState />
+    ) : result.error ? (
+      <p className="text-xs text-nw-coral">{String(result.error)}</p>
+    ) : (
+      <div className="flex flex-col gap-3">
+        <CalcAnswer>
+          At {fmtMoney(inputs.monthly_contribution)}/month starting from {fmtMoney(inputs.current_retirement_savings)}, you're
+          projected to have {fmtMoney(result.balance_at_retirement)} by age {inputs.retirement_age} — {fmtMoney(result.total_contributions)}{" "}
+          of that from contributions, {fmtMoney(result.total_growth)} from growth.
+        </CalcAnswer>
+        <div className="flex flex-wrap gap-2">
+          <ResultTile label="Projected Balance at Retirement" value={fmtMoney(result.balance_at_retirement)} />
+          <ResultTile label="Total Contributions" value={fmtMoney(result.total_contributions)} />
+          <ResultTile label="Total Growth" value={fmtMoney(result.total_growth)} />
+        </div>
+        <CalcViewToggle view={view} onChange={setView} />
+        {view === "chart" ? (
+          <StackedGrowthChart data={stackedData} xLabel="age" />
+        ) : (
+          <ScheduleTable
+            rows={schedule}
+            columns={[
+              { key: "age", label: "Age" },
+              { key: "balance", label: "Balance", format: "money" },
+              { key: "contributions_to_date", label: "Contributions to Date", format: "money" },
+            ]}
+          />
+        )}
+      </div>
+    );
+
+  return <CalcLayout inputs={inputsPanel} results={resultsPanel} />;
+}
+
 function RetirementWithdrawalTab() {
   const [inputs, setInputs] = useState({
     current_age: 55,
@@ -490,17 +597,18 @@ function RetirementLongevityTab() {
 }
 
 export function RetirementCalculator() {
-  const [mode, setMode] = useState<Mode>("need");
+  const [mode, setMode] = useState<Mode>("have");
 
   return (
     <div className="flex flex-col gap-4">
       <CalcCopy
         title="Retirement Calculator"
-        description="Four ways to look at retirement readiness: how much you need to have saved, how to get there, how much you can safely withdraw, and how long your money will last. Pick the question you want answered."
+        description="Five ways to look at retirement readiness: how much you need to have saved, how to get there, how much you'll actually have, how much you can safely withdraw, and how long your money will last. Pick the question you want answered."
       />
       <CalcTabs tabs={TABS} active={mode} onChange={setMode} />
       {mode === "need" && <RetirementNeedTab />}
       {mode === "save" && <RetirementSavingsPlanTab />}
+      {mode === "have" && <RetirementProjectionTab />}
       {mode === "withdraw" && <RetirementWithdrawalTab />}
       {mode === "longevity" && <RetirementLongevityTab />}
     </div>

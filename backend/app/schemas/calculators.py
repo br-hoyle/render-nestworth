@@ -68,6 +68,14 @@ class RetirementSavingsPlanInput(BaseModel):
     avg_investment_return: Decimal = Decimal("0.10")
 
 
+class RetirementProjectionInput(BaseModel):
+    current_age: int
+    retirement_age: int
+    current_retirement_savings: Decimal = Decimal(0)
+    monthly_contribution: Decimal = Decimal(0)
+    avg_investment_return: Decimal = Decimal("0.10")
+
+
 class RetirementWithdrawalInput(BaseModel):
     current_age: int
     retirement_age: int

@@ -100,7 +100,7 @@ function CombinedAccountsTable({
                           shadow
                         }
                       >
-                        {row.account_name} ({row.account_type})
+                        {row.institution_name} - {row.account_name} ({row.account_type})
                       </td>
                       {nums.map((n, i) => (
                         <td
@@ -448,7 +448,6 @@ export default function AccountsPage() {
           )}
         </div>
       ) : (
-      <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1 flex flex-col gap-4 min-w-0">
           {filter === "active" ? (
             <>
@@ -510,59 +509,66 @@ export default function AccountsPage() {
             </>
           )}
         </div>
+      )}
 
-        {panel && (
-          <div className="w-full md:w-[340px] flex-none rounded-lg border border-nw-border bg-nw-rail p-3">
-            {panel !== "create" && (
-              <div className="flex border border-nw-border rounded-md overflow-hidden text-xs mb-3">
-                <button
-                  onClick={() => setPanelTab("edit")}
-                  className={"flex-1 px-2.5 py-1.5 " + (panelTab === "edit" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setPanelTab("history")}
-                  className={"flex-1 px-2.5 py-1.5 " + (panelTab === "history" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
-                >
-                  Balance History
-                </button>
-              </div>
-            )}
-
-            {panel === "create" ? (
-              <AccountForm
-                startDateLabel="Account Open Date"
-                endDateLabel="Account Closure Date"
-                submitLabel="Create account"
-                onSubmit={handleCreate}
-                onCancel={() => setPanel(null)}
-                onClose={() => setPanel(null)}
-              />
-            ) : panelTab === "history" ? (
-              <AccountBalanceHistory account={panel} />
-            ) : (
-              <AccountForm
-                initial={{
-                  account_name: panel.account_name,
-                  institution_name: panel.institution_name,
-                  category: panel.category,
-                  account_type: panel.account_type,
-                  balance_type: panel.balance_type,
-                  start_date: panel.effective_start_date,
-                  end_date: panel.effective_end_date,
-                }}
-                startDateLabel="Account Open Date"
-                endDateLabel="Account Closure Date"
-                submitLabel="Save changes"
-                onSubmit={(values) => handleUpdate(panel, values)}
-                onCancel={() => setPanel(null)}
-                onClose={() => setPanel(null)}
-              />
-            )}
+      {panel && (
+        <Modal
+          onClose={() => setPanel(null)}
+          className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-lg border border-nw-border bg-nw-rail p-4 flex flex-col gap-3"
+        >
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium">{panel === "create" ? "New account" : panel.account_name}</h2>
+            <button type="button" onClick={() => setPanel(null)} className="text-nw-muted text-xs">
+              ✕
+            </button>
           </div>
-        )}
-      </div>
+
+          {panel !== "create" && (
+            <div className="flex border border-nw-border rounded-md overflow-hidden text-xs">
+              <button
+                onClick={() => setPanelTab("edit")}
+                className={"flex-1 px-2.5 py-1.5 " + (panelTab === "edit" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => setPanelTab("history")}
+                className={"flex-1 px-2.5 py-1.5 " + (panelTab === "history" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+              >
+                Balance History
+              </button>
+            </div>
+          )}
+
+          {panel === "create" ? (
+            <AccountForm
+              startDateLabel="Account Open Date"
+              endDateLabel="Account Closure Date"
+              submitLabel="Create account"
+              onSubmit={handleCreate}
+              onCancel={() => setPanel(null)}
+            />
+          ) : panelTab === "history" ? (
+            <AccountBalanceHistory account={panel} />
+          ) : (
+            <AccountForm
+              initial={{
+                account_name: panel.account_name,
+                institution_name: panel.institution_name,
+                category: panel.category,
+                account_type: panel.account_type,
+                balance_type: panel.balance_type,
+                start_date: panel.effective_start_date,
+                end_date: panel.effective_end_date,
+              }}
+              startDateLabel="Account Open Date"
+              endDateLabel="Account Closure Date"
+              submitLabel="Save changes"
+              onSubmit={(values) => handleUpdate(panel, values)}
+              onCancel={() => setPanel(null)}
+            />
+          )}
+        </Modal>
       )}
 
       {bulkUploadOpen && (

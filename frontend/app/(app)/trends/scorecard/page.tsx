@@ -124,7 +124,7 @@ export default function ScorecardPage() {
 
       <div className="flex flex-col gap-4">
         {GROUPS.map((group) => {
-          // fi_progress ("Target Net Worth") is removed as a tile per the household's
+          // fi_progress ("Financial Independence") is removed as a tile per the household's
           // explicit request — Net Worth borrows its dollar target instead (see
           // targetInfoFor) — but it stays in `metrics` (unfiltered) so that lookup keeps
           // working; it's only excluded from what actually renders here.
@@ -154,7 +154,7 @@ export default function ScorecardPage() {
           }
 
           if (group === "Retirement & Financial Independence") {
-            const financialIndependence = groupMetrics.find((m) => m.slug === "target_net_worth");
+            const targetNetWorth = groupMetrics.find((m) => m.slug === "target_net_worth");
             const stacked = groupMetrics.filter(
               (m) => m.slug === "future_investment_balance" || m.slug === "future_retirement_balance"
             );
@@ -162,8 +162,8 @@ export default function ScorecardPage() {
               <div key={group} className="flex flex-col gap-2">
                 <div className="text-[10px] uppercase tracking-wide text-nw-muted">{group}</div>
                 <div className="flex gap-2 items-stretch">
-                  {financialIndependence && <div className="flex-1 min-w-0">{renderTile(financialIndependence, true)}</div>}
-                  {/* Stacked so the combined height matches Financial Independence's chart
+                  {targetNetWorth && <div className="flex-1 min-w-0">{renderTile(targetNetWorth, true)}</div>}
+                  {/* Stacked so the combined height matches Target Net Worth's chart
                       tile next to it, per the household's explicit request. */}
                   <div className="flex-1 min-w-0 flex flex-col gap-2">
                     {stacked.map((m) => (

@@ -301,6 +301,21 @@ def export_balances_csv(
     )
 
 
+def _actual_balance_dates(conn: Connection, household_id: str, start: date, end: date) -> list[date]:
+    """Distinct dates the household actually recorded a balance for any account, within
+    range — used so the net worth chart plots real snapshot dates instead of an arbitrary
+    monthly/daily grid that forward-fill then smooths over."""
+    rows = conn.execute(
+        text(
+            "select distinct full_date from balances "
+            "where household_id = :household_id and full_date between :start and :end "
+            "order by full_date"
+        ),
+        {"household_id": household_id, "start": start, "end": end},
+    ).all()
+    return [r.full_date for r in rows]
+
+
 def _query_dates(start: date, end: date, granularity: str) -> list[date]:
     if granularity == "monthly":
         dates = []
@@ -336,7 +351,7 @@ def _latest_real_balance_date(conn: Connection, household_id: str) -> date | Non
 def networth_series(
     start: date,
     end: date | None = Query(default=None),
-    granularity: str = Query(default="monthly", pattern="^(daily|monthly)$"),
+    granularity: str = Query(default="monthly", pattern="^(daily|monthly|actual)$"),
     session: Session = Depends(get_current_session),
     conn: Connection = Depends(get_tenant_db),
 ) -> dict:
@@ -345,7 +360,11 @@ def networth_series(
     else:
         latest_real_date = _latest_real_balance_date(conn, session.household_id)
         today = min(date.today(), latest_real_date) if latest_real_date else date.today()
-    query_dates = _query_dates(start, today, granularity)
+    query_dates = (
+        _actual_balance_dates(conn, session.household_id, start, today)
+        if granularity == "actual"
+        else _query_dates(start, today, granularity)
+    )
 
     accounts = conn.execute(
         text(
