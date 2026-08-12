@@ -172,7 +172,7 @@ export default function OverviewPage() {
   const rangeEnd = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
-    api.get<NetWorthSeriesResponse>(`/networth/series?start=${rangeStart}&granularity=monthly`).then(setSeries);
+    api.get<NetWorthSeriesResponse>(`/networth/series?start=${rangeStart}&granularity=actual`).then(setSeries);
   }, [rangeStart]);
 
   function refetchScorecard() {

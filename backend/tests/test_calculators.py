@@ -21,6 +21,7 @@ from app.services.calculators import (
     repayment_calculator,
     retirement_longevity,
     retirement_need,
+    retirement_projection,
     retirement_savings_plan,
     retirement_withdrawal,
     roth_ira,
@@ -393,6 +394,26 @@ def test_retirement_savings_plan_already_on_track():
     )
     assert result["already_on_track"] is True
     assert result["required_monthly_contribution"] == Decimal(0)
+
+
+def test_retirement_projection_compounds_savings_and_contributions():
+    result = retirement_projection.compute(
+        current_age=35,
+        retirement_age=65,
+        current_retirement_savings=Decimal("20000"),
+        monthly_contribution=Decimal("500"),
+        avg_investment_return=Decimal("0.10"),
+    )
+    assert result["total_contributions"] == Decimal("180000.00")
+    assert result["balance_at_retirement"] > result["total_contributions"] + Decimal("20000")
+    final_point = result["schedule"][-1]
+    assert final_point["age"] == 65
+    assert final_point["balance"] == result["balance_at_retirement"]
+
+
+def test_retirement_projection_requires_retirement_after_current_age():
+    result = retirement_projection.compute(current_age=65, retirement_age=65)
+    assert "error" in result
 
 
 def test_retirement_withdrawal_depletes_by_life_expectancy():

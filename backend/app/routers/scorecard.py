@@ -56,15 +56,15 @@ METRICS = [
     # Wealth Accumulation & Balance Sheet Health
     ("net_worth", "Net Worth", "Wealth Accumulation & Balance Sheet Health", "dollars", kpi_service.net_worth_value),
     ("net_worth_velocity", "Net Worth Velocity", "Wealth Accumulation & Balance Sheet Health", "percent", kpi_service.net_worth_velocity),
-    # fi_progress (expense-based "25x expenses" FI number) — kept on Overview as "Target Net
-    # Worth" and additionally surfaced here per the household's explicit request; slug stays
-    # put so existing thresholds/assumptions/content keyed by slug don't need to move.
-    ("fi_progress", "Target Net Worth", "Wealth Accumulation & Balance Sheet Health", "dollars", kpi_service.fi_progress),
+    # fi_progress (expense-based "25x expenses" FI number) — kept on Overview as "Financial
+    # Independence" and additionally surfaced here per the household's explicit request; slug
+    # stays put so existing thresholds/assumptions/content keyed by slug don't need to move.
+    ("fi_progress", "Financial Independence", "Wealth Accumulation & Balance Sheet Health", "dollars", kpi_service.fi_progress),
     # Retirement & Financial Independence
     # target_net_worth (age-based savings-annuity projection) is the household's existing
-    # "Financial Independence" metric — not a new Millionaire-Next-Door formula, per their
+    # "Target Net Worth" metric — not a new Millionaire-Next-Door formula, per their
     # explicit call that the two are the same thing conceptually.
-    ("target_net_worth", "Financial Independence", "Retirement & Financial Independence", "dollars", kpi_service.target_net_worth),
+    ("target_net_worth", "Target Net Worth", "Retirement & Financial Independence", "dollars", kpi_service.target_net_worth),
     ("future_investment_balance", "Future Investment Balance", "Retirement & Financial Independence", "dollars", kpi_service.future_investment_balance),
     ("future_retirement_balance", "Future Retirement Balance", "Retirement & Financial Independence", "dollars", kpi_service.future_retirement_balance),
     # Budget rule — not rendered on the Scorecard page; kept alive for Cash Flow's history charts.

@@ -27,6 +27,7 @@ from app.schemas.calculators import (
     RepaymentCalculatorInput,
     RetirementLongevityInput,
     RetirementNeedInput,
+    RetirementProjectionInput,
     RetirementSavingsPlanInput,
     RetirementWithdrawalInput,
     RothIraInput,
@@ -52,6 +53,7 @@ from app.services.calculators import (
     repayment_calculator,
     retirement_longevity,
     retirement_need,
+    retirement_projection,
     retirement_savings_plan,
     retirement_withdrawal,
     roth_ira,
@@ -74,6 +76,7 @@ CALCULATORS = {
     "rent-vs-buy": (RentVsBuyInput, rent_vs_buy.compute),
     # Retirement & Investment redesign:
     "retirement-need": (RetirementNeedInput, retirement_need.compute),
+    "retirement-projection": (RetirementProjectionInput, retirement_projection.compute),
     "retirement-savings-plan": (RetirementSavingsPlanInput, retirement_savings_plan.compute),
     "retirement-withdrawal": (RetirementWithdrawalInput, retirement_withdrawal.compute),
     "retirement-longevity": (RetirementLongevityInput, retirement_longevity.compute),
@@ -224,7 +227,7 @@ def calculator_defaults(
             "annual_expenses": str(annual_expenses),
         }
 
-    if name in ("retirement-need", "retirement-savings-plan", "retirement-withdrawal", "401k", "roth-ira"):
+    if name in ("retirement-need", "retirement-projection", "retirement-savings-plan", "retirement-withdrawal", "401k", "roth-ira"):
         settings = get_household_settings(conn, household_id)
         result: dict = {}
         age = settings.get("household_age")
@@ -240,7 +243,7 @@ def calculator_defaults(
             result["current_savings"] = str(retirement_balance)
             if income:
                 result["current_income"] = str(income)
-        elif name in ("retirement-savings-plan", "retirement-withdrawal"):
+        elif name in ("retirement-projection", "retirement-savings-plan", "retirement-withdrawal"):
             result["current_retirement_savings"] = str(retirement_balance)
         elif name == "401k":
             result["current_balance"] = str(retirement_balance)
