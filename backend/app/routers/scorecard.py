@@ -9,11 +9,19 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
-from app.schemas.scorecard import AllKpiHistoryResponse, KpiHistoryPoint, KpiHistoryResponse, KpiMetric, ScorecardResponse
+from app.schemas.scorecard import (
+    AllKpiHistoryResponse,
+    KpiHistoryPoint,
+    KpiHistoryResponse,
+    KpiInputItem,
+    KpiMetric,
+    ScorecardResponse,
+)
 from app.schemas.settings import merge_with_defaults
 from app.security import decrypt_pii
 from app.services import kpi as kpi_service
 from app.services.age import age_from_birthdate
+from app.services.cashflow_rules import EXCLUDED_CASHFLOW_GROUP, is_excluded_cashflow_group
 from app.services.kpi import KpiInputs
 
 router = APIRouter(tags=["scorecard"])
@@ -133,9 +141,10 @@ def transaction_sums(conn: Connection, household_id: str, start: date, end: date
                 coalesce(sum(-amount) filter (where type = 'expense' and ("group" ilike '%housing%' or item ilike '%mortgage%')), 0) as housing
             from transactions
             where household_id = :household_id and date >= :start and date <= :end
+              and lower(trim(coalesce("group", ''))) <> :excluded_group
             """
         ),
-        {"household_id": household_id, "start": start, "end": end},
+        {"household_id": household_id, "start": start, "end": end, "excluded_group": EXCLUDED_CASHFLOW_GROUP},
     ).mappings().first()
     return row
 
@@ -163,6 +172,7 @@ def classified_expense_sums(conn: Connection, household_id: str, start: date, en
                 where t.household_id = :household_id
                     and t.type = 'expense'
                     and t.date >= :start and t.date <= :end
+                    and lower(trim(coalesce(t."group", ''))) <> :excluded_group
             )
             select
                 coalesce(sum(-amount) filter (where flow_type = 'needs'), 0) as needs,
@@ -172,7 +182,7 @@ def classified_expense_sums(conn: Connection, household_id: str, start: date, en
             from joined
             """
         ),
-        {"household_id": household_id, "start": start, "end": end},
+        {"household_id": household_id, "start": start, "end": end, "excluded_group": EXCLUDED_CASHFLOW_GROUP},
     ).mappings().first()
     return row
 
@@ -307,9 +317,11 @@ def _load_kpi_dataset(conn: Connection, household_id: str, as_of_dates: list[dat
     ).mappings().all()
     income_records = [dict(r) for r in income_rows]
 
-    # Transactions bounded to the widest lookback any as_of date could need (13 months, for
-    # Income Growth Rate's trailing-12mo comparison) — not the household's entire history.
-    txn_start = min(as_of_dates) - relativedelta(months=13)
+    # Transactions bounded to the widest lookback any as_of date could need (25 months, for
+    # Income Growth Rate's year-over-year comparison: 12 months to average for the trailing
+    # window, another 12 before that for the prior window, plus 1 month of buffer) — not the
+    # household's entire history.
+    txn_start = min(as_of_dates) - relativedelta(months=25)
     txn_end = max(as_of_dates)
 
     category_rows = conn.execute(
@@ -334,6 +346,12 @@ def _load_kpi_dataset(conn: Connection, household_id: str, as_of_dates: list[dat
     keys = ("income", "expense", "housing", "needs", "wants", "savings", "classified")
     day_agg: dict[date, dict[str, Decimal]] = {}
     for r in txn_rows:
+        group = r["group"] or ""
+        if is_excluded_cashflow_group(group):
+            # "Savings & Investments" transactions are transfers into asset-building
+            # accounts, not spending — ignored entirely for cash-flow purposes (see
+            # cashflow_rules.py), on both the income and expense side.
+            continue
         d = r["date"]
         agg = day_agg.setdefault(d, {k: Decimal(0) for k in keys})
         amount = r["amount"]
@@ -342,7 +360,6 @@ def _load_kpi_dataset(conn: Connection, household_id: str, as_of_dates: list[dat
             continue
         expense_amt = -amount
         agg["expense"] += expense_amt
-        group = r["group"] or ""
         item = r["item"] or ""
         if "housing" in group.lower() or "mortgage" in item.lower():
             agg["housing"] += expense_amt
@@ -463,10 +480,10 @@ def _build_kpi_inputs_from_dataset(dataset: _KpiDataset, as_of: date, settings: 
     investment_asset_value = _category_total(assets_by_category, "Investment", "Investments")
     retirement_asset_value = _category_total(assets_by_category, "Retirement")
 
-    # Income Growth Rate: this month's actual income transactions vs. the average of the 12
-    # full calendar months before it.
-    current_month_income = dataset.monthly_income.get(as_of.strftime("%Y-%m"), Decimal(0))
-    prior_month_values = [
+    # Income Growth Rate: average monthly income over the trailing 12 full calendar months
+    # vs. average monthly income over the 12 full calendar months before that — a year-over-
+    # year raise/growth rate.
+    trailing_12mo_values = [
         dataset.monthly_income[key]
         for key in (
             (as_of - relativedelta(months=k)).strftime("%Y-%m") for k in range(1, 13)
@@ -474,7 +491,17 @@ def _build_kpi_inputs_from_dataset(dataset: _KpiDataset, as_of: date, settings: 
         if key in dataset.monthly_income
     ]
     trailing_12mo_avg_income = (
-        sum(prior_month_values, Decimal(0)) / len(prior_month_values) if prior_month_values else None
+        sum(trailing_12mo_values, Decimal(0)) / len(trailing_12mo_values) if trailing_12mo_values else None
+    )
+    prior_12mo_values = [
+        dataset.monthly_income[key]
+        for key in (
+            (as_of - relativedelta(months=k)).strftime("%Y-%m") for k in range(13, 25)
+        )
+        if key in dataset.monthly_income
+    ]
+    prior_12mo_avg_income = (
+        sum(prior_12mo_values, Decimal(0)) / len(prior_12mo_values) if prior_12mo_values else None
     )
 
     gross_annual_income = _gross_annual_income_at_dataset(dataset, as_of)
@@ -526,8 +553,8 @@ def _build_kpi_inputs_from_dataset(dataset: _KpiDataset, as_of: date, settings: 
         property_liability_value=property_liability_value,
         investment_asset_value=investment_asset_value,
         retirement_asset_value=retirement_asset_value,
-        current_month_income=current_month_income,
         trailing_12mo_avg_income=trailing_12mo_avg_income,
+        prior_12mo_avg_income=prior_12mo_avg_income,
     )
 
 
@@ -586,8 +613,21 @@ def get_scorecard(
     for slug, label, group, unit, fn in METRICS:
         result = fn(inputs)
         value, color, progress_pct = result if len(result) == 3 else (*result, None)
+        input_rows = [
+            KpiInputItem(label=row_label, value=row_value, unit=row_unit)
+            for row_label, row_value, row_unit in kpi_service.metric_inputs(slug, inputs)
+        ]
         metrics.append(
-            KpiMetric(slug=slug, label=label, group=group, value=value, unit=unit, color=color, progress_pct=progress_pct)
+            KpiMetric(
+                slug=slug,
+                label=label,
+                group=group,
+                value=value,
+                unit=unit,
+                color=color,
+                progress_pct=progress_pct,
+                inputs=input_rows,
+            )
         )
 
     return ScorecardResponse(as_of=today.isoformat(), metrics=metrics)

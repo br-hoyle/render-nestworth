@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import type { TransactionListResponse, TransactionRecord, UnclassifiedGroup } from "@/lib/types";
+import type { TransactionFilterOptions, TransactionListResponse, TransactionRecord, UnclassifiedGroup } from "@/lib/types";
 import { money } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { MultiSelect } from "@/components/ui/MultiSelect";
 import { ImportWizard } from "@/components/transactions/ImportWizard";
 import { ClassifyModal } from "@/components/transactions/ClassifyModal";
 import { EditTransactionModal } from "@/components/transactions/EditTransactionModal";
@@ -27,8 +28,8 @@ const NEED_WANT_OPTIONS: { value: string; label: string }[] = [
 interface Filters {
   start: string;
   end: string;
-  group: string;
-  item: string;
+  group: string[];
+  item: string[];
   search: string;
   account_name: string;
   amount_min: string;
@@ -39,8 +40,8 @@ interface Filters {
 const EMPTY_FILTERS: Filters = {
   start: "",
   end: "",
-  group: "",
-  item: "",
+  group: [],
+  item: [],
   search: "",
   account_name: "",
   amount_min: "",
@@ -59,13 +60,14 @@ export default function TransactionsPage() {
   const [showClassify, setShowClassify] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<TransactionRecord | null>(null);
+  const [filterOptions, setFilterOptions] = useState<TransactionFilterOptions | null>(null);
 
   function load() {
     const params = new URLSearchParams();
     if (filters.start) params.set("start", filters.start);
     if (filters.end) params.set("end", filters.end);
-    if (filters.group) params.set("group", filters.group);
-    if (filters.item) params.set("item", filters.item);
+    filters.group.forEach((g) => params.append("group", g));
+    filters.item.forEach((i) => params.append("item", i));
     if (filters.search) params.set("search", filters.search);
     if (filters.account_name) params.set("account_name", filters.account_name);
     if (filters.amount_min) params.set("amount_min", filters.amount_min);
@@ -87,6 +89,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     loadUnclassified();
+    api.get<TransactionFilterOptions>("/transactions/filter-options").then(setFilterOptions);
   }, []);
 
   useEffect(() => {
@@ -185,17 +188,19 @@ export default function TransactionsPage() {
             value={filters.account_name}
             onChange={(e) => setFilters((f) => ({ ...f, account_name: e.target.value }))}
           />
-          <TextField
+          <MultiSelect
             label="Group"
             placeholder="Any group"
-            value={filters.group}
-            onChange={(e) => setFilters((f) => ({ ...f, group: e.target.value }))}
+            options={filterOptions?.groups ?? []}
+            selected={filters.group}
+            onChange={(group) => setFilters((f) => ({ ...f, group }))}
           />
-          <TextField
+          <MultiSelect
             label="Item"
             placeholder="Any item"
-            value={filters.item}
-            onChange={(e) => setFilters((f) => ({ ...f, item: e.target.value }))}
+            options={filterOptions?.items ?? []}
+            selected={filters.item}
+            onChange={(item) => setFilters((f) => ({ ...f, item }))}
           />
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-wide text-nw-muted">Amount range</label>

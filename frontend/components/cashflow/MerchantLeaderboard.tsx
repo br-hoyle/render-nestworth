@@ -4,13 +4,14 @@ import { useMemo, useState } from "react";
 import type { TransactionRecord } from "@/lib/types";
 import { money } from "@/lib/format";
 
-type View = "most_transactions" | "least_transactions" | "highest_total" | "lowest_total" | "category_share";
+type View = "most_transactions" | "least_transactions" | "highest_total" | "lowest_total" | "average" | "category_share";
 
 const VIEWS: { value: View; label: string }[] = [
   { value: "most_transactions", label: "Most transactions" },
   { value: "least_transactions", label: "Fewest transactions" },
   { value: "highest_total", label: "Highest total" },
   { value: "lowest_total", label: "Lowest total" },
+  { value: "average", label: "Average per transaction" },
   { value: "category_share", label: "% of category (this month)" },
 ];
 
@@ -74,7 +75,13 @@ export function MerchantLeaderboard({ transactions, title }: { transactions: Tra
         })
         .filter((m) => m.metric > 0)
         .sort((a, b) => b.metric - a.metric)
-        .slice(0, 8);
+        .slice(0, 10);
+    }
+    if (view === "average") {
+      return [...perMerchant]
+        .map((m) => ({ ...m, metric: m.total / m.count, display: money(m.total / m.count) }))
+        .sort((a, b) => b.metric - a.metric)
+        .slice(0, 10);
     }
     const sorted = [...perMerchant].sort((a, b) => {
       if (view === "most_transactions") return b.count - a.count;
@@ -82,7 +89,7 @@ export function MerchantLeaderboard({ transactions, title }: { transactions: Tra
       if (view === "highest_total") return b.total - a.total;
       return a.total - b.total;
     });
-    return sorted.slice(0, 8).map((m) => ({
+    return sorted.slice(0, 10).map((m) => ({
       ...m,
       metric: view.includes("transactions") ? m.count : m.total,
       display: view.includes("transactions") ? `${m.count} txns` : money(m.total),
@@ -92,8 +99,8 @@ export function MerchantLeaderboard({ transactions, title }: { transactions: Tra
   const maxMetric = Math.max(1, ...rows.map((r) => r.metric));
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-between items-center gap-2">
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
+      <div className="flex justify-between items-center gap-2 flex-wrap">
         {title && <span className="text-sm font-medium flex-none">{title}</span>}
         <select
           value={view}
@@ -125,12 +132,12 @@ export function MerchantLeaderboard({ transactions, title }: { transactions: Tra
           </select>
         </label>
       </div>
-      <div className="flex flex-col gap-2">
+      <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-y-auto">
         {rows.length === 0 && <p className="text-xs text-nw-muted">Not enough data yet.</p>}
         {rows.map((r, i) => (
           <div key={r.merchant} className="flex items-center gap-2 text-sm">
             <span className="w-5 h-5 rounded-full bg-nw-track text-[10px] flex items-center justify-center text-nw-muted flex-none">{i + 1}</span>
-            <span className="flex-1 truncate">{r.merchant}</span>
+            <span className="flex-1 truncate text-xs text-nw-muted" title={r.merchant}>{r.merchant}</span>
             <div className="w-16 h-1.5 rounded-full bg-nw-track overflow-hidden flex-none">
               <div className="h-full bg-nw-green-line" style={{ width: `${(r.metric / maxMetric) * 100}%` }} />
             </div>

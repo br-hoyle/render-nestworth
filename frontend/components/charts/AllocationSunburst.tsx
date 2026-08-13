@@ -44,11 +44,15 @@ export function AllocationSunburst({ accounts, height = 200 }: { accounts: Accou
             endAngle={-270}
             isAnimationActive={false}
           >
+            {/* Same solid color as the inner ring's matching category — a sub-type is
+                distinguished from its siblings by the stroke gap between segments, not by
+                fading the fill, so the outer ring reads as the same color family at a glance. */}
             {outer.map((d, i) => (
               <Cell
                 key={`${d.category}-${d.type}-${i}`}
                 fill={CATEGORY_COLORS[d.categoryIndex % CATEGORY_COLORS.length]}
-                fillOpacity={d.opacity}
+                stroke="var(--nw-surface)"
+                strokeWidth={1}
               />
             ))}
           </Pie>
@@ -64,16 +68,20 @@ export function AllocationSunburst({ accounts, height = 200 }: { accounts: Accou
           />
         </PieChart>
       </ResponsiveContainer>
-      <div className="flex flex-wrap justify-center gap-2">
+      {/* Two pills per row regardless of text length — a fixed 2-column grid rather than
+          flex-wrap, so a household with several categories still reads as a compact couple of
+          rows instead of one pill per line down the sidebar. */}
+      <div className="grid grid-cols-2 gap-1.5 w-full">
         {inner.map((d, i) => (
           <div
             key={d.name}
-            className="flex items-center gap-2 text-xs rounded-full border border-nw-border px-2.5 py-1"
+            className="flex items-center gap-1 text-[10px] rounded-full border border-nw-border px-2 py-0.5 min-w-0"
           >
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
-            <span>{d.name}</span>
-            <span className="text-nw-muted">{d.value.toFixed(0)}%</span>
-            <span className="text-nw-muted">· {money(d.dollar)}</span>
+            <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
+            <span className="truncate" title={`${d.name} — ${d.value.toFixed(0)}% · ${money(d.dollar)}`}>
+              {d.name}
+            </span>
+            <span className="text-nw-muted flex-none">{d.value.toFixed(0)}%</span>
           </div>
         ))}
       </div>
@@ -100,10 +108,10 @@ function buildRings(accounts: Account[]) {
   const categories = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]);
   const inner = categories.map(([name, value]) => ({ name, value: (value / grandTotal) * 100, dollar: value }));
 
-  const outer: { category: string; type: string; label: string; value: number; dollar: number; categoryIndex: number; opacity: number }[] = [];
+  const outer: { category: string; type: string; label: string; value: number; dollar: number; categoryIndex: number }[] = [];
   categories.forEach(([category], categoryIndex) => {
     const types = [...(typeTotals.get(category)?.entries() ?? [])].sort((a, b) => b[1] - a[1]);
-    types.forEach(([type, value], i) => {
+    types.forEach(([type, value]) => {
       outer.push({
         category,
         type,
@@ -111,7 +119,6 @@ function buildRings(accounts: Account[]) {
         value: (value / grandTotal) * 100,
         dollar: value,
         categoryIndex,
-        opacity: Math.max(0.45, 1 - i * 0.2),
       });
     });
   });

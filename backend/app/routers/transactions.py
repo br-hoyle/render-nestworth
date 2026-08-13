@@ -19,6 +19,7 @@ from app.schemas.transactions import (
     PreviewRow,
     TransactionCategoryRule,
     TransactionCreate,
+    TransactionFilterOptions,
     TransactionListResponse,
     TransactionRead,
     TransactionUpdate,
@@ -225,10 +226,29 @@ def export_transactions_csv(
     )
 
 
+@router.get("/filter-options", response_model=TransactionFilterOptions)
+def transaction_filter_options(
+    session: Session = Depends(get_current_session),
+    conn: Connection = Depends(get_tenant_db),
+) -> TransactionFilterOptions:
+    """Distinct Group/Item values across every transaction (income and expense alike) —
+    powers the Transactions page's Group/Item multi-select filters."""
+    rows = conn.execute(
+        text(
+            'select distinct "group", item from transactions '
+            "where household_id = :household_id"
+        ),
+        {"household_id": session.household_id},
+    ).mappings().all()
+    groups = sorted({r["group"] for r in rows if r["group"]})
+    items = sorted({r["item"] for r in rows if r["item"]})
+    return TransactionFilterOptions(groups=groups, items=items)
+
+
 @router.get("", response_model=TransactionListResponse)
 def list_transactions(
-    group: str | None = None,
-    item: str | None = None,
+    group: list[str] | None = Query(default=None),
+    item: list[str] | None = Query(default=None),
     type: str | None = None,
     account_name: str | None = None,
     search: str | None = None,
@@ -246,10 +266,10 @@ def list_transactions(
     params: dict = {"household_id": session.household_id}
 
     if group:
-        where += ' and t."group" = :group'
+        where += ' and t."group" = ANY(:group)'
         params["group"] = group
     if item:
-        where += " and t.item = :item"
+        where += " and t.item = ANY(:item)"
         params["item"] = item
     if type:
         where += " and t.type = :type"
@@ -283,7 +303,8 @@ def list_transactions(
     rows = conn.execute(
         text(
             f'select t.transaction_id, t.date, t."group", t.item, t.type, t.merchant, t.account_name, '
-            f't.amount, t.note, t.source_file {_CATEGORY_JOIN} {where} '
+            f't.amount, t.note, t.source_file, coalesce(tc_item.flow_type, tc_group.flow_type) as flow_type '
+            f"{_CATEGORY_JOIN} {where} "
             f"order by t.date desc, t.transaction_id limit :limit offset :offset"
         ),
         params,

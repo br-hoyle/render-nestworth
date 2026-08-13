@@ -100,12 +100,18 @@ shrunk in that window. Thresholds: green `≤ 36` months, yellow `≤ 84` months
 **Savings Rate** (`percent`) — `(trailing income − trailing expense) ÷ trailing income ×
 100`. Thresholds: red `< 5%`, green `≥ 15%`.
 
-**Net Cash Flow** (`dollars`) — `trailing income − trailing expense`. The dollar-amount
-counterpart to Savings Rate. Green if non-negative, coral if negative. Goal is 15% of
-income, expressed as a dollar figure: `trailing income × 0.15`. Trailing income isn't a
-value the frontend has directly, so it's derived from the Savings Rate sibling metric
-(`net_cash_flow.value ÷ (savings_rate.value ÷ 100)`) rather than adding a new backend field
-— the same "borrow from a sibling metric" approach Net Worth uses for its own target.
+**Net Cash Flow** (`dollars`) — `average monthly income − average monthly expense` (trailing
+income/expense each divided by the trailing window's month count), so it reads as a
+per-month dollar figure rather than a multi-month total. The dollar-amount counterpart to
+Savings Rate. Green if non-negative, coral if negative. Goal is 15% of average monthly
+income, expressed as a dollar figure: `average monthly income × 0.15`. Average monthly
+income isn't a value the frontend has directly, so it's derived from the Savings Rate
+sibling metric (`net_cash_flow.value ÷ (savings_rate.value ÷ 100)`) rather than adding a new
+backend field — the same "borrow from a sibling metric" approach Net Worth uses for its own
+target. This division is scale-invariant (both sides averaged rather than totaled cancel out
+identically), so the derived progress-to-target percent is unaffected by the totals→average
+change — only the displayed target dollar figure itself is now a monthly amount instead of a
+multi-month total.
 
 **Discretionary Spending Rate** (`percent`) — `trailing "wants"-classified expense ÷
 trailing income × 100`. `null` until transactions are classified. Thresholds: green `< 30%`,
@@ -124,11 +130,14 @@ red `≥ 36%`.
 held flat over the window) × 100` — the share of on-paper pay that actually shows up as
 banked income. Thresholds: red `< 50%`, green `≥ 70%`.
 
-**Income Growth Rate** (`percent`) — `this calendar month's actual income transactions ÷
-average of the 12 full calendar months before it × 100`. A "pace vs. trailing average"
-reading (100% = right on pace), the same convention Cash Flow's Category Drift chart uses
-for expenses. Returns `null` until 12 full prior months of transaction history exist.
-Thresholds: red `< 90%`, green `≥ 105%`.
+**Income Growth Rate** (`percent`) — `(average monthly income, trailing 12 months ÷ average
+monthly income, the 12 months before that) − 1 × 100`. A year-over-year raise/growth rate —
+comparing two 12-month averages instead of one month against a trend absorbs bonuses, side
+income, or a single unusual month. Returns `null` until 24 full prior months of transaction
+history exist (12 to average for the trailing window, another 12 to compare it against).
+Thresholds: red `< 0%`, green `≥ 3%`. This value (as a decimal fraction) is also used to
+prefill the "Annual Raise" assumption in the Retirement Need and 401(k) calculators — see
+`backend/app/routers/calculators.py`'s `_income_growth_rate_fraction` helper.
 
 **Savings Efficiency** (`percent`) — `(net worth now − net worth 1 year ago) ÷ gross income
 over the same trailing 12 months × 100`. Answers "how much of every earned dollar actually

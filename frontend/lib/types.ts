@@ -210,11 +210,17 @@ export interface TransactionRecord {
   amount: string;
   note: string | null;
   source_file: string | null;
+  flow_type: "needs" | "wants" | "savings" | "transfer" | "other" | null;
 }
 
 export interface TransactionListResponse {
   items: TransactionRecord[];
   total: number;
+}
+
+export interface TransactionFilterOptions {
+  groups: string[];
+  items: string[];
 }
 
 export interface UnclassifiedGroup {
@@ -240,6 +246,12 @@ export interface TransactionCategoryRule {
 
 export type KpiColor = "green" | "yellow" | "red" | "coral";
 
+export interface KpiInputItem {
+  label: string;
+  value: number | null;
+  unit: "months" | "percent" | "ratio" | "dollars" | "number";
+}
+
 export interface KpiMetric {
   slug: string;
   label: string;
@@ -248,6 +260,7 @@ export interface KpiMetric {
   unit: "months" | "percent" | "ratio" | "dollars";
   color: KpiColor;
   progress_pct: number | null;
+  inputs: KpiInputItem[];
 }
 
 export interface ScorecardResponse {

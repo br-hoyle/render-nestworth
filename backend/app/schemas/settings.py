@@ -26,7 +26,9 @@ DEFAULT_KPI_THRESHOLDS = {
     # Scorecard overhaul additions:
     "discretionary_spending_rate": {"green_below": 30, "red_at_or_above": 45},
     "net_income_rate": {"red_below": 50, "green_at_or_above": 70},
-    "income_growth_rate": {"red_below": 90, "green_at_or_above": 105},
+    # Year-over-year raise/growth rate, centered on 0% (not a 100%-is-on-pace reading) — red
+    # below no growth, green at or above a typical cost-of-living raise.
+    "income_growth_rate": {"red_below": 0, "green_at_or_above": 3},
     "housing_debt_to_equity": {"green_below": 100, "red_at_or_above": 300},
 }
 

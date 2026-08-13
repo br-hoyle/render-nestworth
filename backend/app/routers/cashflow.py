@@ -8,6 +8,7 @@ from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
 from app.schemas.cashflow import CategoryMonthPoint, CategoryTrend
+from app.services.cashflow_rules import EXCLUDED_CASHFLOW_GROUP
 
 router = APIRouter(prefix="/cashflow", tags=["cashflow"])
 
@@ -39,12 +40,19 @@ def category_trends(
                        sum(-amount) as amount
                 from transactions
                 where household_id = :household_id and type = 'expense' and date >= :start and date <= :end
+                  and lower(trim(coalesce("group", ''))) <> :excluded_group
                   and (cast(:group as text) is null or coalesce("group", 'Other') = cast(:group as text))
                 group by coalesce("group", 'Other'), coalesce(item, 'Other'), date_trunc('month', date)
                 order by "group", item, month
                 """
             ),
-            {"household_id": session.household_id, "start": start, "end": anchor, "group": group},
+            {
+                "household_id": session.household_id,
+                "start": start,
+                "end": anchor,
+                "group": group,
+                "excluded_group": EXCLUDED_CASHFLOW_GROUP,
+            },
         ).mappings().all()
         for row in rows:
             label = row["item"] if group else f'{row["group"]} · {row["item"]}'
@@ -58,11 +66,12 @@ def category_trends(
                        sum(-amount) as amount
                 from transactions
                 where household_id = :household_id and type = 'expense' and date >= :start and date <= :end
+                  and lower(trim(coalesce("group", ''))) <> :excluded_group
                 group by coalesce("group", 'Other'), date_trunc('month', date)
                 order by "group", month
                 """
             ),
-            {"household_id": session.household_id, "start": start, "end": anchor},
+            {"household_id": session.household_id, "start": start, "end": anchor, "excluded_group": EXCLUDED_CASHFLOW_GROUP},
         ).mappings().all()
         for row in rows:
             by_label.setdefault(row["group"], []).append(CategoryMonthPoint(month=row["month"], amount=row["amount"]))

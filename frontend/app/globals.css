@@ -29,6 +29,18 @@
   --nw-line-hi: #3a453f;
   --nw-coral-tint: #2a1512;
   --nw-amber-tint: #2a2213;
+
+  /* Categorical chart palette (Category Drift, "Where the Money Flows") — a fixed 5-hue
+     order plus the existing muted gray as the 6th "everything else" fallback, matching the
+     brand guide's own "Charts & data visualisation" page (own categorical example uses
+     green/blue/violet/amber + gray, capped at "maximum six series"). Chosen and ordered to
+     pass the dataviz skill's validator (OKLCH lightness band, CVD ΔE, contrast) against this
+     surface — do not reorder or recolor without re-validating. */
+  --nw-chart-1: #46c063; /* green */
+  --nw-chart-2: #2f7fc2; /* blue */
+  --nw-chart-3: #bd8016; /* amber */
+  --nw-chart-4: #9550c8; /* violet */
+  --nw-chart-5: #e2645a; /* coral */
 }
 
 :root[data-theme="light"] {
@@ -50,6 +62,14 @@
   --nw-line-hi: #c2c9c5;
   --nw-coral-tint: #fbeae8;
   --nw-amber-tint: #fbf1de;
+
+  /* Light-mode steps of the same categorical chart palette — re-validated against the white
+     surface, same fixed order as the dark set above. */
+  --nw-chart-1: #1a692e; /* green */
+  --nw-chart-2: #1f5f96; /* blue */
+  --nw-chart-3: #b77813; /* amber */
+  --nw-chart-4: #6a3fae; /* violet */
+  --nw-chart-5: #c6382f; /* coral */
 }
 
 @theme inline {
@@ -71,6 +91,11 @@
   --color-nw-line-hi: var(--nw-line-hi);
   --color-nw-coral-tint: var(--nw-coral-tint);
   --color-nw-amber-tint: var(--nw-amber-tint);
+  --color-nw-chart-1: var(--nw-chart-1);
+  --color-nw-chart-2: var(--nw-chart-2);
+  --color-nw-chart-3: var(--nw-chart-3);
+  --color-nw-chart-4: var(--nw-chart-4);
+  --color-nw-chart-5: var(--nw-chart-5);
   --font-sans: var(--font-public-sans);
   --font-display: var(--font-poppins);
 }
