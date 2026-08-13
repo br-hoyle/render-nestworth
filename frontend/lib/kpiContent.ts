@@ -108,9 +108,15 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     whyItMatters: "A single headline number for how much debt exists before looking at ratios or payoff pace.",
     howToInterpret: "Informational only — there's no universal \"good\" total since it scales with income and assets. Watch the trend, not the level.",
   },
+  total_non_property_debt: {
+    description: "Every liability except mortgages, HELOCs, and other property-secured debt.",
+    formula: "Total liabilities − property-secured liabilities",
+    whyItMatters: "Property debt is roughly offset by the home's value; this is the debt that isn't, so it reads as the more urgent payoff target.",
+    howToInterpret: "Informational only, same $0-goal treatment as Total Debt — watch the trend, not the level.",
+  },
   net_cash_flow: {
     description: "How many dollars were left over (or short) after income and expenses over the trailing window.",
-    formula: "Trailing income − trailing expense",
+    formula: "Average Trailing income − Average Trailing expense",
     whyItMatters: "The dollar version of Savings Rate — easier to compare against a specific bill or goal.",
     howToInterpret: "Positive means you banked money this period; negative means you spent more than you earned.",
   },
@@ -127,10 +133,10 @@ export const KPI_CONTENT: Record<string, KpiContent> = {
     howToInterpret: "70%+ is a typical take-home share after tax and deductions; well below that may mean high withholding or unrecorded income.",
   },
   income_growth_rate: {
-    description: "Whether this month's income is running above or below its own recent trend.",
-    formula: "This month's income ÷ average of the trailing 12 months' income × 100",
-    whyItMatters: "Smooths out one-off bonuses or side income so a single unusual month doesn't read as a raise (or a pay cut).",
-    howToInterpret: "100% is right on pace with the trailing year; needs 12+ months of transaction history to compute at all.",
+    description: "Your year-over-year raise (or pay cut), smoothed across a full 12 months rather than one month's snapshot.",
+    formula: "(Average monthly income, trailing 12mo ÷ average monthly income, the 12 months before that) − 1, × 100",
+    whyItMatters: "Comparing two 12-month averages instead of one month against a trend absorbs bonuses, side income, or a single unusual month — this reads as an actual raise pace, not month-to-month noise.",
+    howToInterpret: "0% means flat income year over year; needs 24+ months of transaction history to compute at all. This also feeds the default \"Annual Raise\" assumption in the Retirement Need and 401(k) calculators.",
   },
   housing_debt_to_equity: {
     description: "How much mortgage debt you're carrying relative to the equity you've built in your property.",

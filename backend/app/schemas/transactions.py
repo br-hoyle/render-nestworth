@@ -56,11 +56,21 @@ class TransactionRead(BaseModel):
     amount: Decimal
     note: str | None
     source_file: str | None
+    # Resolved needs/wants/savings/transfer/other classification (exact group+item rule,
+    # falling back to a group-level rule) — None until the household classifies it. Exposed
+    # here so list views (e.g. the Cash Flow page) can compute needs/wants share of expense
+    # without a second round trip per transaction.
+    flow_type: str | None = None
 
 
 class TransactionListResponse(BaseModel):
     items: list[TransactionRead]
     total: int
+
+
+class TransactionFilterOptions(BaseModel):
+    groups: list[str]
+    items: list[str]
 
 
 class TransactionCreate(BaseModel):

@@ -112,6 +112,20 @@ export function KpiDetailPanel({
             <div>
               <div className="text-[10px] uppercase tracking-wide text-nw-muted mb-0.5">Formula</div>
               <p className="text-[#B6C6BB] font-mono text-[11px]">{content.formula}</p>
+              {metric.inputs.length > 0 && (
+                <table className="w-full mt-1.5 text-[11px]">
+                  <tbody>
+                    {metric.inputs.map((row) => (
+                      <tr key={row.label} className="border-t border-nw-border first:border-t-0">
+                        <td className="py-1 pr-2 text-nw-muted">{row.label}</td>
+                        <td className="py-1 text-right font-mono text-nw-text whitespace-nowrap">
+                          {formatMetricValue(row.value, row.unit)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             <div>
               <div className="text-[10px] uppercase tracking-wide text-nw-muted mb-0.5">Why It Matters</div>

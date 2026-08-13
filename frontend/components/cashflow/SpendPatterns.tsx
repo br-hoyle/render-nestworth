@@ -7,8 +7,52 @@ import { money } from "@/lib/format";
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function SpendPatterns({ transactions, title }: { transactions: TransactionRecord[]; title?: string }) {
+// Every calendar date between start/end (inclusive) — one "instance" of its weekday, e.g.
+// each individual Monday in range is its own instance of "Mon".
+function eachDateInRange(start: string, end: string): Date[] {
+  const dates: Date[] = [];
+  const cursor = new Date(start + "T00:00:00");
+  const last = new Date(end + "T00:00:00");
+  while (cursor <= last) {
+    dates.push(new Date(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+}
+
+// Every (year, month) pair touched by start/end — one instance of that month-of-year per
+// year in range, e.g. 2024-01 and 2025-01 are two separate instances of "Jan".
+function eachMonthInRange(start: string, end: string): { year: number; month: number }[] {
+  const months: { year: number; month: number }[] = [];
+  const cursor = new Date(start + "T00:00:00");
+  cursor.setDate(1);
+  const last = new Date(end + "T00:00:00");
+  while (cursor <= last) {
+    months.push({ year: cursor.getFullYear(), month: cursor.getMonth() });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+}
+
+export function SpendPatterns({
+  transactions,
+  title,
+  start,
+  end,
+}: {
+  transactions: TransactionRecord[];
+  title?: string;
+  // The page's selected date range — needed to know how many instances of each weekday/month
+  // actually occurred (including ones with zero spending), not just how many had a transaction.
+  start: string;
+  end: string;
+}) {
   const [view, setView] = useState<"weekday" | "month">("weekday");
+  // "all": average over every occurrence of the period in range, zero-spend ones included —
+  // "what does a typical Saturday/January cost me overall." "active": average over only the
+  // occurrences that actually had a matching transaction — "of the Saturdays I bought
+  // groceries, how much did groceries run me." Same numerator, different denominator.
+  const [countMode, setCountMode] = useState<"all" | "active">("all");
   const [groupFilter, setGroupFilter] = useState("");
   const [itemFilter, setItemFilter] = useState("");
   const [merchantFilter, setMerchantFilter] = useState("");
@@ -29,28 +73,59 @@ export function SpendPatterns({ transactions, title }: { transactions: Transacti
     [transactions, groupFilter, itemFilter, merchantFilter]
   );
 
+  // The numerator is always the total spend landing in that weekday/month. The denominator —
+  // how many occurrences to divide by — is where the two modes differ:
+  //   "all"    → every occurrence of the period in the date range, zero-spend ones included
+  //              ("what does a typical Saturday cost me overall").
+  //   "active" → only the occurrences that actually had a matching transaction
+  //              ("of the Saturdays I bought groceries, how much did groceries run me").
   const buckets = useMemo(() => {
-    const sums = new Map<number, number>();
-    const dateCounts = new Map<number, Set<string>>();
+    const totals = new Map<number, number>();
     for (const t of filtered) {
       const d = new Date(t.date + "T00:00:00");
       const key = view === "weekday" ? d.getDay() : d.getMonth();
-      sums.set(key, (sums.get(key) ?? 0) + Math.abs(Number(t.amount)));
-      if (!dateCounts.has(key)) dateCounts.set(key, new Set());
-      dateCounts.get(key)!.add(t.date);
+      totals.set(key, (totals.get(key) ?? 0) + Math.abs(Number(t.amount)));
+    }
+    const occurrenceCounts = new Map<number, number>();
+    if (countMode === "all") {
+      if (view === "weekday") {
+        for (const d of eachDateInRange(start, end)) {
+          const key = d.getDay();
+          occurrenceCounts.set(key, (occurrenceCounts.get(key) ?? 0) + 1);
+        }
+      } else {
+        for (const { month } of eachMonthInRange(start, end)) {
+          occurrenceCounts.set(month, (occurrenceCounts.get(month) ?? 0) + 1);
+        }
+      }
+    } else {
+      // Distinct instances (exact dates for weekday, distinct year-months for month) that had
+      // at least one matching transaction — a bucket with two purchases on the same Saturday
+      // still counts that Saturday once.
+      const instancesByBucket = new Map<number, Set<string>>();
+      for (const t of filtered) {
+        const d = new Date(t.date + "T00:00:00");
+        const key = view === "weekday" ? d.getDay() : d.getMonth();
+        const instance = view === "weekday" ? t.date : `${d.getFullYear()}-${d.getMonth()}`;
+        if (!instancesByBucket.has(key)) instancesByBucket.set(key, new Set());
+        instancesByBucket.get(key)!.add(instance);
+      }
+      for (const [key, instances] of instancesByBucket) occurrenceCounts.set(key, instances.size);
     }
     const labels = view === "weekday" ? WEEKDAYS : MONTHS;
     return labels.map((label, i) => {
-      const total = sums.get(i) ?? 0;
-      const occurrences = dateCounts.get(i)?.size ?? 0;
-      return { label, average: occurrences > 0 ? total / occurrences : 0 };
+      const total = totals.get(i) ?? 0;
+      const occurrences = occurrenceCounts.get(i) ?? 0;
+      return { label, average: occurrences > 0 ? total / occurrences : 0, occurrences };
     });
-  }, [filtered, view]);
+  }, [filtered, view, start, end, countMode]);
 
   const maxAvg = Math.max(1, ...buckets.map((b) => b.average));
+  const subject = merchantFilter || itemFilter || groupFilter || "expenses";
+  const periodWord = view === "weekday" ? "day" : "month";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2 flex-1 min-h-0">
       <div className="flex justify-between items-center gap-2 flex-wrap">
         {title && <span className="text-sm font-medium">{title}</span>}
         <div className="flex border border-nw-border rounded-md overflow-hidden text-xs flex-none">
@@ -94,18 +169,43 @@ export function SpendPatterns({ transactions, title }: { transactions: Transacti
       {filtered.length === 0 ? (
         <p className="text-xs text-nw-muted">Not enough data yet.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto">
           {buckets.map((b) => (
-            <div key={b.label} className="flex items-center gap-2 text-xs">
+            <div
+              key={b.label}
+              className="flex items-center gap-2 text-xs"
+              title={
+                countMode === "all"
+                  ? `Average ${subject} spend across all ${b.occurrences} ${b.label} ${periodWord}${b.occurrences === 1 ? "" : "s"} in this range, including any with no spending`
+                  : `Of the ${b.occurrences} ${b.label} ${periodWord}${b.occurrences === 1 ? "" : "s"} where you spent on ${subject}, the average amount incurred`
+              }
+            >
               <span className="w-9 text-nw-muted flex-none">{b.label}</span>
               <div className="flex-1 h-2 rounded-full bg-nw-track overflow-hidden">
                 <div className="h-full bg-nw-green-line" style={{ width: `${(b.average / maxAvg) * 100}%` }} />
               </div>
-              <span className="w-16 text-right flex-none">{money(b.average)}</span>
+              <span className="w-16 text-right flex-none text-nw-muted">{money(b.average)}</span>
             </div>
           ))}
         </div>
       )}
+      <div className="flex items-center gap-2 flex-wrap flex-none">
+        <span className="text-[10px] uppercase tracking-wide text-nw-muted">Average over</span>
+        <div className="flex border border-nw-border rounded-md overflow-hidden text-xs flex-none">
+          <button
+            onClick={() => setCountMode("all")}
+            className={"px-2 py-1 whitespace-nowrap " + (countMode === "all" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+          >
+            Every {view === "weekday" ? "day" : "month"}
+          </button>
+          <button
+            onClick={() => setCountMode("active")}
+            className={"px-2 py-1 whitespace-nowrap " + (countMode === "active" ? "bg-nw-green-tint text-nw-mint" : "text-nw-muted")}
+          >
+            Only when spent
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

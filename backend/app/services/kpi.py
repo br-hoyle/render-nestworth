@@ -60,8 +60,10 @@ class KpiInputs:
     property_liability_value: Decimal = Decimal(0)  # sum of Property-category liability accounts
     investment_asset_value: Decimal = Decimal(0)  # sum of Investment-category asset accounts
     retirement_asset_value: Decimal = Decimal(0)  # sum of Retirement-category asset accounts
-    current_month_income: Decimal = Decimal(0)  # actual income transactions, this calendar month
-    trailing_12mo_avg_income: Decimal | None = None  # avg of the 12 full months before this one
+    trailing_12mo_avg_income: Decimal | None = None  # avg monthly income, trailing 12 full months
+    # avg monthly income over the 12 full months BEFORE the trailing_12mo_avg_income window —
+    # i.e. months 13-24 ago. The year-over-year comparison point for Income Growth Rate.
+    prior_12mo_avg_income: Decimal | None = None
 
 
 def _threshold(settings: dict, slug: str, key: str, default: float) -> float:
@@ -345,9 +347,10 @@ def total_non_property_debt_value(i: KpiInputs) -> tuple[float, str]:
 
 
 def net_cash_flow(i: KpiInputs) -> tuple[float, str]:
-    """Trailing income − trailing expense, in dollars — the same trailing window as
-    Savings Rate, just expressed as a dollar amount instead of a percent."""
-    value = float(i.trailing_income - i.trailing_expense)
+    """Average monthly income − average monthly expense (both trailing_expense/income divided
+    by trailing_months), in dollars — the same trailing window as Savings Rate, just an
+    average-per-month dollar amount instead of a percent of a multi-month total."""
+    value = float(i.trailing_income / i.trailing_months) - float(i.trailing_expense / i.trailing_months)
     return value, ("green" if value >= 0 else "coral")
 
 
@@ -377,17 +380,21 @@ def net_income_rate(i: KpiInputs) -> tuple[float | None, str]:
 
 
 def income_growth_rate(i: KpiInputs) -> tuple[float | None, str]:
-    """This calendar month's actual income transactions ÷ the average of the 12 full
-    calendar months before it × 100 — a "pace vs. trailing average" reading (100% = right
-    on pace), the same convention Cash Flow's Category Drift chart uses for expenses, just
-    on income with a 12-month window. None until 12 full prior months of transaction
-    history exist."""
-    if i.trailing_12mo_avg_income is None or i.trailing_12mo_avg_income <= 0:
+    """Average monthly income over the trailing 12 months ÷ average monthly income over the
+    12 months before that, minus 1 (×100) — a year-over-year raise/growth rate, distinct from
+    a within-year "pace vs. average" reading. None until 24 full prior months of income-
+    transaction history exist (12 to compute the trailing average, another 12 to compare it
+    against)."""
+    if (
+        i.trailing_12mo_avg_income is None
+        or i.prior_12mo_avg_income is None
+        or i.prior_12mo_avg_income <= 0
+    ):
         return None, "yellow"
-    ratio_pct = float(i.current_month_income / i.trailing_12mo_avg_income * 100)
-    red = _threshold(i.settings, "income_growth_rate", "red_below", 90)
-    green = _threshold(i.settings, "income_growth_rate", "green_at_or_above", 105)
-    return ratio_pct, color_for_higher_is_better(ratio_pct, red, green)
+    rate_pct = float((i.trailing_12mo_avg_income / i.prior_12mo_avg_income - 1) * 100)
+    red = _threshold(i.settings, "income_growth_rate", "red_below", 0)
+    green = _threshold(i.settings, "income_growth_rate", "green_at_or_above", 3)
+    return rate_pct, color_for_higher_is_better(rate_pct, red, green)
 
 
 def housing_debt_to_equity(i: KpiInputs) -> tuple[float | None, str]:
@@ -433,3 +440,170 @@ def future_investment_balance(i: KpiInputs) -> tuple[float | None, str]:
 
 def future_retirement_balance(i: KpiInputs) -> tuple[float | None, str]:
     return _future_balance(i.retirement_asset_value, "monthly_retirement_contribution", i)
+
+
+# ---------------------------------------------------------------------------------------
+# Input breakdowns — the actual numbers behind each formula, powering the Scorecard detail
+# modal's "Your numbers" table so a household can audit the math instead of taking the
+# formula text on faith. Each entry is (label, value, unit); unit is one of "dollars",
+# "percent", "months", "ratio", "number". Order matches the formula text in
+# frontend/lib/kpiContent.ts left-to-right. `None` values render as "—" (not yet available,
+# e.g. no birthdate configured or no prior-year net worth).
+# ---------------------------------------------------------------------------------------
+
+InputRow = tuple[str, float | None, str]
+
+
+def _f(value: Number | None) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _monthly(total: Decimal, months: int) -> float:
+    return float(total / months) if months else 0.0
+
+
+def _monthly_or_none(total: Decimal | None, months: int) -> float | None:
+    return float(total / months) if total is not None and months else None
+
+
+def _metric_inputs(slug: str, i: KpiInputs) -> list[InputRow]:
+    if slug == "emergency_fund":
+        needs = i.needs_expense_trailing if i.needs_expense_trailing is not None else i.trailing_expense
+        return [
+            ("Cash account balances", _f(i.cash_balance), "dollars"),
+            (f'Avg monthly "needs" expense (trailing {i.trailing_months}mo)', _monthly(needs, i.trailing_months), "dollars"),
+        ]
+    if slug in ("liquid_runway", "liquidity_ratio"):
+        return [
+            ("Liquid account balances", _f(i.liquid_balance), "dollars"),
+            ("Avg monthly total expense", _monthly(i.trailing_expense, i.trailing_months), "dollars"),
+        ]
+    if slug == "total_debt":
+        return [("Total liabilities", _f(i.total_liabilities), "dollars")]
+    if slug == "debt_payoff_runway":
+        return [
+            ("Total liabilities", _f(i.total_liabilities), "dollars"),
+            ("Avg monthly principal reduction (trailing 6mo)", _monthly(i.liability_reduction_trailing_6mo, 6), "dollars"),
+        ]
+    if slug == "debt_to_assets_ratio":
+        return [
+            ("Total liabilities", _f(i.total_liabilities), "dollars"),
+            ("Total assets", _f(i.total_assets), "dollars"),
+        ]
+    if slug == "total_non_property_debt":
+        return [
+            ("Total liabilities", _f(i.total_liabilities), "dollars"),
+            ("Property-secured liabilities", _f(i.property_liability_value), "dollars"),
+        ]
+    if slug == "housing_debt_to_equity":
+        equity = i.property_asset_value - i.property_liability_value
+        return [
+            ("Property-secured liabilities", _f(i.property_liability_value), "dollars"),
+            ("Property assets", _f(i.property_asset_value), "dollars"),
+            ("Property equity (assets − liabilities)", _f(equity), "dollars"),
+        ]
+    if slug == "debt_to_income":
+        monthly_payment = i.liability_reduction_trailing_3mo / 3
+        return [
+            ("Estimated monthly debt payment (trailing 3mo paydown pace)", _f(monthly_payment), "dollars"),
+            ("Monthly gross income", _monthly(i.gross_annual_income, 12), "dollars"),
+        ]
+    if slug == "net_cash_flow":
+        return [
+            (f"Average monthly income (trailing {i.trailing_months}mo)", _f(i.trailing_income / i.trailing_months), "dollars"),
+            (f"Average monthly expense (trailing {i.trailing_months}mo)", _f(i.trailing_expense / i.trailing_months), "dollars"),
+        ]
+    if slug == "net_income_rate":
+        return [
+            (f"Average monthly net (banked) income (trailing {i.trailing_months}mo)", _monthly(i.trailing_income, i.trailing_months), "dollars"),
+            ("Average monthly gross income", _f(i.gross_annual_income / 12), "dollars"),
+        ]
+    if slug == "savings_rate":
+        return [
+            (f"Average monthly income (trailing {i.trailing_months}mo)", _monthly(i.trailing_income, i.trailing_months), "dollars"),
+            (f"Average monthly expense (trailing {i.trailing_months}mo)", _monthly(i.trailing_expense, i.trailing_months), "dollars"),
+        ]
+    if slug == "discretionary_spending_rate":
+        return [
+            (f'Average monthly "wants" expense (trailing {i.trailing_months}mo)', _monthly_or_none(i.wants_expense_trailing, i.trailing_months), "dollars"),
+            (f"Average monthly income (trailing {i.trailing_months}mo)", _monthly(i.trailing_income, i.trailing_months), "dollars"),
+        ]
+    if slug == "income_growth_rate":
+        return [
+            ("Average monthly income (trailing 12mo)", _f(i.trailing_12mo_avg_income), "dollars"),
+            ("Average monthly income (prior 12mo)", _f(i.prior_12mo_avg_income), "dollars"),
+        ]
+    if slug == "housing_cost_ratio":
+        return [
+            ("Monthly housing expense", _monthly(i.housing_expense_trailing, i.trailing_months), "dollars"),
+            ("Monthly net income", _monthly(i.trailing_income, i.trailing_months), "dollars"),
+        ]
+    if slug == "savings_efficiency":
+        return [
+            ("Net worth now", _f(i.net_worth), "dollars"),
+            ("Net worth 1 year ago", _f(i.net_worth_one_year_ago), "dollars"),
+            ("Gross income (trailing 12mo)", _f(i.gross_income_trailing_12mo), "dollars"),
+        ]
+    if slug == "net_worth":
+        return [
+            ("Total assets", _f(i.total_assets), "dollars"),
+            ("Total liabilities", _f(i.total_liabilities), "dollars"),
+        ]
+    if slug == "net_worth_velocity":
+        return [
+            ("Net worth now", _f(i.net_worth), "dollars"),
+            ("Net worth 1 year ago", _f(i.net_worth_one_year_ago), "dollars"),
+            ("Net income, income − expense (trailing 12mo)", _f(i.net_income_trailing_12mo), "dollars"),
+        ]
+    if slug == "fi_progress":
+        annual_expense = (i.trailing_expense / i.trailing_months) * 12
+        withdrawal_rate = float(i.settings.get("fi_withdrawal_rate", 0.04))
+        return [
+            ("Annualized expense (average monthly expense × 12)", _f(annual_expense), "dollars"),
+            ("Withdrawal rate", withdrawal_rate * 100, "percent"),
+        ]
+    if slug == "target_net_worth":
+        age = i.settings.get("household_age")
+        roi = float(i.settings.get("target_net_worth_roi", 0.07))
+        savings_rate_assumption = float(i.settings.get("target_net_worth_savings_rate", 0.15))
+        return [
+            ("Gross annual income", _f(i.gross_annual_income), "dollars"),
+            ("Assumed savings rate", savings_rate_assumption * 100, "percent"),
+            ("Assumed return (ROI)", roi * 100, "percent"),
+            ("Household age", float(age) if age is not None else None, "number"),
+        ]
+    if slug in ("future_investment_balance", "future_retirement_balance"):
+        is_investment = slug == "future_investment_balance"
+        current_balance = i.investment_asset_value if is_investment else i.retirement_asset_value
+        contribution_key = "monthly_investment_contribution" if is_investment else "monthly_retirement_contribution"
+        age = i.settings.get("household_age")
+        retirement_age = i.settings.get("target_retirement_age")
+        return_rate = i.settings.get("expected_return_rate", 0.10)
+        return [
+            ("Current balance", _f(current_balance), "dollars"),
+            ("Monthly contribution", float(i.settings.get(contribution_key, 0) or 0), "dollars"),
+            ("Expected annual return", float(return_rate) * 100 if return_rate is not None else None, "percent"),
+            ("Household age", float(age) if age is not None else None, "number"),
+            ("Target retirement age", float(retirement_age) if retirement_age is not None else None, "number"),
+        ]
+    if slug == "needs_ratio":
+        return [
+            (f'Average monthly "needs" expense (trailing {i.trailing_months}mo)', _monthly_or_none(i.needs_expense_trailing, i.trailing_months), "dollars"),
+            (f"Average monthly income (trailing {i.trailing_months}mo)", _monthly(i.trailing_income, i.trailing_months), "dollars"),
+        ]
+    if slug == "wants_ratio":
+        return [
+            (f'Average monthly "wants" expense (trailing {i.trailing_months}mo)', _monthly_or_none(i.wants_expense_trailing, i.trailing_months), "dollars"),
+            (f"Average monthly income (trailing {i.trailing_months}mo)", _monthly(i.trailing_income, i.trailing_months), "dollars"),
+        ]
+    return []
+
+
+def metric_inputs(slug: str, i: KpiInputs) -> list[InputRow]:
+    try:
+        return _metric_inputs(slug, i)
+    except (KeyError, TypeError, ZeroDivisionError):
+        # Defensive only — a metric with incomplete settings/inputs still gets its headline
+        # value and color from its own already-safe formula function; the inputs table is
+        # supplementary, so a hole here degrades to "no breakdown" rather than a 500.
+        return []

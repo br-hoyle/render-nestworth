@@ -13,10 +13,12 @@ import {
   YAxis,
 } from "recharts";
 import { api } from "@/lib/api";
-import type { KpiHistoryResponse, TransactionListResponse, TransactionRecord } from "@/lib/types";
+import type { TransactionListResponse, TransactionRecord } from "@/lib/types";
 import { money, titleCase } from "@/lib/format";
+import { isExcludedCashflowGroup } from "@/lib/cashflowRules";
 import { CashFlowSankey } from "@/components/charts/CashFlowSankey";
 import { CategoryDrift } from "@/components/cashflow/CategoryDrift";
+import { SpendingTrendBars } from "@/components/cashflow/SpendingTrendBars";
 import { SpendPatterns } from "@/components/cashflow/SpendPatterns";
 import { MerchantLeaderboard } from "@/components/cashflow/MerchantLeaderboard";
 import { LoadingBlock } from "@/components/ui/Spinner";
@@ -67,8 +69,6 @@ function periodLabel(range: number): string {
 export default function CashFlowPage() {
   const [range, setRange] = useState(12);
   const [transactions, setTransactions] = useState<TransactionRecord[] | null>(null);
-  const [needsHistory, setNeedsHistory] = useState<KpiHistoryResponse | null>(null);
-  const [wantsHistory, setWantsHistory] = useState<KpiHistoryResponse | null>(null);
   const [spendView, setSpendView] = useState<"group" | "item">("group");
   const [spendGroupFilter, setSpendGroupFilter] = useState("");
   const [spendItemFilter, setSpendItemFilter] = useState("");
@@ -80,28 +80,65 @@ export default function CashFlowPage() {
   const { start, end } = useMemo(() => computeRange(range === 0 ? null : range), [range]);
 
   useEffect(() => {
-    api.get<TransactionListResponse>(`/transactions?start=${start}&end=${end}&limit=1000`).then((res) => setTransactions(res.items));
-    api.get<KpiHistoryResponse>(`/scorecard/needs_ratio/history?months=${historyMonths}&end=${end}`).then(setNeedsHistory);
-    api.get<KpiHistoryResponse>(`/scorecard/wants_ratio/history?months=${historyMonths}&end=${end}`).then(setWantsHistory);
-  }, [range, start, end, historyMonths]);
+    let cancelled = false;
+    // The transactions API caps a single response at 1000 rows — a wide range (24M, All) can
+    // hold several thousand, so a single fetch silently truncated to the most recent 1000,
+    // dropping whichever earlier months didn't fit. Page through the full result set instead,
+    // so every chart on this page (which all derive from this same array) sees the complete
+    // selected range, not just however much fit in the first page.
+    async function fetchAllTransactions(): Promise<TransactionRecord[]> {
+      const limit = 1000;
+      let offset = 0;
+      let all: TransactionRecord[] = [];
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const res = await api.get<TransactionListResponse>(`/transactions?start=${start}&end=${end}&limit=${limit}&offset=${offset}`);
+        all = all.concat(res.items);
+        offset += limit;
+        if (offset >= res.total || res.items.length === 0) break;
+      }
+      // "Savings & Investments" transactions are transfers into asset-building accounts, not
+      // spending — excluded here (once, up front) so every chart/tile fed by `transactions`
+      // below treats them consistently, instead of each one re-filtering separately.
+      return all.filter((t) => !isExcludedCashflowGroup(t.group));
+    }
+    fetchAllTransactions().then((items) => {
+      if (!cancelled) setTransactions(items);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [range, start, end]);
 
   const byMonth = useMemo(() => {
     if (!transactions) return [];
-    const map = new Map<string, { income: number; expense: number }>();
+    const map = new Map<string, { income: number; expense: number; needsExpense: number; wantsExpense: number }>();
     for (const t of transactions) {
       const month = t.date.slice(0, 7);
-      const entry = map.get(month) ?? { income: 0, expense: 0 };
-      if (t.type === "income") entry.income += Number(t.amount);
-      else entry.expense += Math.abs(Number(t.amount));
+      const entry = map.get(month) ?? { income: 0, expense: 0, needsExpense: 0, wantsExpense: 0 };
+      const amount = Math.abs(Number(t.amount));
+      if (t.type === "income") {
+        entry.income += Number(t.amount);
+      } else {
+        entry.expense += amount;
+        if (t.flow_type === "needs") entry.needsExpense += amount;
+        else if (t.flow_type === "wants") entry.wantsExpense += amount;
+      }
       map.set(month, entry);
     }
     return [...map.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([month, v]) => ({
         month,
-        ...v,
+        income: v.income,
+        expense: v.expense,
         net: v.income - v.expense,
+        // Same basis as "Where the Money Flows": every rate is a share of INCOME, so
+        // Savings% + Needs% + Wants% (+ whatever's unclassified/transfer/savings-flow expense)
+        // sum to 100% of that month's income, instead of two different denominators.
         savingsRate: v.income > 0 ? ((v.income - v.expense) / v.income) * 100 : null,
+        needsRate: v.income > 0 ? (v.needsExpense / v.income) * 100 : null,
+        wantsRate: v.income > 0 ? (v.wantsExpense / v.income) * 100 : null,
       }));
   }, [transactions]);
 
@@ -140,30 +177,6 @@ export default function CashFlowPage() {
   }, [transactions, spendView, spendGroupFilter, spendItemFilter, spendMerchantFilter]);
 
   const maxSpendRow = spendRows[0]?.[1] ?? 1;
-
-  // Needs/wants history points are rolling-window ratios keyed by their own cutoff date, not
-  // calendar-month buckets — matched into byMonth's rows by month, so any point outside the
-  // range currently on screen (e.g. the current partial month) simply has no row to land in.
-  const needsByMonth = useMemo(() => {
-    const map = new Map<string, number | null>();
-    needsHistory?.points.forEach((p) => map.set(p.date.slice(0, 7), p.value));
-    return map;
-  }, [needsHistory]);
-  const wantsByMonth = useMemo(() => {
-    const map = new Map<string, number | null>();
-    wantsHistory?.points.forEach((p) => map.set(p.date.slice(0, 7), p.value));
-    return map;
-  }, [wantsHistory]);
-
-  const combinedChartData = useMemo(
-    () =>
-      byMonth.map((m) => ({
-        ...m,
-        needsRate: needsByMonth.get(m.month) ?? null,
-        wantsRate: wantsByMonth.get(m.month) ?? null,
-      })),
-    [byMonth, needsByMonth, wantsByMonth]
-  );
 
   if (transactions === null) {
     return (
@@ -238,7 +251,7 @@ export default function CashFlowPage() {
       <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
         <div className="text-sm font-medium">Monthly Cash Flow</div>
         <ResponsiveContainer width="100%" height={260}>
-          <ComposedChart data={combinedChartData}>
+          <ComposedChart data={byMonth}>
             <CartesianGrid stroke="var(--nw-border)" vertical={false} />
             <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
             <YAxis
@@ -255,9 +268,13 @@ export default function CashFlowPage() {
               tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
               tickLine={false}
               axisLine={false}
-              width={40}
-              domain={[0, 100]}
-              tickFormatter={(v) => `${v}%`}
+              width={44}
+              // Needs/Wants are bounded 0-100 (a share of expense) but Savings Rate can dip
+              // negative in a lean month — round to the nearest 10 on both ends (instead of a
+              // hard-coded [0, 100]) so a negative or >100 outlier still gets a clean, readable
+              // scale instead of an unrounded, overflowing tick value.
+              domain={[(min: number) => Math.min(0, Math.floor(min / 10) * 10), (max: number) => Math.max(100, Math.ceil(max / 10) * 10)]}
+              tickFormatter={(v) => `${Math.round(v)}%`}
             />
             <Tooltip
               contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
@@ -269,30 +286,33 @@ export default function CashFlowPage() {
                   : [money(Number(value)), name]
               }
             />
-            <Bar yAxisId="left" dataKey="income" name="Income" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-            <Bar yAxisId="left" dataKey="expense" name="Expense" fill="var(--nw-muted)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-            <Line yAxisId="right" type="monotone" dataKey="savingsRate" name="Savings Rate" stroke="var(--nw-green-deep)" strokeWidth={2} dot={false} connectNulls />
-            <Line yAxisId="right" type="monotone" dataKey="needsRate" name="Needs Rate" stroke="var(--nw-mint)" strokeWidth={2} dot={false} connectNulls />
-            <Line yAxisId="right" type="monotone" dataKey="wantsRate" name="Wants Rate" stroke="var(--nw-amber)" strokeWidth={2} dot={false} connectNulls />
+            <Bar yAxisId="left" dataKey="income" name="Income" fill="var(--nw-green)" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+            <Bar yAxisId="left" dataKey="expense" name="Expense" fill="#A3ADA7" radius={[3, 3, 0, 0]} isAnimationActive={false} />
+            {/* Bars are already green (income) and gray (expense); the overlaid rate lines use
+                a brighter green (Savings — distinct from the darker income-bar green), royal
+                blue (Needs), and violet (Wants). Thicker (3px) and slightly transparent
+                (opacity 0.85, echoing the Sankey's translucent connectors) so they read as an
+                overlay on top of the bars rather than competing solid strokes. */}
+            <Line yAxisId="right" type="monotone" dataKey="savingsRate" name="Savings Rate" stroke="#1A692E" strokeWidth={3.5} dot={true} connectNulls />
+            <Line yAxisId="right" type="monotone" dataKey="needsRate" name="Needs Rate" stroke="var(--nw-chart-3)" strokeWidth={3.5} dot={true} connectNulls />
+            <Line yAxisId="right" type="monotone" dataKey="wantsRate" name="Wants Rate" stroke="var(--nw-chart-4)" strokeWidth={3.5} dot={true} connectNulls />
           </ComposedChart>
         </ResponsiveContainer>
         <div className="flex flex-wrap gap-3 text-[10px] text-nw-muted">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--nw-green-deep)" }} /> Savings rate
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "#47c064" }} /> Savings Rate
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--nw-mint)" }} /> Needs rate
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--nw-chart-2)" }} /> Needs Rate
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--nw-amber)" }} /> Wants rate
+            <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--nw-chart-4)" }} /> Wants Rate
           </span>
-          <span>— all % of income. Targets: 50% Needs / 30% Wants</span>
         </div>
       </div>
 
       <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-        <div className="text-sm font-medium">Where the Money Flows</div>
-        {transactions && <CashFlowSankey transactions={transactions} />}
+        {transactions && <CashFlowSankey transactions={transactions} start={start} end={end} />}
       </div>
 
       <div className="flex items-center justify-between">
@@ -368,16 +388,16 @@ export default function CashFlowPage() {
               </select>
             </label>
           </div>
-          <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col gap-1.5 overflow-y-auto">
             {spendRows.length === 0 && <p className="text-xs text-nw-muted">No expense data yet.</p>}
-            {spendRows.map(([label, amount], i) => (
+            {spendRows.slice(0, 10).map(([label, amount], i) => (
               <div key={label} className="flex items-center gap-2 text-sm">
                 <span className="w-5 h-5 rounded-full bg-nw-track text-[10px] flex items-center justify-center text-nw-muted flex-none">{i + 1}</span>
-                <span className="flex-1 truncate">{label}</span>
+                <span className="flex-1 truncate text-xs text-nw-muted" title={label}>{label}</span>
                 <div className="w-16 h-1.5 rounded-full bg-nw-track overflow-hidden flex-none">
                   <div className="h-full bg-nw-green-line" style={{ width: `${(amount / maxSpendRow) * 100}%` }} />
                 </div>
-                <span className="w-16 text-right text-xs flex-none">{money(amount)}</span>
+                <span className="w-16 text-right text-xs flex-none text-nw-muted">{money(amount)}</span>
               </div>
             ))}
           </div>
@@ -388,13 +408,21 @@ export default function CashFlowPage() {
         </div>
 
         <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-          {transactions && <SpendPatterns transactions={transactions} title="Average Spend" />}
+          {transactions && <SpendPatterns transactions={transactions} title="Average Spend" start={start} end={end} />}
         </div>
       </div>
 
-      <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-        <div className="text-sm font-medium">Category Drift</div>
-        <CategoryDrift months={historyMonths} end={end} />
+      <div className="grid grid-cols-[4fr_3fr] gap-3">
+        {/* min-w-0 overrides the grid item's default min-width:auto — without it, a wide
+            range (24M/All) makes Category Drift's heatmap table wide enough to blow out its
+            own grid track and shove SpendingTrendBars off-screen, instead of scrolling within
+            its own card via the overflow-x-auto wrapper inside CategoryDrift. */}
+        <div className="min-w-0 rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
+          <CategoryDrift months={historyMonths} end={end} />
+        </div>
+        <div className="min-w-0 rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
+          <SpendingTrendBars months={historyMonths} end={end} />
+        </div>
       </div>
     </div>
   );

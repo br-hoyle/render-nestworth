@@ -7,7 +7,15 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 
 from app.deps import Session, get_current_session, get_tenant_db
-from app.routers.scorecard import _category_total, balances_totals_at, gross_annual_income_at, get_household_settings, transaction_sums
+from app.routers.scorecard import (
+    _category_total,
+    balances_totals_at,
+    build_kpi_inputs,
+    gross_annual_income_at,
+    get_household_settings,
+    transaction_sums,
+)
+from app.services import kpi as kpi_service
 from app.schemas.calculators import (
     AmortizationInput,
     CompoundInterestConverterInput,
@@ -134,6 +142,18 @@ def _trailing_3mo_monthly_expense(conn: Connection, household_id: str, today: da
     return (txn["expense"] / 3) if txn["expense"] else Decimal(0)
 
 
+def _income_growth_rate_fraction(conn: Connection, household_id: str, today: date, settings: dict) -> Decimal | None:
+    """The Income Growth Rate KPI — average monthly income trailing 12mo vs. the 12mo before
+    that, minus 1 — as a decimal fraction (0.03 = 3%), the live-data default for the
+    Retirement Need / 401(k) calculators' "Annual Raise" input instead of a flat hardcoded 2%.
+    None until 24 full months of income-transaction history exist, same as the KPI itself."""
+    inputs = build_kpi_inputs(conn, household_id, today, settings)
+    rate_pct, _ = kpi_service.income_growth_rate(inputs)
+    if rate_pct is None:
+        return None
+    return Decimal(str(round(rate_pct, 2))) / 100
+
+
 def _open_non_mortgage_liability_accounts(conn: Connection, household_id: str) -> list[dict]:
     """Every open, non-mortgage liability account's latest balance — used to prefill the Debt
     Payoff / Debt Consolidation calculators' debt tables. Interest rate and minimum payment
@@ -243,12 +263,18 @@ def calculator_defaults(
             result["current_savings"] = str(retirement_balance)
             if income:
                 result["current_income"] = str(income)
+            growth = _income_growth_rate_fraction(conn, household_id, today, settings)
+            if growth is not None:
+                result["annual_income_increase"] = str(growth)
         elif name in ("retirement-projection", "retirement-savings-plan", "retirement-withdrawal"):
             result["current_retirement_savings"] = str(retirement_balance)
         elif name == "401k":
             result["current_balance"] = str(retirement_balance)
             if income:
                 result["annual_income"] = str(income)
+            growth = _income_growth_rate_fraction(conn, household_id, today, settings)
+            if growth is not None:
+                result["annual_income_increase"] = str(growth)
         elif name == "roth-ira":
             result["current_balance"] = str(retirement_balance)
         return result

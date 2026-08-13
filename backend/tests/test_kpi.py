@@ -1,5 +1,7 @@
 from decimal import Decimal
 
+import pytest
+
 from app.schemas.settings import DEFAULT_SETTINGS
 from app.services.kpi import (
     KpiInputs,
@@ -208,12 +210,13 @@ def test_total_non_property_debt_value_excludes_property_liabilities():
 
 
 def test_net_cash_flow_positive_and_negative():
+    # Average monthly income (30000/3=10000) - average monthly expense (24000/3=8000) = 2000/mo.
     value, color = net_cash_flow(make_inputs())
-    assert value == 6000.0
+    assert value == 2000.0
     assert color == "green"
 
     value2, color2 = net_cash_flow(make_inputs(trailing_expense=Decimal("40000")))
-    assert value2 == -10000.0
+    assert value2 == pytest.approx(10000.0 - 40000 / 3)
     assert color2 == "coral"
 
 
@@ -249,14 +252,16 @@ def test_income_growth_rate_no_history_returns_none():
 
 
 def test_income_growth_rate_above_and_below_pace():
-    above = make_inputs(current_month_income=Decimal("5500"), trailing_12mo_avg_income=Decimal("5000"))
+    # Trailing 12mo avg $5,500/mo vs the prior 12mo avg $5,000/mo -> +10% year-over-year.
+    above = make_inputs(trailing_12mo_avg_income=Decimal("5500"), prior_12mo_avg_income=Decimal("5000"))
     value, color = income_growth_rate(above)
-    assert value == 110.0
+    assert value == 10.0
     assert color == "green"
 
-    below = make_inputs(current_month_income=Decimal("4000"), trailing_12mo_avg_income=Decimal("5000"))
+    # Trailing 12mo avg $4,000/mo vs the prior 12mo avg $5,000/mo -> -20% year-over-year.
+    below = make_inputs(trailing_12mo_avg_income=Decimal("4000"), prior_12mo_avg_income=Decimal("5000"))
     value2, color2 = income_growth_rate(below)
-    assert value2 == 80.0
+    assert value2 == -20.0
     assert color2 == "red"
 
 

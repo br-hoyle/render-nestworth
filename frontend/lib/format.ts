@@ -21,6 +21,8 @@ export function formatMetricValue(value: number | null, unit: string): string {
       return `${value.toFixed(1)}x`;
     case "dollars":
       return money(value);
+    case "number":
+      return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
     default:
       return String(value);
   }
