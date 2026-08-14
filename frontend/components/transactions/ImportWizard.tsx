@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import type { ImportPreviewResponse, PreviewRow } from "@/lib/types";
+import { formatFullDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 
 type Step = "upload" | "mapping" | "preview" | "done";
@@ -237,7 +238,7 @@ export function ImportWizard({ onDone, onCancel }: { onDone: () => void; onCance
                 >
                   <span>{r.status === "dupe" ? "⊘" : "✓"}</span>
                   <span className="flex-1 px-2 truncate">{r.merchant}</span>
-                  <span className="w-24 text-nw-muted">{r.date}</span>
+                  <span className="w-28 text-nw-muted whitespace-nowrap">{formatFullDate(r.date)}</span>
                   <span className={r.type === "income" ? "text-nw-green" : ""}>{r.amount}</span>
                 </div>
               ))}

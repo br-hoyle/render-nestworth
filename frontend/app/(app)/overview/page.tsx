@@ -139,11 +139,6 @@ function monthsAgo(n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatDateLabel(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
-
 export default function OverviewPage() {
   const { session } = useAuth();
   const welcomeTitle = session ? `Welcome back, ${session.household_name.replace(/^the\s+/i, "")} Household!` : "Welcome back!";
@@ -360,8 +355,8 @@ export default function OverviewPage() {
                     labelFormatter={(label) => formatMonthYear(String(label))}
                     formatter={(v) => money(Number(v))}
                   />
-                  <Bar dataKey="income" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
-                  <Bar dataKey="expense" fill="var(--nw-muted)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="income" name="Income" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="expense" name="Expense" fill="var(--nw-muted)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                 </BarChart>
               </ResponsiveContainer>
             )}

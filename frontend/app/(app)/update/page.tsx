@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import type { Account, StaleAccountInfo } from "@/lib/types";
+import { formatFullDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { LoadingBlock } from "@/components/ui/Spinner";
@@ -203,7 +204,7 @@ export default function UpdatePage() {
           <div className="flex items-center gap-2 text-xs text-nw-amber">
             <span className="w-1.5 h-1.5 rounded-full bg-nw-amber" />
             {stale.last_real_date
-              ? `Last ${money(current!.latest_balance ?? 0)} on ${stale.last_real_date} · ${stale.days_stale}d ago`
+              ? `Last ${money(current!.latest_balance ?? 0)} on ${formatFullDate(stale.last_real_date)} · ${stale.days_stale}d ago`
               : "No snapshot yet"}
           </div>
         )}

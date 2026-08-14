@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import type { TransactionRecord } from "@/lib/types";
-import { money } from "@/lib/format";
+import { money, titleCase } from "@/lib/format";
 import { chartColorForIndex } from "@/lib/chartColors";
 import { Modal } from "@/components/ui/Modal";
 
@@ -25,7 +25,7 @@ interface SankeyLinkPayload {
   target: SankeyNodePayload;
 }
 
-const TOTAL_INCOME = "Total income";
+const TOTAL_INCOME = "Total Income";
 const SAVINGS = "Savings";
 // Named but rendered as nothing (see renderNode) — its only purpose is an extra depth column,
 // so "Total income" has breathing room before the expense/savings branches fan out, instead of
@@ -94,13 +94,13 @@ function buildSankeyData(transactions: TransactionRecord[], expandedGroup: strin
       // percentages are computed off the same denominator as the "Savings Rate" tile.
       const amount = Number(t.amount);
       totalIncome += amount;
-      const bucket = t.item || t.group || t.merchant || "Other income";
+      const bucket = titleCase(t.item || t.group || t.merchant || "Other income");
       incomeBucketTotals.set(bucket, (incomeBucketTotals.get(bucket) ?? 0) + amount);
     } else {
       const amount = Math.abs(Number(t.amount));
       totalExpense += amount;
-      const group = t.group || "Other";
-      const item = t.item || "Other";
+      const group = titleCase(t.group || "Other");
+      const item = titleCase(t.item || "Other");
       groupTotals.set(group, (groupTotals.get(group) ?? 0) + amount);
       if (!itemTotalsByGroup.has(group)) itemTotalsByGroup.set(group, new Map());
       const itemTotals = itemTotalsByGroup.get(group)!;

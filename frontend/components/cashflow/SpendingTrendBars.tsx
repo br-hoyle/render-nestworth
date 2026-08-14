@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
-import { money, formatMonthYear } from "@/lib/format";
+import { money, formatMonthYear, titleCase } from "@/lib/format";
 import { chartColorForIndex } from "@/lib/chartColors";
 import { LoadingBlock } from "@/components/ui/Spinner";
 
@@ -85,15 +85,15 @@ export function SpendingTrendBars({ months = 12, end }: { months?: number; end?:
                 formatter={(value, name) => [money(Number(value)), name]}
               />
               {trends.map((t, i) => (
-                <Bar key={t.label} dataKey={t.label} name={t.label} stackId="a" fill={chartColorForIndex(i)} isAnimationActive={false} />
+                <Bar key={t.label} dataKey={t.label} name={titleCase(t.label)} stackId="a" fill={chartColorForIndex(i)} isAnimationActive={false} />
               ))}
             </BarChart>
           </ResponsiveContainer>
           <div className="flex flex-wrap gap-3">
             {trends.map((t, i) => (
-              <div key={t.label} className="flex items-center gap-1.5 text-xs" title={t.label}>
+              <div key={t.label} className="flex items-center gap-1.5 text-xs" title={titleCase(t.label)}>
                 <span className="w-2 h-2 rounded-full flex-none" style={{ background: chartColorForIndex(i) }} />
-                <span className="truncate max-w-[140px]">{t.label}</span>
+                <span className="truncate max-w-[140px]">{titleCase(t.label)}</span>
               </div>
             ))}
           </div>

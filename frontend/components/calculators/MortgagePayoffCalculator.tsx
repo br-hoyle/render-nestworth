@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
+import { money, formatFullDate } from "@/lib/format";
 import {
   NumField,
   ResultTile,
@@ -229,7 +229,7 @@ export function MortgagePayoffCalculator() {
         <CalcAnswer>
           {result.months_saved && result.months_saved > 0
             ? `This pays off ${result.months_saved} months earlier than your original schedule, saving ${fmtMoney(result.interest_saved)} in interest.`
-            : `Payoff in ${result.months_to_payoff} months (${result.years_to_payoff} years), on ${result.payoff_date}.`}
+            : `Payoff in ${result.months_to_payoff} months (${result.years_to_payoff} years), on ${result.payoff_date ? formatFullDate(result.payoff_date) : "—"}.`}
         </CalcAnswer>
         <div className="flex flex-wrap gap-2">
           <ResultTile label="Current Balance" value={fmtMoney(result.current_balance)} />
@@ -237,7 +237,7 @@ export function MortgagePayoffCalculator() {
             label="Payoff Time"
             value={result.years_to_payoff != null ? `${result.years_to_payoff} years` : "—"}
           />
-          <ResultTile label="Payoff Date" value={result.payoff_date ?? "—"} />
+          <ResultTile label="Payoff Date" value={result.payoff_date ? formatFullDate(result.payoff_date) : "—"} />
           <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
           <ResultTile label="Interest Saved vs. Original" value={fmtMoney(result.interest_saved)} />
           <ResultTile label="Time Saved vs. Original" value={result.months_saved != null ? `${result.months_saved} mo` : "—"} />

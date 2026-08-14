@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { NetWorthPoint } from "@/lib/types";
-import { money, formatMonthYear } from "@/lib/format";
+import { money, formatMonthYear, formatFullDate } from "@/lib/format";
 
 export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[]; height?: number }) {
   const data = points.map((p) => ({
@@ -72,6 +72,7 @@ export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[
         />
         <Tooltip
           contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
+          labelFormatter={(label) => formatFullDate(String(label))}
           formatter={(value) => money(Number(value))}
         />
         <ReferenceLine y={0} stroke="var(--nw-border)" />
@@ -83,7 +84,7 @@ export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[
           strokeWidth={2}
           dot={false}
           isAnimationActive={false}
-          name="Net worth"
+          name="Net Worth"
         />
       </AreaChart>
     </ResponsiveContainer>

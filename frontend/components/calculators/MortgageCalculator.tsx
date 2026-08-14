@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
+import { money, formatFullDate } from "@/lib/format";
 import {
   AmountOrPercentField,
   AmountOrPercent,
@@ -155,13 +155,13 @@ export function MortgageCalculator() {
       <div className="flex flex-col gap-3">
         <CalcAnswer>
           This home costs {fmtMoney(result.total_monthly_payment)}/mo all-in — {fmtMoney(result.monthly_pi)} principal &amp; interest, plus
-          taxes/insurance/fees — and pays off {result.payoff_date}.
+          taxes/insurance/fees — and pays off {formatFullDate(result.payoff_date)}.
         </CalcAnswer>
         <div className="flex flex-wrap gap-2">
           <ResultTile label="Total Payment" value={fmtMoney(result.total_monthly_payment)} />
           <ResultTile label="Principal & Interest" value={fmtMoney(result.monthly_pi)} />
           <ResultTile label="Loan Amount" value={fmtMoney(result.loan_amount)} />
-          <ResultTile label="Payoff Date" value={result.payoff_date} />
+          <ResultTile label="Payoff Date" value={formatFullDate(result.payoff_date)} />
           <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
         </div>
         <div className="rounded-lg border border-nw-border bg-nw-surface p-3">

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { Account } from "@/lib/types";
-import { money } from "@/lib/format";
+import { money, titleCase } from "@/lib/format";
 
 // Fixed regardless of light/dark theme — a category's color shouldn't shift when the
 // household toggles appearance, only the surrounding chrome (tooltip, card) should.
@@ -106,16 +106,16 @@ function buildRings(accounts: Account[]) {
   if (grandTotal <= 0) return { inner: [], outer: [] };
 
   const categories = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]);
-  const inner = categories.map(([name, value]) => ({ name, value: (value / grandTotal) * 100, dollar: value }));
+  const inner = categories.map(([name, value]) => ({ name: titleCase(name), value: (value / grandTotal) * 100, dollar: value }));
 
   const outer: { category: string; type: string; label: string; value: number; dollar: number; categoryIndex: number }[] = [];
   categories.forEach(([category], categoryIndex) => {
     const types = [...(typeTotals.get(category)?.entries() ?? [])].sort((a, b) => b[1] - a[1]);
     types.forEach(([type, value]) => {
       outer.push({
-        category,
-        type,
-        label: `${category} · ${type}`,
+        category: titleCase(category),
+        type: titleCase(type),
+        label: `${titleCase(category)} · ${titleCase(type)}`,
         value: (value / grandTotal) * 100,
         dollar: value,
         categoryIndex,
