@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import type { TransactionListResponse, TransactionRecord } from "@/lib/types";
-import { money, titleCase } from "@/lib/format";
+import { money, titleCase, formatMonthYear } from "@/lib/format";
 import { isExcludedCashflowGroup } from "@/lib/cashflowRules";
 import { CashFlowSankey } from "@/components/charts/CashFlowSankey";
 import { CategoryDrift } from "@/components/cashflow/CategoryDrift";
@@ -253,7 +253,13 @@ export default function CashFlowPage() {
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart data={byMonth}>
             <CartesianGrid stroke="var(--nw-border)" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+              tickLine={false}
+              axisLine={{ stroke: "var(--nw-border)" }}
+              tickFormatter={formatMonthYear}
+            />
             <YAxis
               yAxisId="left"
               tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
@@ -278,8 +284,8 @@ export default function CashFlowPage() {
             />
             <Tooltip
               contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
-              itemStyle={{ color: "var(--nw-text)" }}
               labelStyle={{ color: "var(--nw-text)" }}
+              labelFormatter={(label) => formatMonthYear(String(label))}
               formatter={(value, name) =>
                 ["Savings Rate", "Needs Rate", "Wants Rate"].includes(String(name))
                   ? [`${Number(value).toFixed(0)}%`, name]

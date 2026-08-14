@@ -15,7 +15,7 @@ import type {
   TransactionListResponse,
   TransactionRecord,
 } from "@/lib/types";
-import { money, titleCase, computeChangePct } from "@/lib/format";
+import { money, titleCase, computeChangePct, formatMonthYear } from "@/lib/format";
 import { useAuth } from "@/lib/auth-context";
 import { NetWorthChart } from "@/components/charts/NetWorthChart";
 import { AllocationSunburst } from "@/components/charts/AllocationSunburst";
@@ -347,9 +347,19 @@ export default function OverviewPage() {
               <ResponsiveContainer width="100%" height={140}>
                 <BarChart data={cashflowByMonth}>
                   <CartesianGrid stroke="var(--nw-border)" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+                    tickLine={false}
+                    axisLine={{ stroke: "var(--nw-border)" }}
+                    tickFormatter={formatMonthYear}
+                  />
                   <YAxis tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={false} width={60} tickFormatter={(v) => money(v)} />
-                  <Tooltip contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }} formatter={(v) => money(Number(v))} />
+                  <Tooltip
+                    contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
+                    labelFormatter={(label) => formatMonthYear(String(label))}
+                    formatter={(v) => money(Number(v))}
+                  />
                   <Bar dataKey="income" fill="var(--nw-green)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                   <Bar dataKey="expense" fill="var(--nw-muted)" radius={[2, 2, 0, 0]} isAnimationActive={false} />
                 </BarChart>

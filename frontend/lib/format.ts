@@ -10,6 +10,16 @@ export function money(v: number | string, opts: { maximumFractionDigits?: number
   return formatted.replace(/^-/, "−");
 }
 
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// The one month/date format every chart axis and tooltip shares — "2024-01" or
+// "2024-01-15" -> "Jan, 2024". String-sliced (not `new Date(...)`) so it's immune to
+// timezone-shift-by-a-day bugs on date-only strings.
+export function formatMonthYear(dateStr: string): string {
+  const [year, month] = dateStr.split("-");
+  return `${SHORT_MONTHS[Number(month) - 1]}, ${year}`;
+}
+
 export function formatMetricValue(value: number | null, unit: string): string {
   if (value === null) return "—";
   switch (unit) {

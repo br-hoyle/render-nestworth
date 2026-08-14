@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { NetWorthPoint } from "@/lib/types";
-import { money } from "@/lib/format";
+import { money, formatMonthYear } from "@/lib/format";
 
 export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[]; height?: number }) {
   const data = points.map((p) => ({
@@ -61,6 +61,7 @@ export function NetWorthChart({ points, height = 275 }: { points: NetWorthPoint[
           tickLine={false}
           axisLine={{ stroke: "var(--nw-border)" }}
           minTickGap={40}
+          tickFormatter={formatMonthYear}
         />
         <YAxis
           tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
