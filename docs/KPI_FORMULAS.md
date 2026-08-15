@@ -97,22 +97,23 @@ shrunk in that window. Thresholds: green `≤ 36` months, yellow `≤ 84` months
 
 ## Cash Flow & Budgeting Efficiency
 
-**Savings Rate** (`percent`) — `(trailing-12mo income − trailing-12mo expense) ÷ trailing-12mo
-income × 100`. Fixed 12-month window, independent of the household's `expense_basis` setting
-(which drives Emergency Fund, Liquid Runway, and other metrics below) — this matches the
-Cash Flow page's own "Savings Rate" tile and "Where the Money Flows" Sankey, which both
-default to a 12-month view; using the shared 3mo-default window here previously made this
-KPI disagree with those pages. Thresholds: red `< 5%`, green `≥ 15%`.
+**Savings Rate** (`percent`) — `(income − expense) ÷ income × 100` over the last 12 FULL
+calendar months, excluding the current (partial) month — e.g. as of any day in Aug 2026,
+Aug 2025 through Jul 2026. Independent of the household's `expense_basis` setting (which
+drives Emergency Fund, Liquid Runway, and other metrics below); this window is instead a
+byte-for-byte match of the Cash Flow page's own default range (frontend `computeRange(12)`),
+so this KPI, the Cash Flow page's "Savings Rate" tile, and its "Where the Money Flows"
+Sankey all agree exactly rather than approximately. Thresholds: red `< 5%`, green `≥ 15%`.
 
-**Net Cash Flow** (`dollars`) — `trailing-12mo income − trailing-12mo expense, ÷ 12`, so it
-reads as a per-month dollar figure. The dollar-amount counterpart to Savings Rate, and
-deliberately kept on the exact same trailing-12mo window (see Savings Rate above) — the two
-metrics' windows must match. Green if non-negative, coral if negative. Goal is 15% of average
-monthly income, expressed as a dollar figure: `average monthly income × 0.15`. Average
-monthly income isn't a value the frontend has directly, so it's derived from the Savings
-Rate sibling metric (`net_cash_flow.value ÷ (savings_rate.value ÷ 100)`) rather than adding a
-new backend field — the same "borrow from a sibling metric" approach Net Worth uses for its
-own target. That division is only valid because both metrics share the same window —
+**Net Cash Flow** (`dollars`) — the same last-12-full-calendar-months income − expense as
+Savings Rate, ÷ 12, so it reads as a per-month dollar figure. The dollar-amount counterpart
+to Savings Rate, and deliberately kept on the exact same window (see Savings Rate above) —
+the two metrics' windows must match. Green if non-negative, coral if negative. Goal is 15% of
+average monthly income, expressed as a dollar figure: `average monthly income × 0.15`.
+Average monthly income isn't a value the frontend has directly, so it's derived from the
+Savings Rate sibling metric (`net_cash_flow.value ÷ (savings_rate.value ÷ 100)`) rather than
+adding a new backend field — the same "borrow from a sibling metric" approach Net Worth uses
+for its own target. That division is only valid because both metrics share the same window —
 changing one metric's window without the other silently breaks this derived dollar target.
 
 **Discretionary Spending Rate** (`percent`) — `trailing "wants"-classified expense ÷

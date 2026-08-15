@@ -529,6 +529,19 @@ def _build_kpi_inputs_from_dataset(dataset: _KpiDataset, as_of: date, settings: 
     gross_income_12mo = txn_12mo["income"]
     net_income_12mo = txn_12mo["income"] - txn_12mo["expense"]
 
+    # Last 12 FULL calendar months, excluding the current (partial) month — e.g. as of any day
+    # in Aug 2026, this is Aug 2025 through Jul 2026 inclusive. Exactly mirrors the frontend
+    # Cash Flow page's own computeRange(12): first day of the month 12 months back through the
+    # last day of last month. Used only by Savings Rate / Net Cash Flow, so those two KPIs
+    # match that page (and its Sankey) exactly, not just approximately via the rolling
+    # 365-day window above.
+    as_of_month_start = as_of.replace(day=1)
+    full_months_end = as_of_month_start - timedelta(days=1)
+    full_months_start = as_of_month_start - relativedelta(months=12)
+    txn_full_months = _transaction_sums_dataset(dataset, full_months_start, full_months_end)
+    full_months_income = txn_full_months["income"]
+    full_months_net_income = txn_full_months["income"] - txn_full_months["expense"]
+
     return KpiInputs(
         net_worth=net_worth,
         net_worth_one_year_ago=net_worth_1y,
@@ -548,6 +561,8 @@ def _build_kpi_inputs_from_dataset(dataset: _KpiDataset, as_of: date, settings: 
         savings_flow_trailing=savings_trailing,
         gross_income_trailing_12mo=gross_income_12mo,
         net_income_trailing_12mo=net_income_12mo,
+        trailing_12_full_months_income=full_months_income,
+        trailing_12_full_months_net_income=full_months_net_income,
         liability_reduction_trailing_3mo=liability_reduction_3mo,
         property_asset_value=property_asset_value,
         property_liability_value=property_liability_value,

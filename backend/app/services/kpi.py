@@ -54,6 +54,14 @@ class KpiInputs:
     # Net Worth Velocity.
     gross_income_trailing_12mo: Decimal = Decimal(0)
     net_income_trailing_12mo: Decimal = Decimal(0)
+    # The last 12 FULL calendar months, excluding the current (partial) month — e.g. as of any
+    # day in Aug 2026, this is Aug 2025 through Jul 2026. Deliberately distinct from the rolling
+    # 365-day gross_income_trailing_12mo/net_income_trailing_12mo pair above: this one exactly
+    # mirrors the Cash Flow page's own default 12-month range (frontend computeRange(12)), so
+    # Savings Rate and Net Cash Flow match that page and the "Where the Money Flows" Sankey
+    # precisely, not just approximately. Used only by savings_rate/net_cash_flow.
+    trailing_12_full_months_income: Decimal = Decimal(0)
+    trailing_12_full_months_net_income: Decimal = Decimal(0)
     # Scorecard overhaul additions:
     liability_reduction_trailing_3mo: Decimal = Decimal(0)  # positive = paid down; feeds DTI
     property_asset_value: Decimal = Decimal(0)  # sum of Property-category asset accounts
@@ -153,14 +161,15 @@ def housing_cost_ratio(i: KpiInputs) -> tuple[float | None, str]:
 
 
 def savings_rate(i: KpiInputs) -> tuple[float | None, str]:
-    """Fixed trailing-12mo window (independent of the expense_basis setting that drives
+    """Last 12 FULL calendar months (independent of the expense_basis setting that drives
     trailing_income/trailing_expense elsewhere) — matches the Cash Flow page's own "Savings
-    Rate" tile and "Where the Money Flows" Sankey, which default to a 12-month view. Using
-    the shared 3mo-default expense_basis window here made this KPI disagree with those pages
-    whenever a household hadn't set expense_basis to "12mo" themselves."""
-    if i.gross_income_trailing_12mo <= 0:
+    Rate" tile and "Where the Money Flows" Sankey EXACTLY, since both default to that same
+    last-12-full-calendar-months range. Using the shared 3mo-default expense_basis window
+    here made this KPI disagree with those pages whenever a household hadn't set
+    expense_basis to "12mo" themselves."""
+    if i.trailing_12_full_months_income <= 0:
         return None, "red"
-    rate_pct = float(i.net_income_trailing_12mo / i.gross_income_trailing_12mo * 100)
+    rate_pct = float(i.trailing_12_full_months_net_income / i.trailing_12_full_months_income * 100)
     red = _threshold(i.settings, "savings_rate", "red_below", 5)
     green = _threshold(i.settings, "savings_rate", "green_at_or_above", 15)
     return rate_pct, color_for_higher_is_better(rate_pct, red, green)
@@ -352,13 +361,13 @@ def total_non_property_debt_value(i: KpiInputs) -> tuple[float, str]:
 
 
 def net_cash_flow(i: KpiInputs) -> tuple[float, str]:
-    """Trailing-12mo net income (income − expense) ÷ 12 — the same fixed trailing-12mo window
-    as Savings Rate (see its docstring), just an average-per-month dollar amount instead of a
+    """Last-12-full-calendar-months net income (income − expense) ÷ 12 — the same window as
+    Savings Rate (see its docstring), just an average-per-month dollar amount instead of a
     percent of a multi-month total. `netCashFlowGoal` in the frontend's kpiThresholds.ts
     recovers "average monthly income" as `net_cash_flow.value ÷ (savings_rate.value ÷ 100)` —
     that division is only valid because both metrics share this exact window; changing one
     without the other silently breaks that derived dollar target."""
-    value = float(i.net_income_trailing_12mo) / 12
+    value = float(i.trailing_12_full_months_net_income) / 12
     return value, ("green" if value >= 0 else "coral")
 
 
@@ -518,8 +527,12 @@ def _metric_inputs(slug: str, i: KpiInputs) -> list[InputRow]:
         ]
     if slug == "net_cash_flow":
         return [
-            ("Average monthly income (trailing 12mo)", _f(i.gross_income_trailing_12mo / 12), "dollars"),
-            ("Average monthly expense (trailing 12mo)", _f((i.gross_income_trailing_12mo - i.net_income_trailing_12mo) / 12), "dollars"),
+            ("Average monthly income (last 12 full months)", _f(i.trailing_12_full_months_income / 12), "dollars"),
+            (
+                "Average monthly expense (last 12 full months)",
+                _f((i.trailing_12_full_months_income - i.trailing_12_full_months_net_income) / 12),
+                "dollars",
+            ),
         ]
     if slug == "net_income_rate":
         return [
@@ -528,8 +541,8 @@ def _metric_inputs(slug: str, i: KpiInputs) -> list[InputRow]:
         ]
     if slug == "savings_rate":
         return [
-            ("Gross income (trailing 12mo)", _f(i.gross_income_trailing_12mo), "dollars"),
-            ("Net income, income − expense (trailing 12mo)", _f(i.net_income_trailing_12mo), "dollars"),
+            ("Gross income (last 12 full months)", _f(i.trailing_12_full_months_income), "dollars"),
+            ("Net income, income − expense (last 12 full months)", _f(i.trailing_12_full_months_net_income), "dollars"),
         ]
     if slug == "discretionary_spending_rate":
         return [
