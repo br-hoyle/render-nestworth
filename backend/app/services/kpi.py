@@ -153,9 +153,14 @@ def housing_cost_ratio(i: KpiInputs) -> tuple[float | None, str]:
 
 
 def savings_rate(i: KpiInputs) -> tuple[float | None, str]:
-    if i.trailing_income <= 0:
+    """Fixed trailing-12mo window (independent of the expense_basis setting that drives
+    trailing_income/trailing_expense elsewhere) — matches the Cash Flow page's own "Savings
+    Rate" tile and "Where the Money Flows" Sankey, which default to a 12-month view. Using
+    the shared 3mo-default expense_basis window here made this KPI disagree with those pages
+    whenever a household hadn't set expense_basis to "12mo" themselves."""
+    if i.gross_income_trailing_12mo <= 0:
         return None, "red"
-    rate_pct = float((i.trailing_income - i.trailing_expense) / i.trailing_income * 100)
+    rate_pct = float(i.net_income_trailing_12mo / i.gross_income_trailing_12mo * 100)
     red = _threshold(i.settings, "savings_rate", "red_below", 5)
     green = _threshold(i.settings, "savings_rate", "green_at_or_above", 15)
     return rate_pct, color_for_higher_is_better(rate_pct, red, green)
@@ -347,10 +352,13 @@ def total_non_property_debt_value(i: KpiInputs) -> tuple[float, str]:
 
 
 def net_cash_flow(i: KpiInputs) -> tuple[float, str]:
-    """Average monthly income − average monthly expense (both trailing_expense/income divided
-    by trailing_months), in dollars — the same trailing window as Savings Rate, just an
-    average-per-month dollar amount instead of a percent of a multi-month total."""
-    value = float(i.trailing_income / i.trailing_months) - float(i.trailing_expense / i.trailing_months)
+    """Trailing-12mo net income (income − expense) ÷ 12 — the same fixed trailing-12mo window
+    as Savings Rate (see its docstring), just an average-per-month dollar amount instead of a
+    percent of a multi-month total. `netCashFlowGoal` in the frontend's kpiThresholds.ts
+    recovers "average monthly income" as `net_cash_flow.value ÷ (savings_rate.value ÷ 100)` —
+    that division is only valid because both metrics share this exact window; changing one
+    without the other silently breaks that derived dollar target."""
+    value = float(i.net_income_trailing_12mo) / 12
     return value, ("green" if value >= 0 else "coral")
 
 
@@ -510,8 +518,8 @@ def _metric_inputs(slug: str, i: KpiInputs) -> list[InputRow]:
         ]
     if slug == "net_cash_flow":
         return [
-            (f"Average monthly income (trailing {i.trailing_months}mo)", _f(i.trailing_income / i.trailing_months), "dollars"),
-            (f"Average monthly expense (trailing {i.trailing_months}mo)", _f(i.trailing_expense / i.trailing_months), "dollars"),
+            ("Average monthly income (trailing 12mo)", _f(i.gross_income_trailing_12mo / 12), "dollars"),
+            ("Average monthly expense (trailing 12mo)", _f((i.gross_income_trailing_12mo - i.net_income_trailing_12mo) / 12), "dollars"),
         ]
     if slug == "net_income_rate":
         return [
@@ -520,8 +528,8 @@ def _metric_inputs(slug: str, i: KpiInputs) -> list[InputRow]:
         ]
     if slug == "savings_rate":
         return [
-            (f"Average monthly income (trailing {i.trailing_months}mo)", _monthly(i.trailing_income, i.trailing_months), "dollars"),
-            (f"Average monthly expense (trailing {i.trailing_months}mo)", _monthly(i.trailing_expense, i.trailing_months), "dollars"),
+            ("Gross income (trailing 12mo)", _f(i.gross_income_trailing_12mo), "dollars"),
+            ("Net income, income − expense (trailing 12mo)", _f(i.net_income_trailing_12mo), "dollars"),
         ]
     if slug == "discretionary_spending_rate":
         return [
