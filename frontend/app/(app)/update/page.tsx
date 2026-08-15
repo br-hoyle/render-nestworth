@@ -17,12 +17,11 @@ function todayStr(): string {
 }
 
 interface RowState {
-  date: string;
   balance: string;
   closing: boolean;
 }
 
-type SortKey = "balance_type" | "institution_name" | "account_type" | "account_name" | "date" | "balance";
+type SortKey = "balance_type" | "institution_name" | "account_type" | "account_name" | "balance";
 type SortDir = "asc" | "desc";
 
 interface SavedBalance {
@@ -42,6 +41,7 @@ export default function UpdatePage() {
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [staleByAccount, setStaleByAccount] = useState<Record<string, StaleAccountInfo>>({});
   const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [asOfDate, setAsOfDate] = useState(todayStr());
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [saving, setSaving] = useState(false);
@@ -59,7 +59,7 @@ export default function UpdatePage() {
       setStaleByAccount(staleMap);
       const initialRows: Record<string, RowState> = {};
       accts.forEach((a) => {
-        initialRows[a.account_id] = { date: todayStr(), balance: "", closing: false };
+        initialRows[a.account_id] = { balance: "", closing: false };
       });
       setRows(initialRows);
       setAccounts(accts);
@@ -94,10 +94,7 @@ export default function UpdatePage() {
     list.sort((a, b) => {
       let av: string | number;
       let bv: string | number;
-      if (sortKey === "date") {
-        av = rows[a.account_id]?.date ?? "";
-        bv = rows[b.account_id]?.date ?? "";
-      } else if (sortKey === "balance") {
+      if (sortKey === "balance") {
         av = Number(rows[a.account_id]?.balance || 0);
         bv = Number(rows[b.account_id]?.balance || 0);
       } else {
@@ -127,10 +124,10 @@ export default function UpdatePage() {
       accounts.map(async (a) => {
         const row = rows[a.account_id];
         if (row.closing) {
-          await api.post(`/accounts/${a.account_id}/close`, { effective_end_date: row.date });
+          await api.post(`/accounts/${a.account_id}/close`, { effective_end_date: asOfDate });
           return { type: "closed" as const };
         }
-        await api.post("/balances", { account_id: a.account_id, full_date: row.date, balance: Number(row.balance) });
+        await api.post("/balances", { account_id: a.account_id, full_date: asOfDate, balance: Number(row.balance) });
         return {
           type: "balance" as const,
           account_id: a.account_id,
@@ -253,6 +250,20 @@ export default function UpdatePage() {
       </div>
 
       <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <label htmlFor="as-of-date" className="text-xs text-nw-muted">
+            As of date
+          </label>
+          <input
+            id="as-of-date"
+            type="date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+            className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs w-[140px]"
+          />
+          <span className="text-xs text-nw-muted">— every balance and closure below is recorded as of this one date.</span>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="text-xs w-full min-w-max border-collapse">
             <thead>
@@ -261,7 +272,6 @@ export default function UpdatePage() {
                 {headerCell("Institution", "institution_name")}
                 {headerCell("Account Type", "account_type")}
                 {headerCell("Account Name", "account_name")}
-                {headerCell("Date", "date")}
                 {headerCell("Balance", "balance", "text-right")}
                 <th className="px-2 py-2 font-normal text-left whitespace-nowrap">Close</th>
               </tr>
@@ -294,14 +304,6 @@ export default function UpdatePage() {
                         )}
                         <span>{a.account_name}</span>
                       </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        type="date"
-                        value={row.date}
-                        onChange={(e) => updateRow(a.account_id, { date: e.target.value })}
-                        className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs w-[140px]"
-                      />
                     </td>
                     <td className="px-2 py-2">
                       <input
