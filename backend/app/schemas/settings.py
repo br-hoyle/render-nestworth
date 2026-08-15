@@ -35,8 +35,8 @@ DEFAULT_KPI_THRESHOLDS = {
 DEFAULT_SETTINGS = {
     "stale_threshold_days": 30,
     "default_range_months": 12,
-    "liquid_account_types": ["Checking", "Savings"],
-    "cash_account_types": ["Checking", "Savings"],
+    "liquid_account_types": ["Checking", "Savings", "High-Yield Savings"],
+    "cash_account_types": ["Checking", "Savings", "High-Yield Savings"],
     "expense_basis": "3mo",  # "3mo" | "12mo" | "manual"
     "manual_monthly_expense": None,
     "fi_withdrawal_rate": 0.04,
@@ -65,8 +65,8 @@ class HouseholdSettings(BaseModel):
 
     stale_threshold_days: int = 30
     default_range_months: int = 12
-    liquid_account_types: list[str] = ["Checking", "Savings"]
-    cash_account_types: list[str] = ["Checking", "Savings"]
+    liquid_account_types: list[str] = ["Checking", "Savings", "High-Yield Savings"]
+    cash_account_types: list[str] = ["Checking", "Savings", "High-Yield Savings"]
     expense_basis: str = "3mo"
     manual_monthly_expense: float | None = None
     fi_withdrawal_rate: float = 0.04
