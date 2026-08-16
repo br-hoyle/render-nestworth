@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, Sankey, Tooltip } from "recharts";
 import type { TransactionRecord } from "@/lib/types";
-import { money } from "@/lib/format";
+import { money, titleCase } from "@/lib/format";
 import { chartColorForIndex } from "@/lib/chartColors";
 import { Modal } from "@/components/ui/Modal";
 
@@ -25,7 +25,7 @@ interface SankeyLinkPayload {
   target: SankeyNodePayload;
 }
 
-const TOTAL_INCOME = "Total income";
+const TOTAL_INCOME = "Total Income";
 const SAVINGS = "Savings";
 // Named but rendered as nothing (see renderNode) — its only purpose is an extra depth column,
 // so "Total income" has breathing room before the expense/savings branches fan out, instead of
@@ -89,15 +89,18 @@ function buildSankeyData(transactions: TransactionRecord[], expandedGroup: strin
   let totalExpense = 0;
 
   for (const t of transactions) {
-    const amount = Math.abs(Number(t.amount));
     if (t.type === "income") {
+      // Signed, not abs — matches the Cash Flow tile's income total so this diagram's
+      // percentages are computed off the same denominator as the "Savings Rate" tile.
+      const amount = Number(t.amount);
       totalIncome += amount;
-      const bucket = t.item || t.group || t.merchant || "Other income";
+      const bucket = titleCase(t.item || t.group || t.merchant || "Other income");
       incomeBucketTotals.set(bucket, (incomeBucketTotals.get(bucket) ?? 0) + amount);
     } else {
+      const amount = Math.abs(Number(t.amount));
       totalExpense += amount;
-      const group = t.group || "Other";
-      const item = t.item || "Other";
+      const group = titleCase(t.group || "Other");
+      const item = titleCase(t.item || "Other");
       groupTotals.set(group, (groupTotals.get(group) ?? 0) + amount);
       if (!itemTotalsByGroup.has(group)) itemTotalsByGroup.set(group, new Map());
       const itemTotals = itemTotalsByGroup.get(group)!;
@@ -315,6 +318,19 @@ export function CashFlowSankey({
   const [mode, setMode] = useState<"total" | "avgMonthly">("total");
   const divisor = mode === "avgMonthly" ? monthsBetween(start, end) : 1;
 
+  // Same signed-income / abs-expense formula as the Cash Flow tile's "Savings Rate" (just at
+  // 1 decimal instead of 0) — computed here directly so a rate still shows even when
+  // expenses >= income, since the diagram itself can't draw a negative-width Savings link.
+  const savingsRate = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const t of transactions) {
+      if (t.type === "income") income += Number(t.amount);
+      else expense += Math.abs(Number(t.amount));
+    }
+    return income > 0 ? ((income - expense) / income) * 100 : null;
+  }, [transactions]);
+
   const modeToggle = (
     <div className="flex border border-nw-border rounded-md overflow-hidden text-xs flex-none">
       <button
@@ -335,7 +351,12 @@ export function CashFlowSankey({
   return (
     <>
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-sm font-medium">Where the Money Flows</div>
+        <div className="flex items-baseline gap-2">
+          <div className="text-sm font-medium">Where the Money Flows</div>
+          {savingsRate !== null && (
+            <span className="text-xs text-nw-muted">Savings rate: {savingsRate.toFixed(1)}%</span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {modeToggle}
           <button
@@ -350,7 +371,12 @@ export function CashFlowSankey({
       {showLarge && (
         <Modal onClose={() => setShowLarge(false)} className="w-full max-w-5xl rounded-lg border border-nw-border bg-nw-rail p-4 flex flex-col gap-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="text-sm font-medium">Where the Money Flows</div>
+            <div className="flex items-baseline gap-2">
+              <div className="text-sm font-medium">Where the Money Flows</div>
+              {savingsRate !== null && (
+                <span className="text-xs text-nw-muted">Savings rate: {savingsRate.toFixed(1)}%</span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               {modeToggle}
               <button onClick={() => setShowLarge(false)} className="text-nw-muted text-xs">

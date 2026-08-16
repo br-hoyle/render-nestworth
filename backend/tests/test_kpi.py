@@ -48,6 +48,10 @@ def make_inputs(**overrides) -> KpiInputs:
         housing_expense_trailing=Decimal("7200"),
         liability_reduction_trailing_6mo=Decimal("6000"),
         liability_reduction_trailing_3mo=Decimal("3000"),
+        gross_income_trailing_12mo=Decimal("120000"),
+        net_income_trailing_12mo=Decimal("24000"),
+        trailing_12_full_months_income=Decimal("120000"),
+        trailing_12_full_months_net_income=Decimal("24000"),
         settings=DEFAULT_SETTINGS,
     )
     defaults.update(overrides)
@@ -115,14 +119,14 @@ def test_housing_cost_ratio_diverges_from_gross_income():
 
 
 def test_savings_rate():
-    # (30000-24000)/30000 = 20% -> green
+    # 24000/120000 (last 12 full months net/gross income) = 20% -> green
     value, color = savings_rate(make_inputs())
     assert value == 20.0
     assert color == "green"
 
 
 def test_savings_rate_no_income_returns_none():
-    value, color = savings_rate(make_inputs(trailing_income=Decimal("0")))
+    value, color = savings_rate(make_inputs(trailing_12_full_months_income=Decimal("0")))
     assert value is None
     assert color == "red"
 
@@ -210,13 +214,13 @@ def test_total_non_property_debt_value_excludes_property_liabilities():
 
 
 def test_net_cash_flow_positive_and_negative():
-    # Average monthly income (30000/3=10000) - average monthly expense (24000/3=8000) = 2000/mo.
+    # Last-12-full-months net income (24000) / 12 = 2000/mo.
     value, color = net_cash_flow(make_inputs())
     assert value == 2000.0
     assert color == "green"
 
-    value2, color2 = net_cash_flow(make_inputs(trailing_expense=Decimal("40000")))
-    assert value2 == pytest.approx(10000.0 - 40000 / 3)
+    value2, color2 = net_cash_flow(make_inputs(trailing_12_full_months_net_income=Decimal("-40000")))
+    assert value2 == pytest.approx(-40000 / 12)
     assert color2 == "coral"
 
 

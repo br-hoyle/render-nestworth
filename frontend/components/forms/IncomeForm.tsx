@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ApiError } from "@/lib/api";
 import type { IncomeConflict } from "@/lib/types";
+import { formatFullDate } from "@/lib/format";
 import { TextField } from "@/components/ui/TextField";
 import { Button } from "@/components/ui/Button";
 
@@ -130,12 +131,12 @@ export function IncomeForm({
       {conflict && (
         <div className="rounded-md border border-[#5A3228] bg-nw-coral-tint px-3 py-2 text-xs text-nw-coral flex flex-col gap-2">
           <span>
-            This overlaps {conflict.individual}&apos;s existing record ({conflict.effective_start_date} →{" "}
-            {conflict.effective_end_date}).
+            This overlaps {conflict.individual}&apos;s existing record ({formatFullDate(conflict.effective_start_date)} →{" "}
+            {formatFullDate(conflict.effective_end_date)}).
           </span>
           {conflict.suggested_resolution_end_date && onResolveConflict && (
             <button type="button" onClick={resolveAndRetry} className="self-start underline">
-              End the previous record on {conflict.suggested_resolution_end_date} and retry
+              End the previous record on {formatFullDate(conflict.suggested_resolution_end_date)} and retry
             </button>
           )}
         </div>

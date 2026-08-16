@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { TransactionFilterOptions, TransactionListResponse, TransactionRecord, UnclassifiedGroup } from "@/lib/types";
-import { money } from "@/lib/format";
+import { money, formatFullDate } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { MultiSelect } from "@/components/ui/MultiSelect";
@@ -254,7 +254,7 @@ export default function TransactionsPage() {
             <div className="min-w-0">
               <div className="truncate">{t.merchant || "—"}</div>
               <div className="text-xs text-nw-muted truncate">
-                {t.date} · {t.group ?? "—"} {t.item ? `› ${t.item}` : ""} · {t.account_name ?? "—"}
+                {formatFullDate(t.date)} · {t.group ?? "—"} {t.item ? `› ${t.item}` : ""} · {t.account_name ?? "—"}
               </div>
             </div>
             <div className={t.type === "income" ? "text-nw-green" : ""}>{money(t.amount)}</div>

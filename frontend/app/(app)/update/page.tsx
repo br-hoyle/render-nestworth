@@ -1,124 +1,167 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import type { Account, StaleAccountInfo } from "@/lib/types";
+import { formatFullDate, titleCase } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/ui/TextField";
 import { LoadingBlock } from "@/components/ui/Spinner";
 
 function money(v: string | number) {
   return Number(v).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-interface ChangeEntry {
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+interface RowState {
+  balance: string;
+  closing: boolean;
+}
+
+type SortKey = "balance_type" | "institution_name" | "account_type" | "account_name" | "balance";
+type SortDir = "asc" | "desc";
+
+interface SavedBalance {
   account_id: string;
   account_name: string;
   before: number | null;
   after: number;
-  full_date: string;
+}
+
+interface SaveOutcome {
+  balances: SavedBalance[];
+  closedCount: number;
+  failedCount: number;
 }
 
 export default function UpdatePage() {
-  const [queue, setQueue] = useState<Account[] | null>(null);
+  const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [staleByAccount, setStaleByAccount] = useState<Record<string, StaleAccountInfo>>({});
-  const [index, setIndex] = useState(0);
-  const [balance, setBalance] = useState("");
-  const [asOfDate, setAsOfDate] = useState(new Date().toISOString().slice(0, 10));
-  const [changes, setChanges] = useState<ChangeEntry[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [rows, setRows] = useState<Record<string, RowState>>({});
+  const [asOfDate, setAsOfDate] = useState(todayStr());
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [result, setResult] = useState<SaveOutcome | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [accounts, stale] = await Promise.all([
+      const [accts, stale] = await Promise.all([
         api.get<Account[]>("/accounts?filter=active"),
         api.get<StaleAccountInfo[]>("/accounts/stale"),
       ]);
       const staleMap: Record<string, StaleAccountInfo> = {};
       stale.forEach((s) => (staleMap[s.account_id] = s));
       setStaleByAccount(staleMap);
-      // Stale accounts first, then the rest.
-      const sorted = [...accounts].sort((a, b) => {
-        const aStale = staleMap[a.account_id]?.is_stale ? 0 : 1;
-        const bStale = staleMap[b.account_id]?.is_stale ? 0 : 1;
-        return aStale - bStale;
+      const initialRows: Record<string, RowState> = {};
+      accts.forEach((a) => {
+        initialRows[a.account_id] = { balance: "", closing: false };
       });
-      setQueue(sorted);
+      setRows(initialRows);
+      setAccounts(accts);
     })();
   }, []);
 
-  const current = queue?.[index];
+  function updateRow(accountId: string, patch: Partial<RowState>) {
+    setRows((r) => ({ ...r, [accountId]: { ...r[accountId], ...patch } }));
+  }
 
-  async function handleSaveAndNext() {
-    if (!current) return;
-    setError(null);
-    setSubmitting(true);
-    try {
-      await api.post("/balances", {
-        account_id: current.account_id,
-        full_date: asOfDate,
-        balance: Number(balance),
+  function handleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  const sortedAccounts = useMemo(() => {
+    if (!accounts) return [];
+    const list = [...accounts];
+    if (sortKey === null) {
+      // Default order — stale accounts first, so the ones most in need of an update lead.
+      return list.sort((a, b) => {
+        const aStale = staleByAccount[a.account_id]?.is_stale ? 0 : 1;
+        const bStale = staleByAccount[b.account_id]?.is_stale ? 0 : 1;
+        return aStale - bStale;
       });
-      setChanges((c) => {
-        const entry: ChangeEntry = {
-          account_id: current.account_id,
-          account_name: current.account_name,
-          before: current.latest_balance ? Number(current.latest_balance) : null,
-          after: Number(balance),
-          full_date: asOfDate,
-        };
-        const existingIdx = c.findIndex((e) => e.account_id === current.account_id);
-        if (existingIdx >= 0) {
-          const copy = [...c];
-          copy[existingIdx] = entry;
-          return copy;
+    }
+    const dir = sortDir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      let av: string | number;
+      let bv: string | number;
+      if (sortKey === "balance") {
+        av = Number(rows[a.account_id]?.balance || 0);
+        bv = Number(rows[b.account_id]?.balance || 0);
+      } else {
+        av = a[sortKey];
+        bv = b[sortKey];
+      }
+      if (typeof av === "string" && typeof bv === "string") return av.localeCompare(bv) * dir;
+      return ((av as number) - (bv as number)) * dir;
+    });
+    return list;
+  }, [accounts, sortKey, sortDir, rows, staleByAccount]);
+
+  function isRowDone(accountId: string): boolean {
+    const row = rows[accountId];
+    if (!row) return false;
+    if (row.closing) return true;
+    return row.balance.trim() !== "" && !Number.isNaN(Number(row.balance));
+  }
+
+  const allDone = (accounts ?? []).length > 0 && (accounts ?? []).every((a) => isRowDone(a.account_id));
+
+  async function handleSave() {
+    if (!accounts) return;
+    setSaving(true);
+    setSaveError(null);
+    const outcomes = await Promise.allSettled(
+      accounts.map(async (a) => {
+        const row = rows[a.account_id];
+        if (row.closing) {
+          await api.post(`/accounts/${a.account_id}/close`, { effective_end_date: asOfDate });
+          return { type: "closed" as const };
         }
-        return [...c, entry];
-      });
-      advance();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
-    } finally {
-      setSubmitting(false);
+        await api.post("/balances", { account_id: a.account_id, full_date: asOfDate, balance: Number(row.balance) });
+        return {
+          type: "balance" as const,
+          account_id: a.account_id,
+          account_name: a.account_name,
+          before: a.latest_balance ? Number(a.latest_balance) : null,
+          after: Number(row.balance),
+        };
+      })
+    );
+
+    const balances: SavedBalance[] = [];
+    let closedCount = 0;
+    let failedCount = 0;
+    for (const o of outcomes) {
+      if (o.status === "rejected") {
+        failedCount++;
+      } else if (o.value.type === "closed") {
+        closedCount++;
+      } else {
+        balances.push(o.value);
+      }
     }
-  }
-
-  function advance() {
-    setBalance("");
-    setAsOfDate(new Date().toISOString().slice(0, 10));
-    setIndex((i) => i + 1);
-  }
-
-  function handleBack() {
-    if (!queue || index === 0) return;
-    setError(null);
-    const prevIndex = index - 1;
-    const prevAccount = queue[prevIndex];
-    const existing = changes.find((c) => c.account_id === prevAccount.account_id);
-    setBalance(existing ? String(existing.after) : "");
-    setAsOfDate(existing ? existing.full_date : new Date().toISOString().slice(0, 10));
-    setIndex(prevIndex);
-  }
-
-  async function handleClosed() {
-    if (!current) return;
-    const endDate = window.prompt("Close this account as of (YYYY-MM-DD):", asOfDate);
-    if (!endDate) return;
-    try {
-      await api.post(`/accounts/${current.account_id}/close`, { effective_end_date: endDate });
-      advance();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+    if (failedCount > 0) {
+      setSaveError(`${failedCount} row${failedCount === 1 ? "" : "s"} failed to save — the rest were saved. Fix and try again.`);
     }
+    setResult({ balances, closedCount, failedCount });
+    setSaving(false);
   }
 
-  if (queue === null) {
+  if (accounts === null) {
     return <LoadingBlock />;
   }
 
-  if (queue.length === 0) {
+  if (accounts.length === 0) {
     return (
       <div className="p-6 flex flex-col gap-3">
         <h1 className="text-lg font-medium">Update balances</h1>
@@ -133,106 +176,178 @@ export default function UpdatePage() {
     );
   }
 
-  if (index >= queue.length) {
+  if (result) {
     return (
       <div className="p-4 md:p-6 flex flex-col gap-4 max-w-md">
-        <div className="rounded-lg border border-nw-green-line bg-nw-green-tint text-nw-mint px-4 py-6 text-center">
-          <div className="text-sm">{changes.length} accounts updated</div>
+        <h1 className="text-lg font-medium">Update balances</h1>
+        <div className="rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-1 text-sm">
+          {result.balances.length > 0 && <p className="text-nw-green">{result.balances.length} balance(s) saved.</p>}
+          {result.closedCount > 0 && (
+            <p className="text-nw-muted">
+              {result.closedCount} account{result.closedCount === 1 ? "" : "s"} closed.
+            </p>
+          )}
+          {result.failedCount > 0 && (
+            <p className="text-nw-coral">
+              {result.failedCount} row{result.failedCount === 1 ? "" : "s"} failed to save.
+            </p>
+          )}
         </div>
-        <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
-          <div className="text-[10px] uppercase tracking-wide text-nw-muted">What moved</div>
-          {changes.map((c) => {
-            const delta = c.before === null ? null : c.after - c.before;
-            return (
-              <div key={c.account_name} className="flex justify-between text-sm">
-                <span>{c.account_name}</span>
-                <span className={delta !== null && delta < 0 ? "text-nw-coral" : "text-nw-green"}>
-                  {delta === null ? "new" : `${delta >= 0 ? "+" : ""}${money(delta)}`}
-                </span>
-              </div>
-            );
-          })}
-          {changes.length === 0 && <p className="text-xs text-nw-muted">Nothing updated this round.</p>}
+        {result.balances.length > 0 && (
+          <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-2">
+            <div className="text-[10px] uppercase tracking-wide text-nw-muted">What moved</div>
+            {result.balances.map((b) => {
+              const delta = b.before === null ? null : b.after - b.before;
+              return (
+                <div key={b.account_id} className="flex justify-between text-sm">
+                  <span>{b.account_name}</span>
+                  <span className={delta !== null && delta < 0 ? "text-nw-coral" : "text-nw-green"}>
+                    {delta === null ? "new" : `${delta >= 0 ? "+" : ""}${money(delta)}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="flex gap-2">
+          {result.failedCount > 0 && (
+            <Button className="flex-1" onClick={() => setResult(null)}>
+              Back to table
+            </Button>
+          )}
+          <Link href="/overview" className="flex-1">
+            <Button variant="primary" className="w-full">
+              Back to overview
+            </Button>
+          </Link>
         </div>
-        <button onClick={handleBack} className="text-xs text-nw-mint text-center">
-          ← Back to fix the last entry
-        </button>
-        <Link href="/overview">
-          <Button variant="primary" className="w-full">
-            Back to overview
-          </Button>
-        </Link>
       </div>
     );
   }
 
-  const stale = current ? staleByAccount[current.account_id] : undefined;
+  function sortIndicator(key: SortKey) {
+    if (sortKey !== key) return null;
+    return <span className="ml-1 text-nw-mint">{sortDir === "asc" ? "▲" : "▼"}</span>;
+  }
+
+  function headerCell(label: string, key: SortKey, extraClass = "") {
+    return (
+      <th
+        onClick={() => handleSort(key)}
+        className={"px-2 py-2 font-normal text-left whitespace-nowrap cursor-pointer select-none hover:text-nw-text " + extraClass}
+      >
+        {label}
+        {sortIndicator(key)}
+      </th>
+    );
+  }
 
   return (
-    <div className="p-4 md:p-6 flex flex-col gap-4 max-w-md">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-6 flex flex-col gap-4 max-w-5xl mx-auto w-full">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-lg font-medium">Update balances</h1>
-        <span className="text-xs text-nw-muted">
-          {index + 1} / {queue.length}
-        </span>
+        <span className="text-xs text-nw-muted">{accounts.length} active accounts</span>
       </div>
 
-      {index > 0 && (
-        <button onClick={handleBack} className="text-xs text-nw-mint self-start -mt-2">
-          ← Back
-        </button>
-      )}
-
-      <div className="flex gap-1">
-        {queue.map((_, i) => (
-          <div
-            key={i}
-            className={"h-1.5 flex-1 rounded-full " + (i < index ? "bg-nw-green-deep" : i === index ? "bg-nw-green" : "bg-nw-track")}
+      <div className="rounded-lg border border-nw-border bg-nw-surface p-3 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <label htmlFor="as-of-date" className="text-xs text-nw-muted">
+            As of date
+          </label>
+          <input
+            id="as-of-date"
+            type="date"
+            value={asOfDate}
+            onChange={(e) => setAsOfDate(e.target.value)}
+            className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs w-[140px]"
           />
-        ))}
+          <span className="text-xs text-nw-muted">— every balance and closure below is recorded as of this one date.</span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="text-xs w-full min-w-max border-collapse">
+            <thead>
+              <tr className="text-nw-muted border-b border-nw-border">
+                {headerCell("Class", "balance_type")}
+                {headerCell("Institution", "institution_name")}
+                {headerCell("Account Type", "account_type")}
+                {headerCell("Account Name", "account_name")}
+                {headerCell("Balance", "balance", "text-right")}
+                <th className="px-2 py-2 font-normal text-left whitespace-nowrap">Close</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedAccounts.map((a) => {
+                const row = rows[a.account_id];
+                if (!row) return null;
+                const stale = staleByAccount[a.account_id];
+                return (
+                  <tr key={a.account_id} className="border-b border-nw-border last:border-0">
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <span className={a.balance_type === "liability" ? "text-nw-coral" : "text-nw-green"}>
+                        {titleCase(a.balance_type)}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2 whitespace-nowrap">{a.institution_name}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">{a.account_type}</td>
+                    <td className="px-2 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {stale?.is_stale && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full bg-nw-amber flex-none"
+                            title={
+                              stale.last_real_date
+                                ? `Last ${money(a.latest_balance ?? 0)} on ${formatFullDate(stale.last_real_date)} · ${stale.days_stale}d ago`
+                                : "No snapshot yet"
+                            }
+                          />
+                        )}
+                        <span>{a.account_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        disabled={row.closing}
+                        value={row.balance}
+                        onChange={(e) => updateRow(a.account_id, { balance: e.target.value })}
+                        placeholder="$"
+                        className="rounded-md border border-nw-border bg-nw-rail px-2 py-1 text-xs w-[110px] text-right disabled:opacity-40"
+                      />
+                    </td>
+                    <td className="px-2 py-2">
+                      <Button
+                        type="button"
+                        variant={row.closing ? "danger" : "secondary"}
+                        className="px-2 py-1 text-xs whitespace-nowrap"
+                        onClick={() => updateRow(a.account_id, { closing: !row.closing })}
+                      >
+                        {row.closing ? "Closing ✕" : "Close"}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {saveError && <p className="text-xs text-nw-coral">{saveError}</p>}
+
+        <Button variant="primary" disabled={!allDone || saving} onClick={handleSave} className="w-full md:w-auto md:self-start">
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        {!allDone && (
+          <p className="text-xs text-nw-muted">Every account needs a balance or to be marked closed before you can save.</p>
+        )}
       </div>
 
-      <div className="rounded-lg border border-nw-border bg-nw-surface p-4 flex flex-col gap-3">
-        <div>
-          <div className="text-xs text-nw-muted">
-            {current!.institution_name} · {current!.category}
-          </div>
-          <div className="text-base font-medium">{current!.account_name}</div>
-        </div>
-        {stale && (
-          <div className="flex items-center gap-2 text-xs text-nw-amber">
-            <span className="w-1.5 h-1.5 rounded-full bg-nw-amber" />
-            {stale.last_real_date
-              ? `Last ${money(current!.latest_balance ?? 0)} on ${stale.last_real_date} · ${stale.days_stale}d ago`
-              : "No snapshot yet"}
-          </div>
-        )}
-        <TextField
-          label="Balance"
-          type="number"
-          step="0.01"
-          value={balance}
-          onChange={(e) => setBalance(e.target.value)}
-          placeholder="$"
-          autoFocus
-        />
-        <TextField
-          label="As of date"
-          type="date"
-          value={asOfDate}
-          onChange={(e) => setAsOfDate(e.target.value)}
-        />
-        {error && <p className="text-xs text-nw-coral">{error}</p>}
-        <Button variant="primary" disabled={!balance || submitting} onClick={handleSaveAndNext}>
-          {submitting ? "Saving…" : "Save & next"}
-        </Button>
-        <Button className="w-full" onClick={handleClosed}>
-          Account closed
-        </Button>
-        <p className="text-xs text-nw-muted text-center">
-          Every active account needs a balance before you can finish — there's no skipping.
-        </p>
-      </div>
+      <p className="text-xs text-nw-muted">
+        Liability balances don&apos;t need a minus sign — they&apos;re already applied as a negative to net worth based on
+        the account&apos;s class.
+      </p>
     </div>
   );
 }

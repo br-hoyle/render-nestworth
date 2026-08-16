@@ -14,7 +14,7 @@ import {
 } from "recharts";
 import { api } from "@/lib/api";
 import type { TransactionListResponse, TransactionRecord } from "@/lib/types";
-import { money, titleCase } from "@/lib/format";
+import { money, titleCase, formatMonthYear, formatFullDate } from "@/lib/format";
 import { isExcludedCashflowGroup } from "@/lib/cashflowRules";
 import { CashFlowSankey } from "@/components/charts/CashFlowSankey";
 import { CategoryDrift } from "@/components/cashflow/CategoryDrift";
@@ -53,11 +53,6 @@ function computeRange(months: number | null): { start: string; end: string } {
   const start = new Date(currentMonthStart);
   start.setMonth(start.getMonth() - months);
   return { start: toDateStr(start), end: toDateStr(end) };
-}
-
-function formatDateLabel(isoDate: string): string {
-  const [y, m, d] = isoDate.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
 function periodLabel(range: number): string {
@@ -193,7 +188,7 @@ export default function CashFlowPage() {
         <div className="flex items-baseline gap-2 flex-wrap">
           <h1 className="text-lg font-medium">Cash Flow</h1>
           <span className="text-xs text-nw-muted">
-            {formatDateLabel(start)} – {formatDateLabel(end)}
+            {formatFullDate(start)} – {formatFullDate(end)}
           </span>
         </div>
         {range === 0 ? (
@@ -222,7 +217,7 @@ export default function CashFlowPage() {
         <div className="flex items-baseline gap-2 flex-wrap">
           <h1 className="text-lg font-medium">Cash Flow</h1>
           <span className="text-xs text-nw-muted">
-            {formatDateLabel(start)} – {formatDateLabel(end)}
+            {formatFullDate(start)} – {formatFullDate(end)}
           </span>
         </div>
         <div className="flex gap-1">
@@ -253,7 +248,13 @@ export default function CashFlowPage() {
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart data={byMonth}>
             <CartesianGrid stroke="var(--nw-border)" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+              tickLine={false}
+              axisLine={{ stroke: "var(--nw-border)" }}
+              tickFormatter={formatMonthYear}
+            />
             <YAxis
               yAxisId="left"
               tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
@@ -278,8 +279,8 @@ export default function CashFlowPage() {
             />
             <Tooltip
               contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
-              itemStyle={{ color: "var(--nw-text)" }}
               labelStyle={{ color: "var(--nw-text)" }}
+              labelFormatter={(label) => formatMonthYear(String(label))}
               formatter={(value, name) =>
                 ["Savings Rate", "Needs Rate", "Wants Rate"].includes(String(name))
                   ? [`${Number(value).toFixed(0)}%`, name]

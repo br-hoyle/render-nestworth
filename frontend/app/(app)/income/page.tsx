@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { IncomeConflictError, IncomeForm, type IncomeFormValues } from "@/components/forms/IncomeForm";
-import { titleCase } from "@/lib/format";
+import { titleCase, formatMonthYear, formatFullDate } from "@/lib/format";
 import { LoadingBlock } from "@/components/ui/Spinner";
 
 function money(v: string | number) {
@@ -126,7 +126,13 @@ export default function IncomePage() {
             <ResponsiveContainer width="100%" height={200}>
               <ComposedChart data={seriesData}>
                 <CartesianGrid stroke="var(--nw-border)" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--nw-muted)" }} tickLine={false} axisLine={{ stroke: "var(--nw-border)" }} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "var(--nw-border)" }}
+                  tickFormatter={formatMonthYear}
+                />
                 <YAxis
                   yAxisId="left"
                   tick={{ fontSize: 10, fill: "var(--nw-muted)" }}
@@ -146,8 +152,8 @@ export default function IncomePage() {
                 />
                 <Tooltip
                   contentStyle={{ background: "var(--nw-surface)", border: "1px solid var(--nw-border)", fontSize: 12 }}
-                  itemStyle={{ color: "var(--nw-text)" }}
                   labelStyle={{ color: "var(--nw-text)" }}
+                  labelFormatter={(label) => formatMonthYear(String(label))}
                   formatter={(value, name) => (name === "Diff %" ? [`${Number(value).toFixed(0)}%`, name] : [money(Number(value)), name])}
                 />
                 {/* Fixed hex, not theme vars — these series colors shouldn't shift with light/dark mode. */}
@@ -240,7 +246,7 @@ export default function IncomePage() {
                   <div className="flex flex-col gap-0.5">
                     <span className="font-medium">{r.company}</span>
                     <span className="text-xs text-nw-muted">
-                      {r.effective_start_date} → {r.is_open ? "open" : r.effective_end_date}
+                      {formatFullDate(r.effective_start_date)} → {r.is_open ? "open" : formatFullDate(r.effective_end_date)}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">

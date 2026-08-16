@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
-import { money } from "@/lib/format";
+import { money, formatFullDate } from "@/lib/format";
 import {
   NumField,
   ResultTile,
@@ -182,7 +182,7 @@ export function AmortizationCalculator() {
             label="Payoff Time"
             value={result.years_to_payoff != null ? `${result.years_to_payoff} years` : "—"}
           />
-          <ResultTile label="Payoff Date" value={result.payoff_date ?? "—"} />
+          <ResultTile label="Payoff Date" value={result.payoff_date ? formatFullDate(result.payoff_date) : "—"} />
           <ResultTile label="Total Interest" value={fmtMoney(result.total_interest)} />
           <ResultTile label="Interest Saved" value={fmtMoney(result.interest_saved)} />
           <ResultTile label="Time Saved" value={result.months_saved != null ? `${result.months_saved} mo` : "—"} />

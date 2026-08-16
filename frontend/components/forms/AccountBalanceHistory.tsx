@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Account, Balance } from "@/lib/types";
-import { money } from "@/lib/format";
+import { money, formatFullDate } from "@/lib/format";
 import { LoadingBlock } from "@/components/ui/Spinner";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
@@ -92,7 +92,7 @@ export function AccountBalanceHistory({ account }: { account: Account }) {
             .sort((a, b) => b.full_date.localeCompare(a.full_date))
             .map((b) => (
               <div key={b.balance_id} className="flex justify-between items-center text-sm px-1 py-1 border-b border-nw-border last:border-0">
-                <span className="text-nw-muted">{b.full_date}</span>
+                <span className="text-nw-muted">{formatFullDate(b.full_date)}</span>
                 <div className="flex items-center gap-2">
                   <span className={account.balance_type === "liability" ? "text-nw-coral" : ""}>{money(b.balance)}</span>
                   <button
